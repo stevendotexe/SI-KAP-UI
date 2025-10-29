@@ -16,12 +16,16 @@ export default function EvaluationsPage() {
   const [searchTerm, setSearchTerm] = useState("")
 
   useEffect(() => {
-    if (!isLoading && !user) {
-      router.push("/login")
+    if (!isLoading) {
+      if (!user) {
+        router.push("/login")
+      } else if (user.role === "student") {
+        router.push("/dashboard")
+      }
     }
   }, [user, isLoading, router])
 
-  if (isLoading || !user) return null
+  if (isLoading || !user || user.role === "student") return null
 
   // Mock evaluations data
   const allEvaluations = [
@@ -81,7 +85,7 @@ export default function EvaluationsPage() {
       <div className="relative">
         <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search by student name or ID..."
+          placeholder={"Search by student name or ID..."}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="pl-10"

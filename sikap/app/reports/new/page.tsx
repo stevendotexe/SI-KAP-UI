@@ -68,26 +68,26 @@ export default function NewReportPage() {
           </Button>
         </Link>
         <div>
-          <h1 className="text-3xl font-bold">Submit New Report</h1>
-          <p className="text-muted-foreground mt-2">Create your weekly progress report</p>
+          <h1 className="text-3xl font-bold">Kirim Laporan Baru</h1>
+          <p className="text-muted-foreground mt-2">Buat laporan progres mingguan Anda</p>
         </div>
       </div>
 
       {/* Form */}
       <Card>
         <CardHeader>
-          <CardTitle>Weekly Report Form</CardTitle>
-          <CardDescription>Fill in your weekly activities and progress</CardDescription>
+          <CardTitle>Formulir Laporan Harian</CardTitle>
+          <CardDescription>Isi aktivitas dan progres harian Anda</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Week Selection */}
+            {/* Day Selection */}
             <div className="space-y-2">
-              <Label htmlFor="week">Week *</Label>
+              <Label htmlFor="week">Hari *</Label>
               <Input
                 id="week"
                 name="week"
-                placeholder="e.g., Week 1"
+                placeholder="contoh: Senin"
                 value={formData.week}
                 onChange={handleChange}
                 required
@@ -96,11 +96,11 @@ export default function NewReportPage() {
 
             {/* Title */}
             <div className="space-y-2">
-              <Label htmlFor="title">Report Title *</Label>
+              <Label htmlFor="title">Judul Laporan *</Label>
               <Input
                 id="title"
                 name="title"
-                placeholder="e.g., Initial Setup & Orientation"
+                placeholder="contoh: Setup Awal & Orientasi"
                 value={formData.title}
                 onChange={handleChange}
                 required
@@ -109,11 +109,11 @@ export default function NewReportPage() {
 
             {/* Activities */}
             <div className="space-y-2">
-              <Label htmlFor="activities">Activities This Week *</Label>
+              <Label htmlFor="activities">Aktivitas Hari Ini *</Label>
               <Textarea
                 id="activities"
                 name="activities"
-                placeholder="Describe the activities you completed this week..."
+                placeholder="Jelaskan aktivitas yang Anda selesaikan hari ini..."
                 value={formData.activities}
                 onChange={handleChange}
                 rows={4}
@@ -123,11 +123,11 @@ export default function NewReportPage() {
 
             {/* Challenges */}
             <div className="space-y-2">
-              <Label htmlFor="challenges">Challenges & Solutions</Label>
+              <Label htmlFor="challenges">Tantangan & Solusi</Label>
               <Textarea
                 id="challenges"
                 name="challenges"
-                placeholder="Describe any challenges you faced and how you solved them..."
+                placeholder="Jelaskan tantangan yang dihadapi dan cara mengatasinya..."
                 value={formData.challenges}
                 onChange={handleChange}
                 rows={4}
@@ -136,11 +136,11 @@ export default function NewReportPage() {
 
             {/* Next Week */}
             <div className="space-y-2">
-              <Label htmlFor="nextWeek">Plans for Next Week</Label>
+              <Label htmlFor="nextWeek">Rencana Esok</Label>
               <Textarea
                 id="nextWeek"
                 name="nextWeek"
-                placeholder="What do you plan to do next week?..."
+                placeholder="Apa rencana Anda esok hari?..."
                 value={formData.nextWeek}
                 onChange={handleChange}
                 rows={4}
@@ -150,11 +150,11 @@ export default function NewReportPage() {
             {/* Actions */}
             <div className="flex gap-3 pt-4">
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Submitting..." : "Submit Report"}
+                {isSubmitting ? "Mengirim..." : "Kirim Laporan"}
               </Button>
               <Link href="/reports">
                 <Button type="button" variant="outline">
-                  Cancel
+                  Batal
                 </Button>
               </Link>
             </div>

@@ -23,11 +23,11 @@ export default function ReportDetailPage() {
 
   if (isLoading || !user) return null
 
-  // Mock report data
+  // Mock report data (default in English)
   const report = {
     id: reportId,
     week: "Week 1",
-    date: "2024-01-08",
+  date: "2025-10-13",
     status: "submitted",
     title: "Initial Setup & Orientation",
     activities:
@@ -35,6 +35,19 @@ export default function ReportDetailPage() {
     challenges: "Initially had some issues with environment setup, but the IT team helped resolve them quickly.",
     nextWeek: "Next week I plan to start working on the database schema design and begin the first sprint tasks.",
     feedback: "Great start! Your setup is complete and you're ready to begin development work.",
+  }
+
+  // Localized version for student view
+  const reportIdn = {
+    ...report,
+    title: "Penyiapan Awal & Orientasi",
+    activities:
+      "Minggu ini saya menyelesaikan proses orientasi (onboarding), menyiapkan lingkungan pengembangan, dan mengikuti sesi orientasi. Saya membiasakan diri dengan tech stack perusahaan dan struktur proyek.",
+    challenges:
+      "Awalnya saya mengalami beberapa kendala saat penyiapan lingkungan, namun tim TI membantu menyelesaikannya dengan cepat.",
+    nextWeek:
+      "Minggu depan saya berencana mulai mengerjakan perancangan skema basis data dan memulai tugas sprint pertama.",
+    feedback: "Awal yang bagus! Penyiapan Anda sudah selesai dan Anda siap memulai pekerjaan pengembangan.",
   }
 
   return (
@@ -47,41 +60,56 @@ export default function ReportDetailPage() {
           </Button>
         </Link>
         <div>
-          <h1 className="text-3xl font-bold">{report.title}</h1>
+          <h1 className="text-3xl font-bold">{user.role === "student" ? reportIdn.title : report.title}</h1>
           <p className="text-muted-foreground mt-2">
-            {report.week} - {report.date}
+            {user.role === "student"
+              ? (() => {
+                  const days = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat"]
+                  const match = /week\s*(\d+)/i.exec(report.week)
+                  const idx = match ? Math.max(1, Math.min(5, parseInt(match[1], 10))) - 1 : 0
+                  return `${days[idx]} - ${report.date}`
+                })()
+              : `${report.week} - ${report.date}`}
           </p>
         </div>
       </div>
 
       {/* Status */}
       <div className="flex items-center gap-3">
-        <Badge className="bg-green-100 text-green-800">Submitted</Badge>
-        <span className="text-sm text-muted-foreground">Submitted on {report.date}</span>
+  <Badge className="bg-green-100 text-green-800">{user.role === "student" ? "Terkirim" : "Submitted"}</Badge>
+        <span className="text-sm text-muted-foreground">
+          {user.role === "student" ? `Dikirim pada ${report.date}` : `Submitted on ${report.date}`}
+        </span>
       </div>
 
       {/* Report Content */}
       <Card>
         <CardHeader>
-          <CardTitle>Report Details</CardTitle>
+          <CardTitle>{user.role === "student" ? "Detail Laporan" : "Report Details"}</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-6 pt-6">
           {/* Activities */}
           <div>
-            <h3 className="font-semibold mb-2">Activities This Week</h3>
-            <p className="text-muted-foreground">{report.activities}</p>
+            <h3 className="font-semibold mb-2">
+              {user.role === "student" ? "Aktivitas Minggu Ini" : "Activities This Week"}
+            </h3>
+            <p className="text-muted-foreground">{user.role === "student" ? reportIdn.activities : report.activities}</p>
           </div>
 
           {/* Challenges */}
           <div>
-            <h3 className="font-semibold mb-2">Challenges & Solutions</h3>
-            <p className="text-muted-foreground">{report.challenges}</p>
+            <h3 className="font-semibold mb-2">
+              {user.role === "student" ? "Tantangan & Solusi" : "Challenges & Solutions"}
+            </h3>
+            <p className="text-muted-foreground">{user.role === "student" ? reportIdn.challenges : report.challenges}</p>
           </div>
 
           {/* Next Week */}
           <div>
-            <h3 className="font-semibold mb-2">Plans for Next Week</h3>
-            <p className="text-muted-foreground">{report.nextWeek}</p>
+            <h3 className="font-semibold mb-2">
+              {user.role === "student" ? "Rencana Minggu Depan" : "Plans for Next Week"}
+            </h3>
+            <p className="text-muted-foreground">{user.role === "student" ? reportIdn.nextWeek : report.nextWeek}</p>
           </div>
         </CardContent>
       </Card>
@@ -90,10 +118,12 @@ export default function ReportDetailPage() {
       {report.feedback && (
         <Card className="border-blue-200 bg-blue-50">
           <CardHeader>
-            <CardTitle className="text-blue-900">Mentor Feedback</CardTitle>
+            <CardTitle className="text-blue-900">
+              {user.role === "student" ? "Umpan Balik Mentor" : "Mentor Feedback"}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-blue-800">{report.feedback}</p>
+            <p className="text-blue-800">{user.role === "student" ? reportIdn.feedback : report.feedback}</p>
           </CardContent>
         </Card>
       )}
@@ -101,7 +131,7 @@ export default function ReportDetailPage() {
       {/* Actions */}
       <div className="flex gap-3">
         <Link href="/reports">
-          <Button variant="outline">Back to Reports</Button>
+          <Button variant="outline">{user.role === "student" ? "Kembali ke Laporan" : "Back to Reports"}</Button>
         </Link>
       </div>
     </div>

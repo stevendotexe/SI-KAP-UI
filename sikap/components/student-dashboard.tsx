@@ -9,36 +9,42 @@ import Link from "next/link"
 
 export function StudentDashboard() {
   const { user } = useAuth()
+  const displayName =
+    user?.role === "student"
+      ? user?.name && user.name.toLowerCase() !== "student"
+        ? user.name
+        : "Ahmad"
+      : user?.name
 
   // Mock data for student reports
   const reports = [
     {
       id: 1,
-      week: "Week 1",
-      date: "2024-01-08",
+      week: "Senin",
+      date: "2025-10-13",
       status: "submitted",
-      title: "Initial Setup & Orientation",
+      title: "Setup Awal & Orientasi",
     },
     {
       id: 2,
-      week: "Week 2",
-      date: "2024-01-15",
+      week: "Selasa",
+      date: "2025-10-14",
       status: "submitted",
-      title: "Database Design & Implementation",
+      title: "Desain & Implementasi Basis Data",
     },
     {
       id: 3,
-      week: "Week 3",
-      date: "2024-01-22",
+      week: "Rabu",
+      date: "2025-10-15",
       status: "pending",
-      title: "API Development",
+      title: "Pengembangan API",
     },
     {
       id: 4,
-      week: "Week 4",
-      date: "2024-01-29",
+      week: "Kamis",
+      date: "2025-10-16",
       status: "draft",
-      title: "Testing & Debugging",
+      title: "Pengujian & Debugging",
     },
   ]
 
@@ -58,11 +64,11 @@ export function StudentDashboard() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "submitted":
-        return <Badge className="bg-green-100 text-green-800">Submitted</Badge>
+        return <Badge className="bg-green-100 text-green-800">Terkirim</Badge>
       case "pending":
-        return <Badge className="bg-yellow-100 text-yellow-800">Pending Review</Badge>
+        return <Badge className="bg-yellow-100 text-yellow-800">Menunggu Tinjauan</Badge>
       case "draft":
-        return <Badge className="bg-gray-100 text-gray-800">Draft</Badge>
+        return <Badge className="bg-gray-100 text-gray-800">Draf</Badge>
       default:
         return null
     }
@@ -72,39 +78,39 @@ export function StudentDashboard() {
     <div className="space-y-6 p-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold">Welcome, {user?.name}!</h1>
-        <p className="text-muted-foreground mt-2">Student ID: {user?.studentId}</p>
+  <h1 className="text-3xl font-bold">Selamat datang, {displayName}!</h1>
+        <p className="text-muted-foreground mt-2">ID Siswa: {user?.studentId}</p>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Reports Submitted</CardTitle>
+            <CardTitle className="text-sm font-medium">Laporan Terkirim</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">3</div>
-            <p className="text-xs text-muted-foreground">out of 4 weeks</p>
+            <p className="text-xs text-muted-foreground">dari 4 hari</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Pending Review</CardTitle>
+            <CardTitle className="text-sm font-medium">Menunggu Tinjauan</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">1</div>
-            <p className="text-xs text-muted-foreground">awaiting mentor feedback</p>
+            <p className="text-xs text-muted-foreground">menunggu umpan balik mentor</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Average Score</CardTitle>
+            <CardTitle className="text-sm font-medium">Nilai Rata-rata</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">8.5</div>
-            <p className="text-xs text-muted-foreground">out of 10</p>
+            <p className="text-xs text-muted-foreground">dari 10</p>
           </CardContent>
         </Card>
       </div>
@@ -114,11 +120,11 @@ export function StudentDashboard() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Weekly Reports</CardTitle>
-              <CardDescription>Your submitted and draft reports</CardDescription>
+              <CardTitle>Laporan Harian</CardTitle>
+              <CardDescription>Laporan terkirim dan draf Anda</CardDescription>
             </div>
             <Link href="/reports/new">
-              <Button>New Report</Button>
+              <Button>Laporan Baru</Button>
             </Link>
           </div>
         </CardHeader>
@@ -141,7 +147,7 @@ export function StudentDashboard() {
                   {getStatusBadge(report.status)}
                   <Link href={`/reports/${report.id}`}>
                     <Button variant="outline" size="sm">
-                      View
+                      Lihat
                     </Button>
                   </Link>
                 </div>
@@ -154,20 +160,14 @@ export function StudentDashboard() {
       {/* Quick Actions */}
       <Card>
         <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
+          <CardTitle>Aksi Cepat</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <Link href="/reports/new">
               <Button variant="outline" className="w-full justify-start bg-transparent">
                 <FileText className="mr-2 h-4 w-4" />
-                Submit New Report
-              </Button>
-            </Link>
-            <Link href="/evaluations">
-              <Button variant="outline" className="w-full justify-start bg-transparent">
-                <AlertCircle className="mr-2 h-4 w-4" />
-                View Evaluations
+                Kirim Laporan Baru
               </Button>
             </Link>
           </div>

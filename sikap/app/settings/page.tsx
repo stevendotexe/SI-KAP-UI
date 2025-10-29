@@ -17,12 +17,16 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
-    if (!isLoading && !user) {
-      router.push("/login")
+    if (!isLoading) {
+      if (!user) {
+        router.push("/login")
+      } else if (user.role === "student") {
+        router.push("/biodata")
+      }
     }
   }, [user, isLoading, router])
 
-  if (isLoading || !user) return null
+  if (isLoading || !user || user.role === "student") return null
 
   const handleSave = async () => {
     setIsSaving(true)

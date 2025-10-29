@@ -139,7 +139,7 @@ export default function StudentDetailPage() {
       <Tabs defaultValue="reports" className="w-full">
         <TabsList>
           <TabsTrigger value="reports">Reports</TabsTrigger>
-          <TabsTrigger value="evaluations">Evaluations</TabsTrigger>
+          {user.role !== "student" && <TabsTrigger value="evaluations">Evaluations</TabsTrigger>}
           <TabsTrigger value="info">Information</TabsTrigger>
         </TabsList>
 
@@ -147,18 +147,31 @@ export default function StudentDetailPage() {
         <TabsContent value="reports" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Submitted Reports</CardTitle>
-              <CardDescription>Weekly progress reports</CardDescription>
+              <CardTitle>
+                {user.role === "student" ? "Laporan Terkirim" : "Submitted Reports"}
+              </CardTitle>
+              <CardDescription>
+                {user.role === "student" ? "Laporan harian" : "Weekly progress reports"}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {reports.map((report) => (
+                {reports.map((report, idx) => (
                   <div
                     key={report.id}
                     className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
                   >
                     <div className="flex-1">
-                      <p className="font-medium">{report.week}</p>
+                      <p className="font-medium">
+                        {user.role === "student"
+                          ? (() => {
+                              const days = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat"]
+                              const match = /week\s*(\d+)/i.exec(report.week)
+                              const i = match ? Math.max(1, Math.min(5, parseInt(match[1], 10))) - 1 : idx % 5
+                              return days[i]
+                            })()
+                          : report.week}
+                      </p>
                       <p className="text-sm text-muted-foreground">{report.title}</p>
                     </div>
                     <div className="flex items-center gap-3">
@@ -179,8 +192,9 @@ export default function StudentDetailPage() {
           </Card>
         </TabsContent>
 
-        {/* Evaluations Tab */}
-        <TabsContent value="evaluations" className="space-y-4">
+        {/* Evaluations Tab - hidden for students */}
+        {user.role !== "student" && (
+          <TabsContent value="evaluations" className="space-y-4">
           <div className="flex justify-end">
             <Link href={`/evaluations/new?studentId=${studentId}`}>
               <Button>Add Evaluation</Button>
@@ -216,6 +230,7 @@ export default function StudentDetailPage() {
             </CardContent>
           </Card>
         </TabsContent>
+        )}
 
         {/* Information Tab */}
         <TabsContent value="info" className="space-y-4">

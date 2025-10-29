@@ -10,14 +10,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { LayoutDashboard, FileText, Users, Settings, LogOut, Menu, X } from "lucide-react"
+import { LayoutDashboard, FileText, Users, Settings, LogOut, Menu, X, CalendarCheck, ListChecks, User, ScrollText } from "lucide-react"
 import { useState } from "react"
 
 const navigationItems = {
   student: [
-    { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { label: "Laporan Mingguan", href: "/reports", icon: FileText },
-    { label: "Evaluasi", href: "/evaluations", icon: Users },
+    { label: "Beranda", href: "/dashboard", icon: LayoutDashboard },
+    { label: "Laporan", href: "/reports", icon: FileText },
+    { label: "Absensi", href: "/absensi", icon: CalendarCheck },
+    { label: "Daftar Tugas", href: "/daftar-tugas", icon: ListChecks },
+    { label: "Raport Akhir", href: "/raport-akhir", icon: ScrollText },
   ],
   mentor: [
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -41,6 +43,14 @@ export function Sidebar() {
   if (!user) return null
 
   const items = navigationItems[user.role] || []
+
+  // Display name: for student accounts with generic name "student", show "Ahmad"
+  const displayName =
+    user.role === "student"
+      ? user.name && user.name.toLowerCase() !== "student"
+        ? user.name
+        : "Ahmad"
+      : user.name
 
   const handleLogout = () => {
     logout()
@@ -102,7 +112,7 @@ export function Sidebar() {
                     <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 text-left">
-                    <p className="text-sm font-medium text-sidebar-foreground">{user.name}</p>
+                    <p className="text-sm font-medium text-sidebar-foreground">{displayName}</p>
                     <p className="text-xs text-sidebar-foreground/60 capitalize">{user.role}</p>
                   </div>
                 </button>
@@ -110,19 +120,23 @@ export function Sidebar() {
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuItem disabled>
                   <div className="flex flex-col gap-1">
-                    <p className="font-medium">{user.name}</p>
+                    <p className="font-medium">{displayName}</p>
                     <p className="text-xs text-muted-foreground">{user.email}</p>
                   </div>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => router.push("/settings")}>
-                  <Settings className="mr-2 h-4 w-4" />
-                  Pengaturan
+                <DropdownMenuItem onClick={() => router.push(user.role === "student" ? "/biodata" : "/settings")}>
+                  {user.role === "student" ? (
+                    <User className="mr-2 h-4 w-4" />
+                  ) : (
+                    <Settings className="mr-2 h-4 w-4" />
+                  )}
+                  {user.role === "student" ? "Biodata" : "Pengaturan"}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout} className="text-destructive">
                   <LogOut className="mr-2 h-4 w-4" />
-                  Logout
+                  {user.role === "student" ? "Keluar" : "Logout"}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
