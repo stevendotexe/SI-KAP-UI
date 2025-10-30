@@ -55,3 +55,29 @@ export interface Analytics {
   completionRate: number
   averageScore: number
 }
+
+export interface BiotaData {
+  nama: string
+  email: string
+  noTelepon: string
+  sekolahAsal?: string
+  departemen?: string
+}
+
+export interface TaskFeedback {
+  id: string
+  studentId: string
+  taskName: string
+  score: number
+  feedback: string
+  date: string
+}
+
+export interface BankSoal {
+  id: string
+  mentorId: string
+  title: string
+  description: string
+  attachment: string | null
+  createdAt: string
+}

@@ -3,9 +3,9 @@
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
-import { StudentDashboard } from "@/components/student-dashboard"
-import { MentorDashboard } from "@/components/mentor-dashboard"
-import { AdminDashboard } from "@/components/admin-dashboard"
+import { StudentDashboard } from "@/components/dashboards/student-dashboard"
+import { MentorDashboard } from "@/components/dashboards/mentor-dashboard"
+import { AdminDashboard } from "@/components/dashboards/admin-dashboard"
 
 export default function DashboardPage() {
   const { user, isLoading } = useAuth()

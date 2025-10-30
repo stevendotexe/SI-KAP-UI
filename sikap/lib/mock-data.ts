@@ -1,3 +1,4 @@
+// Mock Students
 export const mockStudents = [
   {
     id: "1",
@@ -191,3 +192,117 @@ export const mockAnalytics = {
     { department: "Design", students: 31, mentors: 5 },
   ],
 }
+
+// Mock Performance Data
+export const mockPerformanceData = [
+  {
+    studentId: "1",
+    studentName: "Ahmad Rizki",
+    tasks: [
+      { taskName: "Setup Database", date: "2024-01-08", score: 8.5 },
+      { taskName: "API Development", date: "2024-01-15", score: 8.7 },
+      { taskName: "Testing", date: "2024-01-22", score: 8.3 },
+      { taskName: "Documentation", date: "2024-01-29", score: 8.6 },
+    ],
+  },
+  {
+    studentId: "2",
+    studentName: "Siti Nurhaliza",
+    tasks: [
+      { taskName: "Setup Database", date: "2024-01-08", score: 9.0 },
+      { taskName: "API Development", date: "2024-01-15", score: 9.2 },
+      { taskName: "Testing", date: "2024-01-22", score: 9.1 },
+      { taskName: "Documentation", date: "2024-01-29", score: 9.0 },
+    ],
+  },
+  {
+    studentId: "3",
+    studentName: "Budi Santoso",
+    tasks: [
+      { taskName: "Setup Database", date: "2024-01-08", score: 7.8 },
+      { taskName: "API Development", date: "2024-01-15", score: 7.9 },
+      { taskName: "Testing", date: "2024-01-22", score: 7.7 },
+      { taskName: "Documentation", date: "2024-01-29", score: 8.0 },
+    ],
+  },
+]
+
+// Mock Attendance Data
+export const mockAttendanceData = [
+  {
+    studentId: "1",
+    studentName: "Ahmad Rizki",
+    attendance: {
+      hadir: 10,
+      izin: 2,
+      tidakHadir: 1,
+    },
+    details: [
+      { date: "2024-01-08", status: "hadir", photo: "photo1.jpg" },
+      { date: "2024-01-09", status: "hadir", photo: "photo2.jpg" },
+      { date: "2024-01-10", status: "izin", reason: "Sakit" },
+      { date: "2024-01-11", status: "hadir", photo: "photo3.jpg" },
+      { date: "2024-01-12", status: "tidakHadir" },
+    ],
+  },
+  {
+    studentId: "2",
+    studentName: "Siti Nurhaliza",
+    attendance: {
+      hadir: 12,
+      izin: 1,
+      tidakHadir: 0,
+    },
+    details: [
+      { date: "2024-01-08", status: "hadir", photo: "photo4.jpg" },
+      { date: "2024-01-09", status: "hadir", photo: "photo5.jpg" },
+      { date: "2024-01-10", status: "hadir", photo: "photo6.jpg" },
+      { date: "2024-01-11", status: "izin", reason: "Acara keluarga" },
+      { date: "2024-01-12", status: "hadir", photo: "photo7.jpg" },
+    ],
+  },
+  {
+    studentId: "3",
+    studentName: "Budi Santoso",
+    attendance: {
+      hadir: 9,
+      izin: 2,
+      tidakHadir: 2,
+    },
+    details: [
+      { date: "2024-01-08", status: "hadir", photo: "photo8.jpg" },
+      { date: "2024-01-09", status: "tidakHadir" },
+      { date: "2024-01-10", status: "hadir", photo: "photo9.jpg" },
+      { date: "2024-01-11", status: "izin", reason: "Perjalanan" },
+      { date: "2024-01-12", status: "tidakHadir" },
+    ],
+  },
+]
+
+// Mock Bank Soal
+export const mockBankSoal = [
+  {
+    id: "1",
+    mentorId: "MEN-001",
+    title: "Desain Database Relasional",
+    description: "Buatlah desain database untuk sistem manajemen siswa dengan minimal 5 tabel",
+    attachment: null,
+    createdAt: "2024-01-05",
+  },
+  {
+    id: "2",
+    mentorId: "MEN-001",
+    title: "Implementasi REST API",
+    description: "Implementasikan REST API dengan minimal 10 endpoint menggunakan Node.js dan Express",
+    attachment: "api-requirements.pdf",
+    createdAt: "2024-01-10",
+  },
+  {
+    id: "3",
+    mentorId: "MEN-002",
+    title: "Unit Testing dengan Jest",
+    description: "Buatlah unit test untuk fungsi-fungsi kritis dengan coverage minimal 80%",
+    attachment: null,
+    createdAt: "2024-01-12",
+  },
+]
