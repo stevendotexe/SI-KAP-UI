@@ -29,6 +29,7 @@ const navigationItems = {
     { label: "Siswa", href: "/students", icon: Users },
     { label: "Mentor", href: "/mentors", icon: Users },
     { label: "Laporan", href: "/reports", icon: FileText },
+    { label: "Kehadiran", href: "/attendance", icon: Users },
   ],
 }
 

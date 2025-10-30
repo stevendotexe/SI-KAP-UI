@@ -7,7 +7,9 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Search, Trash2, Edit } from "lucide-react"
+import { Search, Trash2, Edit, Plus } from "lucide-react"
+import Link from "next/link"
+import { useMentors } from "@/hooks/use-mentors"
 
 export default function MentorsPage() {
   const { user, isLoading } = useAuth()
@@ -22,41 +24,9 @@ export default function MentorsPage() {
 
   if (isLoading || !user) return null
 
-  // Mock mentors data
-  const allMentors = [
-    {
-      id: 1,
-      name: "Dr. Budi Santoso",
-      mentorId: "MEN-001",
-      email: "budi@example.com",
-      status: "active",
-      studentsCount: 3,
-      department: "Information Technology",
-      joinDate: "2023-06-01",
-    },
-    {
-      id: 2,
-      name: "Prof. Siti Nurhaliza",
-      mentorId: "MEN-002",
-      email: "siti@example.com",
-      status: "active",
-      studentsCount: 4,
-      department: "Information Technology",
-      joinDate: "2023-07-15",
-    },
-    {
-      id: 3,
-      name: "Dr. Ahmad Rizki",
-      mentorId: "MEN-003",
-      email: "ahmad@example.com",
-      status: "inactive",
-      studentsCount: 0,
-      department: "Information Technology",
-      joinDate: "2023-08-20",
-    },
-  ]
+  const { mentors } = useMentors()
 
-  const filteredMentors = allMentors.filter(
+  const filteredMentors = mentors.filter(
     (mentor) =>
       mentor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       mentor.mentorId.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -68,17 +38,21 @@ export default function MentorsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Mentors</h1>
-          <p className="text-muted-foreground mt-2">Manage all mentors in the system</p>
+          <h1 className="text-3xl font-bold">Mentor</h1>
+          <p className="text-muted-foreground mt-2">Kelola mentor di sistem</p>
         </div>
-        <Button>Add Mentor</Button>
+        <Link href="/mentors/new">
+          <Button>
+            <Plus className="mr-2 h-4 w-4" /> Tambah Mentor
+          </Button>
+        </Link>
       </div>
 
       {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search by name, ID, or email..."
+          placeholder="Cari berdasarkan nama, ID, atau email..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="pl-10"
@@ -92,30 +66,36 @@ export default function MentorsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left py-3 px-4 font-medium">Name</th>
+                  <th className="text-left py-3 px-4 font-medium">Nama</th>
                   <th className="text-left py-3 px-4 font-medium">ID</th>
                   <th className="text-left py-3 px-4 font-medium">Email</th>
-                  <th className="text-left py-3 px-4 font-medium">Students</th>
+                  <th className="text-left py-3 px-4 font-medium">Jumlah Siswa</th>
                   <th className="text-left py-3 px-4 font-medium">Status</th>
-                  <th className="text-left py-3 px-4 font-medium">Actions</th>
+                  <th className="text-left py-3 px-4 font-medium">Aksi</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredMentors.length > 0 ? (
                   filteredMentors.map((mentor) => (
                     <tr key={mentor.id} className="border-b hover:bg-muted/50 transition-colors">
-                      <td className="py-3 px-4">{mentor.name}</td>
+                      <td className="py-3 px-4">
+                        <Link href={`/mentors/${mentor.id}`} className="text-primary hover:underline">
+                          {mentor.name}
+                        </Link>
+                      </td>
                       <td className="py-3 px-4 text-muted-foreground">{mentor.mentorId}</td>
                       <td className="py-3 px-4 text-muted-foreground">{mentor.email}</td>
                       <td className="py-3 px-4">{mentor.studentsCount}</td>
                       <td className="py-3 px-4">
-                        <Badge variant={mentor.status === "active" ? "default" : "secondary"}>{mentor.status}</Badge>
+                        <Badge variant={mentor.status === "active" ? "default" : "secondary"}>{mentor.status === "active" ? "aktif" : mentor.status}</Badge>
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex gap-2">
-                          <Button variant="ghost" size="sm">
-                            <Edit className="h-4 w-4" />
-                          </Button>
+                          <Link href={`/mentors/${mentor.id}`}>
+                            <Button variant="ghost" size="sm">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </Link>
                           <Button variant="ghost" size="sm" className="text-destructive">
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -126,7 +106,7 @@ export default function MentorsPage() {
                 ) : (
                   <tr>
                     <td colSpan={6} className="text-center py-8 text-muted-foreground">
-                      No mentors found
+                      Tidak ada mentor
                     </td>
                   </tr>
                 )}
