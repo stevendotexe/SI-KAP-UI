@@ -1,6 +1,6 @@
 "use client"
 
-import { mockStudents, mockMentors, mockReports, mockEvaluations, mockAnalytics } from "./mock-data"
+import { mockStudents, mockMentors, mockReports, mockEvaluations, mockAnalytics, mockAttendance } from "./mock-data"
 
 // Student Store
 export const studentStore = {
@@ -62,4 +62,11 @@ export const analyticsStore = {
   getReportSubmissionData: () => mockAnalytics.reportSubmissionData,
   getScoreDistribution: () => mockAnalytics.scoreDistribution,
   getDepartmentStats: () => mockAnalytics.departmentStats,
+}
+
+// Attendance Store
+export const attendanceStore = {
+  getAll: () => mockAttendance,
+  getByDate: (date: string) => mockAttendance.filter((a) => a.date === date),
+  getByStudentId: (studentId: string) => mockAttendance.filter((a) => a.studentId === studentId),
 }
