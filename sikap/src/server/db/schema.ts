@@ -15,47 +15,47 @@ export const createTable = pgTableCreator((name) => `pg-drizzle_${name}`);
 /**
  * Enums
  */
-export const userRole = pgEnum("user_role", ["ADMIN", "MENTOR", "STUDENT"]);
+export const userRole = pgEnum("user_role", ["admin", "mentor", "student"]);
 export const taskStatus = pgEnum("task_status", [
-  "TODO",
-  "IN_PROGRESS",
-  "SUBMITTED",
-  "APPROVED",
-  "REJECTED",
+  "todo",
+  "in_progress",
+  "submitted",
+  "approved",
+  "rejected",
 ]);
 export const placementStatus = pgEnum("placement_status", [
-  "ACTIVE",
-  "COMPLETED",
-  "CANCELED",
+  "active",
+  "completed",
+  "canceled",
 ]);
 export const attendanceStatus = pgEnum("attendance_status", [
-  "PRESENT",
-  "ABSENT",
-  "LATE",
-  "EXCUSED",
+  "present",
+  "absent",
+  "late",
+  "excused",
 ]);
-export const reportType = pgEnum("report_type", ["DAILY", "WEEKLY", "MONTHLY"]);
+export const reportType = pgEnum("report_type", ["daily", "weekly", "monthly"]);
 export const reviewStatus = pgEnum("review_status", [
-  "PENDING",
-  "APPROVED",
-  "REJECTED",
+  "pending",
+  "approved",
+  "rejected",
 ]);
 export const ownerType = pgEnum("owner_type", [
-  "TASK",
-  "REPORT",
-  "FINAL_REPORT",
-  "ASSESSMENT",
+  "task",
+  "report",
+  "final_report",
+  "assessment",
 ]);
 export const notificationType = pgEnum("notification_type", [
-  "ASSIGNMENT",
-  "APPROVAL",
-  "REMINDER",
-  "SYSTEM",
+  "assignment",
+  "approval",
+  "reminder",
+  "system",
 ]);
 export const eventType = pgEnum("event_type", [
-  "MEETING",
-  "DEADLINE",
-  "MILESTONE",
+  "meeting",
+  "deadline",
+  "milestone",
 ]);
 
 /**
@@ -66,7 +66,10 @@ export const user = pgTable("user", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
-  role: userRole("role").notNull().default("STUDENT"),
+  role: userRole("role").notNull().default("student"),
+  banned: boolean("banned").notNull().default(false),
+  banReason: text("ban_reason"),
+  banExpires: timestamp("ban_expires"),
   emailVerified: boolean("email_verified")
     .$defaultFn(() => false)
     .notNull(),
@@ -90,6 +93,9 @@ export const session = pgTable("session", {
   userId: text("user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
+  impersonatedBy: text("impersonated_by").references(() => user.id, {
+    onDelete: "cascade",
+  }),
 });
 
 export const account = pgTable("account", {
@@ -285,7 +291,7 @@ export const placement = createTable(
       .references(() => program.id, { onDelete: "set null" }),
     startDate: d.date(),
     endDate: d.date(),
-    status: placementStatus("status").notNull().default("ACTIVE"),
+    status: placementStatus("status").notNull().default("active"),
     createdAt: d
       .timestamp({ withTimezone: true })
       .$defaultFn(() => new Date())
@@ -337,7 +343,7 @@ export const task = createTable(
     title: d.text().notNull(),
     description: d.text(),
     dueDate: d.date(),
-    status: taskStatus("status").notNull().default("TODO"),
+    status: taskStatus("status").notNull().default("todo"),
     createdById: d
       .varchar({ length: 255 })
       .notNull()
@@ -404,7 +410,7 @@ export const attendanceLog = createTable(
     date: d.date().notNull(),
     checkInAt: d.timestamp({ withTimezone: true }),
     checkOutAt: d.timestamp({ withTimezone: true }),
-    status: attendanceStatus("status").notNull().default("PRESENT"),
+    status: attendanceStatus("status").notNull().default("present"),
     latitude: d.numeric({ precision: 9, scale: 6 }),
     longitude: d.numeric({ precision: 9, scale: 6 }),
     locationNote: d.text(),
@@ -452,7 +458,7 @@ export const report = createTable(
     periodEnd: d.date(),
     submittedAt: d.timestamp({ withTimezone: true }),
     reviewedByMentorId: d.integer().references(() => mentorProfile.id),
-    reviewStatus: reviewStatus("review_status").notNull().default("PENDING"),
+    reviewStatus: reviewStatus("review_status").notNull().default("pending"),
     score: d.numeric({ precision: 5, scale: 2 }),
     createdAt: d
       .timestamp({ withTimezone: true })

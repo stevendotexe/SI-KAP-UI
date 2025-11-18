@@ -127,8 +127,26 @@ export const protectedProcedure = t.procedure
     }
     return next({
       ctx: {
-        // infers the `session` as non-nullable
         session: { ...ctx.session, user: ctx.session.user },
       },
     });
+  });
+
+export const mentorProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (ctx.session.user.role !== "mentor") {
+    throw new TRPCError({ code: "FORBIDDEN" });
+  }
+  return next();
+});
+
+export const requirePermissions = (permission: Record<string, string[]>) =>
+  t.middleware(async ({ ctx, next }) => {
+    const has = await auth.api.userHasPermission({
+      body: { permission },
+      headers: ctx.headers,
+    });
+    if (!has) {
+      throw new TRPCError({ code: "FORBIDDEN" });
+    }
+    return next();
   });
