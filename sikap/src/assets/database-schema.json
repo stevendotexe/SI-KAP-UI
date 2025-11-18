@@ -1,0 +1,859 @@
+{
+  "nodes": [
+    {
+      "id": "user",
+      "label": "User",
+      "doc": "Authentication user. Roles: ADMIN, MENTOR, STUDENT.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "text",
+          "primary_key": true,
+          "nullable": false,
+          "doc": "Auth provider user id (string)"
+        },
+        { "name": "name", "type": "text", "nullable": false },
+        { "name": "email", "type": "text", "nullable": false, "unique": true },
+        {
+          "name": "role",
+          "type": "enum:user_role",
+          "nullable": false,
+          "default": "STUDENT",
+          "doc": "System role for UI features"
+        },
+        {
+          "name": "email_verified",
+          "type": "boolean",
+          "nullable": false,
+          "default": false
+        },
+        { "name": "image", "type": "text", "nullable": true },
+        {
+          "name": "created_at",
+          "type": "timestamp(tz)",
+          "nullable": false,
+          "default_fn": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp(tz)",
+          "nullable": false,
+          "default_fn": "now()"
+        }
+      ],
+      "indexes": [
+        { "name": "user_email_unique", "columns": ["email"], "unique": true }
+      ]
+    },
+    {
+      "id": "mentor_profile",
+      "label": "MentorProfile",
+      "doc": "Profile for mentors supervising students at companies.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "int",
+          "primary_key": true,
+          "generated": "identity"
+        },
+        {
+          "name": "user_id",
+          "type": "varchar(255)",
+          "nullable": false,
+          "references": {
+            "table": "user",
+            "column": "id",
+            "onDelete": "cascade"
+          },
+          "doc": "Links to auth user"
+        },
+        {
+          "name": "company_id",
+          "type": "int",
+          "nullable": true,
+          "references": { "table": "company", "column": "id" }
+        },
+        { "name": "phone", "type": "varchar(30)", "nullable": true },
+        {
+          "name": "active",
+          "type": "boolean",
+          "nullable": false,
+          "default": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp(tz)",
+          "nullable": false,
+          "default_fn": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp(tz)",
+          "nullable": true,
+          "on_update_fn": "now()"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "mentor_user_unique",
+          "columns": ["user_id"],
+          "unique": true
+        },
+        { "name": "mentor_company_idx", "columns": ["company_id"] }
+      ]
+    },
+    {
+      "id": "student_profile",
+      "label": "StudentProfile",
+      "doc": "Profile for students participating in PKL program.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "int",
+          "primary_key": true,
+          "generated": "identity"
+        },
+        {
+          "name": "user_id",
+          "type": "varchar(255)",
+          "nullable": false,
+          "references": {
+            "table": "user",
+            "column": "id",
+            "onDelete": "cascade"
+          }
+        },
+        { "name": "school", "type": "text", "nullable": true },
+        { "name": "major", "type": "text", "nullable": true },
+        { "name": "cohort", "type": "text", "nullable": true },
+        { "name": "phone", "type": "varchar(30)", "nullable": true },
+        {
+          "name": "active",
+          "type": "boolean",
+          "nullable": false,
+          "default": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp(tz)",
+          "nullable": false,
+          "default_fn": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp(tz)",
+          "nullable": true,
+          "on_update_fn": "now()"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "student_user_unique",
+          "columns": ["user_id"],
+          "unique": true
+        }
+      ]
+    },
+    {
+      "id": "company",
+      "label": "Company",
+      "doc": "Company where students are placed for PKL.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "int",
+          "primary_key": true,
+          "generated": "identity"
+        },
+        { "name": "name", "type": "text", "nullable": false },
+        { "name": "address", "type": "text", "nullable": true },
+        { "name": "latitude", "type": "numeric(9,6)", "nullable": true },
+        { "name": "longitude", "type": "numeric(9,6)", "nullable": true },
+        { "name": "contact_email", "type": "text", "nullable": true },
+        { "name": "contact_phone", "type": "varchar(30)", "nullable": true },
+        { "name": "website", "type": "text", "nullable": true },
+        {
+          "name": "created_at",
+          "type": "timestamp(tz)",
+          "nullable": false,
+          "default_fn": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp(tz)",
+          "nullable": true,
+          "on_update_fn": "now()"
+        }
+      ],
+      "indexes": [{ "name": "company_name_idx", "columns": ["name"] }]
+    },
+    {
+      "id": "program",
+      "label": "Program",
+      "doc": "PKL program or cohort definition.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "int",
+          "primary_key": true,
+          "generated": "identity"
+        },
+        { "name": "name", "type": "text", "nullable": false },
+        { "name": "description", "type": "text", "nullable": true },
+        { "name": "start_date", "type": "date", "nullable": true },
+        { "name": "end_date", "type": "date", "nullable": true },
+        {
+          "name": "created_at",
+          "type": "timestamp(tz)",
+          "nullable": false,
+          "default_fn": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp(tz)",
+          "nullable": true,
+          "on_update_fn": "now()"
+        }
+      ]
+    },
+    {
+      "id": "placement",
+      "label": "Placement",
+      "doc": "Assignment linking a student to a mentor and company within a program.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "int",
+          "primary_key": true,
+          "generated": "identity"
+        },
+        {
+          "name": "student_id",
+          "type": "int",
+          "nullable": false,
+          "references": {
+            "table": "student_profile",
+            "column": "id",
+            "onDelete": "cascade"
+          }
+        },
+        {
+          "name": "mentor_id",
+          "type": "int",
+          "nullable": false,
+          "references": {
+            "table": "mentor_profile",
+            "column": "id",
+            "onDelete": "set null"
+          }
+        },
+        {
+          "name": "company_id",
+          "type": "int",
+          "nullable": false,
+          "references": {
+            "table": "company",
+            "column": "id",
+            "onDelete": "restrict"
+          }
+        },
+        {
+          "name": "program_id",
+          "type": "int",
+          "nullable": true,
+          "references": {
+            "table": "program",
+            "column": "id",
+            "onDelete": "set null"
+          }
+        },
+        { "name": "start_date", "type": "date", "nullable": true },
+        { "name": "end_date", "type": "date", "nullable": true },
+        {
+          "name": "status",
+          "type": "enum:placement_status",
+          "nullable": false,
+          "default": "ACTIVE"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp(tz)",
+          "nullable": false,
+          "default_fn": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp(tz)",
+          "nullable": true,
+          "on_update_fn": "now()"
+        }
+      ],
+      "indexes": [
+        { "name": "placement_student_idx", "columns": ["student_id"] },
+        { "name": "placement_status_idx", "columns": ["status"] }
+      ]
+    },
+    {
+      "id": "task",
+      "label": "Task",
+      "doc": "Task assigned within a placement; shown in Task List UI.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "int",
+          "primary_key": true,
+          "generated": "identity"
+        },
+        {
+          "name": "placement_id",
+          "type": "int",
+          "nullable": false,
+          "references": {
+            "table": "placement",
+            "column": "id",
+            "onDelete": "cascade"
+          }
+        },
+        { "name": "title", "type": "text", "nullable": false },
+        { "name": "description", "type": "text", "nullable": true },
+        { "name": "due_date", "type": "date", "nullable": true },
+        {
+          "name": "status",
+          "type": "enum:task_status",
+          "nullable": false,
+          "default": "TODO"
+        },
+        {
+          "name": "created_by_id",
+          "type": "varchar(255)",
+          "nullable": false,
+          "references": { "table": "user", "column": "id" }
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp(tz)",
+          "nullable": false,
+          "default_fn": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp(tz)",
+          "nullable": true,
+          "on_update_fn": "now()"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "task_placement_status_idx",
+          "columns": ["placement_id", "status"]
+        },
+        { "name": "task_due_date_idx", "columns": ["due_date"] }
+      ]
+    },
+    {
+      "id": "task_checklist_item",
+      "label": "TaskChecklistItem",
+      "doc": "Checklist items within a task.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "int",
+          "primary_key": true,
+          "generated": "identity"
+        },
+        {
+          "name": "task_id",
+          "type": "int",
+          "nullable": false,
+          "references": {
+            "table": "task",
+            "column": "id",
+            "onDelete": "cascade"
+          }
+        },
+        { "name": "label", "type": "text", "nullable": false },
+        {
+          "name": "is_completed",
+          "type": "boolean",
+          "nullable": false,
+          "default": false
+        },
+        { "name": "position", "type": "int", "nullable": true }
+      ],
+      "indexes": [{ "name": "checklist_task_idx", "columns": ["task_id"] }]
+    },
+    {
+      "id": "attendance_log",
+      "label": "AttendanceLog",
+      "doc": "Student attendance (Absen) records with optional geolocation.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "int",
+          "primary_key": true,
+          "generated": "identity"
+        },
+        {
+          "name": "placement_id",
+          "type": "int",
+          "nullable": false,
+          "references": {
+            "table": "placement",
+            "column": "id",
+            "onDelete": "cascade"
+          }
+        },
+        { "name": "date", "type": "date", "nullable": false },
+        { "name": "check_in_at", "type": "timestamp(tz)", "nullable": true },
+        { "name": "check_out_at", "type": "timestamp(tz)", "nullable": true },
+        {
+          "name": "status",
+          "type": "enum:attendance_status",
+          "nullable": false,
+          "default": "PRESENT"
+        },
+        { "name": "latitude", "type": "numeric(9,6)", "nullable": true },
+        { "name": "longitude", "type": "numeric(9,6)", "nullable": true },
+        { "name": "location_note", "type": "text", "nullable": true },
+        {
+          "name": "verified_by_mentor_id",
+          "type": "int",
+          "nullable": true,
+          "references": {
+            "table": "mentor_profile",
+            "column": "id",
+            "onDelete": "set null"
+          }
+        },
+        { "name": "verified_at", "type": "timestamp(tz)", "nullable": true },
+        {
+          "name": "created_at",
+          "type": "timestamp(tz)",
+          "nullable": false,
+          "default_fn": "now()"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "attendance_unique_per_day",
+          "columns": ["placement_id", "date"],
+          "unique": true
+        },
+        { "name": "attendance_status_idx", "columns": ["status"] }
+      ]
+    },
+    {
+      "id": "report",
+      "label": "Report",
+      "doc": "Periodic student reports (daily/weekly/monthly) with mentor reviews.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "int",
+          "primary_key": true,
+          "generated": "identity"
+        },
+        {
+          "name": "placement_id",
+          "type": "int",
+          "nullable": false,
+          "references": {
+            "table": "placement",
+            "column": "id",
+            "onDelete": "cascade"
+          }
+        },
+        { "name": "type", "type": "enum:report_type", "nullable": false },
+        { "name": "title", "type": "text", "nullable": true },
+        { "name": "content", "type": "text", "nullable": true },
+        { "name": "period_start", "type": "date", "nullable": true },
+        { "name": "period_end", "type": "date", "nullable": true },
+        { "name": "submitted_at", "type": "timestamp(tz)", "nullable": true },
+        {
+          "name": "reviewed_by_mentor_id",
+          "type": "int",
+          "nullable": true,
+          "references": { "table": "mentor_profile", "column": "id" }
+        },
+        {
+          "name": "review_status",
+          "type": "enum:review_status",
+          "nullable": false,
+          "default": "PENDING"
+        },
+        { "name": "score", "type": "numeric(5,2)", "nullable": true },
+        {
+          "name": "created_at",
+          "type": "timestamp(tz)",
+          "nullable": false,
+          "default_fn": "now()"
+        }
+      ],
+      "indexes": [
+        { "name": "report_type_idx", "columns": ["type"] },
+        { "name": "report_placement_idx", "columns": ["placement_id"] }
+      ]
+    },
+    {
+      "id": "final_report",
+      "label": "FinalReport",
+      "doc": "Final report submitted at program end; downloadable as PDF.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "int",
+          "primary_key": true,
+          "generated": "identity"
+        },
+        {
+          "name": "placement_id",
+          "type": "int",
+          "nullable": false,
+          "references": {
+            "table": "placement",
+            "column": "id",
+            "onDelete": "cascade"
+          }
+        },
+        { "name": "title", "type": "text", "nullable": true },
+        { "name": "content", "type": "text", "nullable": true },
+        { "name": "submitted_at", "type": "timestamp(tz)", "nullable": true },
+        {
+          "name": "approved_by_mentor_id",
+          "type": "int",
+          "nullable": true,
+          "references": { "table": "mentor_profile", "column": "id" }
+        },
+        { "name": "approved_at", "type": "timestamp(tz)", "nullable": true },
+        { "name": "grade", "type": "text", "nullable": true },
+        {
+          "name": "created_at",
+          "type": "timestamp(tz)",
+          "nullable": false,
+          "default_fn": "now()"
+        }
+      ]
+    },
+    {
+      "id": "assessment",
+      "label": "Assessment",
+      "doc": "Mentor evaluation of student performance with total score.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "int",
+          "primary_key": true,
+          "generated": "identity"
+        },
+        {
+          "name": "placement_id",
+          "type": "int",
+          "nullable": false,
+          "references": {
+            "table": "placement",
+            "column": "id",
+            "onDelete": "cascade"
+          }
+        },
+        {
+          "name": "evaluator_mentor_id",
+          "type": "int",
+          "nullable": true,
+          "references": { "table": "mentor_profile", "column": "id" }
+        },
+        { "name": "comments", "type": "text", "nullable": true },
+        { "name": "total_score", "type": "numeric(5,2)", "nullable": true },
+        {
+          "name": "created_at",
+          "type": "timestamp(tz)",
+          "nullable": false,
+          "default_fn": "now()"
+        }
+      ]
+    },
+    {
+      "id": "assessment_item",
+      "label": "AssessmentItem",
+      "doc": "Per-criterion scores within an assessment.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "int",
+          "primary_key": true,
+          "generated": "identity"
+        },
+        {
+          "name": "assessment_id",
+          "type": "int",
+          "nullable": false,
+          "references": {
+            "table": "assessment",
+            "column": "id",
+            "onDelete": "cascade"
+          }
+        },
+        { "name": "criterion", "type": "text", "nullable": false },
+        { "name": "max_score", "type": "numeric(5,2)", "nullable": true },
+        { "name": "score", "type": "numeric(5,2)", "nullable": true },
+        { "name": "comments", "type": "text", "nullable": true },
+        { "name": "position", "type": "int", "nullable": true }
+      ]
+    },
+    {
+      "id": "attachment",
+      "label": "Attachment",
+      "doc": "Files attached to tasks, reports, assessments, and final reports.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "int",
+          "primary_key": true,
+          "generated": "identity"
+        },
+        { "name": "owner_type", "type": "enum:owner_type", "nullable": false },
+        {
+          "name": "owner_id",
+          "type": "int",
+          "nullable": false,
+          "doc": "References entity id per owner_type"
+        },
+        { "name": "url", "type": "text", "nullable": false },
+        { "name": "filename", "type": "text", "nullable": true },
+        { "name": "mime_type", "type": "text", "nullable": true },
+        { "name": "size_bytes", "type": "int", "nullable": true },
+        {
+          "name": "created_by_id",
+          "type": "varchar(255)",
+          "nullable": true,
+          "references": { "table": "user", "column": "id" }
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp(tz)",
+          "nullable": false,
+          "default_fn": "now()"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "attachment_owner_idx",
+          "columns": ["owner_type", "owner_id"]
+        }
+      ]
+    },
+    {
+      "id": "notification",
+      "label": "Notification",
+      "doc": "User notifications (bell icon) for approvals, assignments, and reminders.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "int",
+          "primary_key": true,
+          "generated": "identity"
+        },
+        {
+          "name": "user_id",
+          "type": "varchar(255)",
+          "nullable": false,
+          "references": {
+            "table": "user",
+            "column": "id",
+            "onDelete": "cascade"
+          }
+        },
+        { "name": "type", "type": "enum:notification_type", "nullable": false },
+        { "name": "title", "type": "text", "nullable": false },
+        { "name": "body", "type": "text", "nullable": true },
+        {
+          "name": "is_read",
+          "type": "boolean",
+          "nullable": false,
+          "default": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp(tz)",
+          "nullable": false,
+          "default_fn": "now()"
+        }
+      ],
+      "indexes": [
+        { "name": "notification_user_idx", "columns": ["user_id"] },
+        { "name": "notification_read_idx", "columns": ["is_read"] }
+      ]
+    },
+    {
+      "id": "calendar_event",
+      "label": "CalendarEvent",
+      "doc": "Calendar events (deadlines, meetings) shown in UI calendar.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "int",
+          "primary_key": true,
+          "generated": "identity"
+        },
+        {
+          "name": "placement_id",
+          "type": "int",
+          "nullable": true,
+          "references": {
+            "table": "placement",
+            "column": "id",
+            "onDelete": "set null"
+          }
+        },
+        { "name": "type", "type": "enum:event_type", "nullable": false },
+        { "name": "title", "type": "text", "nullable": false },
+        { "name": "description", "type": "text", "nullable": true },
+        { "name": "scheduled_at", "type": "timestamp(tz)", "nullable": false },
+        { "name": "location", "type": "text", "nullable": true },
+        {
+          "name": "created_by_id",
+          "type": "varchar(255)",
+          "nullable": true,
+          "references": { "table": "user", "column": "id" }
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp(tz)",
+          "nullable": false,
+          "default_fn": "now()"
+        }
+      ]
+    },
+
+    {
+      "id": "account",
+      "label": "Account",
+      "doc": "Auth account (OAuth/password) linked to user.",
+      "fields": [
+        { "name": "id", "type": "text", "primary_key": true },
+        { "name": "account_id", "type": "text", "nullable": false },
+        { "name": "provider_id", "type": "text", "nullable": false },
+        {
+          "name": "user_id",
+          "type": "text",
+          "nullable": false,
+          "references": {
+            "table": "user",
+            "column": "id",
+            "onDelete": "cascade"
+          }
+        },
+        { "name": "access_token", "type": "text", "nullable": true },
+        { "name": "refresh_token", "type": "text", "nullable": true },
+        { "name": "id_token", "type": "text", "nullable": true },
+        {
+          "name": "access_token_expires_at",
+          "type": "timestamp",
+          "nullable": true
+        },
+        {
+          "name": "refresh_token_expires_at",
+          "type": "timestamp",
+          "nullable": true
+        },
+        { "name": "scope", "type": "text", "nullable": true },
+        { "name": "password", "type": "text", "nullable": true },
+        { "name": "created_at", "type": "timestamp", "nullable": false },
+        { "name": "updated_at", "type": "timestamp", "nullable": false }
+      ],
+      "indexes": [{ "name": "account_user_idx", "columns": ["user_id"] }]
+    },
+    {
+      "id": "session",
+      "label": "Session",
+      "doc": "Auth sessions for user logins.",
+      "fields": [
+        { "name": "id", "type": "text", "primary_key": true },
+        { "name": "expires_at", "type": "timestamp", "nullable": false },
+        { "name": "token", "type": "text", "nullable": false, "unique": true },
+        { "name": "created_at", "type": "timestamp", "nullable": false },
+        { "name": "updated_at", "type": "timestamp", "nullable": false },
+        { "name": "ip_address", "type": "text", "nullable": true },
+        { "name": "user_agent", "type": "text", "nullable": true },
+        {
+          "name": "user_id",
+          "type": "text",
+          "nullable": false,
+          "references": {
+            "table": "user",
+            "column": "id",
+            "onDelete": "cascade"
+          }
+        }
+      ],
+      "indexes": [
+        { "name": "session_user_idx", "columns": ["user_id"] },
+        { "name": "session_token_unique", "columns": ["token"], "unique": true }
+      ]
+    },
+    {
+      "id": "verification",
+      "label": "Verification",
+      "doc": "Verification tokens (email/password reset).",
+      "fields": [
+        { "name": "id", "type": "text", "primary_key": true },
+        { "name": "identifier", "type": "text", "nullable": false },
+        { "name": "value", "type": "text", "nullable": false },
+        { "name": "expires_at", "type": "timestamp", "nullable": false },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "nullable": false,
+          "default_fn": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp",
+          "nullable": false,
+          "default_fn": "now()"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    { "from": "mentor_profile", "to": "user", "label": "1:1" },
+    { "from": "student_profile", "to": "user", "label": "1:1" },
+    { "from": "mentor_profile", "to": "company", "label": "N:1" },
+    { "from": "placement", "to": "student_profile", "label": "N:1" },
+    { "from": "placement", "to": "mentor_profile", "label": "N:1" },
+    { "from": "placement", "to": "company", "label": "N:1" },
+    { "from": "placement", "to": "program", "label": "N:1" },
+    { "from": "task", "to": "placement", "label": "N:1" },
+    { "from": "task_checklist_item", "to": "task", "label": "N:1" },
+    { "from": "attendance_log", "to": "placement", "label": "N:1" },
+    {
+      "from": "attendance_log",
+      "to": "mentor_profile",
+      "label": "N:1 (verified_by)"
+    },
+    { "from": "report", "to": "placement", "label": "N:1" },
+    { "from": "report", "to": "mentor_profile", "label": "N:1 (reviewed_by)" },
+    { "from": "final_report", "to": "placement", "label": "1:1" },
+    {
+      "from": "final_report",
+      "to": "mentor_profile",
+      "label": "N:1 (approved_by)"
+    },
+    { "from": "assessment", "to": "placement", "label": "N:1" },
+    {
+      "from": "assessment",
+      "to": "mentor_profile",
+      "label": "N:1 (evaluator)"
+    },
+    { "from": "assessment_item", "to": "assessment", "label": "N:1" },
+    { "from": "attachment", "to": "user", "label": "N:1 (created_by)" },
+    { "from": "notification", "to": "user", "label": "N:1" },
+    { "from": "calendar_event", "to": "placement", "label": "N:1" },
+    { "from": "account", "to": "user", "label": "N:1" },
+    { "from": "session", "to": "user", "label": "N:1" }
+  ],
+  "custom_theme": {
+    "NODE": { "NODE": "#0f172a", "NODE_BORDER": "#38bdf8" },
+    "EDGE": { "EDGE": "#64748b", "LABEL": "#e2e8f0" },
+    "TEXT": { "TEXT": "#e2e8f0" }
+  }
+}
