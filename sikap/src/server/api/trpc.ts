@@ -143,6 +143,14 @@ export const mentorProcedure = protectedProcedure.use(({ ctx, next }) => {
   return next();
 });
 
+export const adminOrMentorProcedure = protectedProcedure.use(({ ctx, next }) => {
+  const role = ctx.session.user.role;
+  if (role !== "admin" && role !== "mentor") {
+    throw new TRPCError({ code: "FORBIDDEN" });
+  }
+  return next();
+});
+
 export const requirePermissions = (permission: Record<string, string[]>) =>
   t.middleware(async ({ ctx, next }) => {
     const has = await auth.api.userHasPermission({
