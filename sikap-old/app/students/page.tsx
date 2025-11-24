@@ -1,0 +1,132 @@
+"use client"
+
+import { useAuth } from "@/lib/auth-context"
+import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Users, Search } from "lucide-react"
+import Link from "next/link"
+
+export default function StudentsPage() {
+  const { user, isLoading } = useAuth()
+  const router = useRouter()
+  const [searchTerm, setSearchTerm] = useState("")
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.push("/login")
+    }
+  }, [user, isLoading, router])
+
+  if (isLoading || !user) return null
+
+  // Mock students data
+  const allStudents = [
+    {
+      id: 1,
+      name: "Ahmad Rizki",
+      studentId: "STU-001",
+      email: "ahmad@example.com",
+      status: "active",
+      reportsSubmitted: 3,
+      averageScore: 8.5,
+      department: "Information Technology",
+    },
+    {
+      id: 2,
+      name: "Siti Nurhaliza",
+      studentId: "STU-002",
+      email: "siti@example.com",
+      status: "active",
+      reportsSubmitted: 4,
+      averageScore: 9.0,
+      department: "Information Technology",
+    },
+    {
+      id: 3,
+      name: "Budi Santoso",
+      studentId: "STU-003",
+      email: "budi@example.com",
+      status: "active",
+      reportsSubmitted: 2,
+      averageScore: 7.8,
+      department: "Information Technology",
+    },
+  ]
+
+  const filteredStudents = allStudents.filter(
+    (student) =>
+      student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.studentId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.email.toLowerCase().includes(searchTerm.toLowerCase()),
+  )
+
+  return (
+    <div className="space-y-6 p-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold">Students</h1>
+        <p className="text-muted-foreground mt-2">
+          {user.role === "mentor" ? "Your assigned students" : "All students in the system"}
+        </p>
+      </div>
+
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search by name, ID, or email..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-10"
+        />
+      </div>
+
+      {/* Students Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filteredStudents.length > 0 ? (
+          filteredStudents.map((student) => (
+            <Card key={student.id} className="hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <CardTitle>{student.name}</CardTitle>
+                    <CardDescription>{student.studentId}</CardDescription>
+                  </div>
+                  <Badge variant="outline">{student.status}</Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2 text-sm">
+                  <p className="text-muted-foreground">
+                    <span className="font-medium">Email:</span> {student.email}
+                  </p>
+                  <p className="text-muted-foreground">
+                    <span className="font-medium">Department:</span> {student.department}
+                  </p>
+                  <p className="text-muted-foreground">
+                    <span className="font-medium">Reports:</span> {student.reportsSubmitted} submitted
+                  </p>
+                  <p className="text-muted-foreground">
+                    <span className="font-medium">Avg Score:</span> {student.averageScore}/10
+                  </p>
+                </div>
+                <Link href={`/students/${student.id}`}>
+                  <Button className="w-full">View Details</Button>
+                </Link>
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          <div className="col-span-full text-center py-12">
+            <Users className="h-12 w-12 text-muted-foreground mx-auto mb-3 opacity-50" />
+            <p className="text-muted-foreground">No students found</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
