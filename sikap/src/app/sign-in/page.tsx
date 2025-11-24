@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 
 import { authClient } from "@/server/better-auth/client";
-import logo from "@/assets/images/logo-regular.svg";
+import logo from "@/assets/images/logo.jpg";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
