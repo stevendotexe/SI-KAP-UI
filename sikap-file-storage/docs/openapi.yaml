@@ -1,0 +1,166 @@
+openapi: "3.0.3"
+info:
+  title: SI-KAP File Storage API
+  version: 1.0.0
+  description: Simple file storage service with upload, static serving, and deletion.
+servers:
+  - url: http://localhost:4000
+tags:
+  - name: Public
+    description: Public endpoints that do not require authentication
+  - name: Private
+    description: Endpoints protected by x-api-key
+security:
+  - ApiKeyAuth: []
+paths:
+  /:
+    get:
+      tags:
+        - Private
+      summary: Health check
+      operationId: getHealth
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Sikap Storage: Env Var Version
+        '401':
+          description: Unauthorized (missing or invalid x-api-key)
+  /upload:
+    post:
+      tags:
+        - Private
+      summary: Upload file
+      operationId: uploadFile
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+                - file
+      responses:
+        '200':
+          description: Upload result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResponse'
+              example:
+                status: success
+                data:
+                  - original_name: photo.jpg
+                    filename: 123e4567-e89b-12d3-a456-426614174000.webp
+                    url: /files/123e4567-e89b-12d3-a456-426614174000.webp
+                    mimetype: image/jpeg
+        '400':
+          description: Bad request (invalid multipart data)
+        '401':
+          description: Unauthorized (missing or invalid x-api-key)
+        '500':
+          description: Internal server error (file write failure)
+  /file/{filename}:
+    delete:
+      tags:
+        - Private
+      summary: Delete file
+      operationId: deleteFile
+      parameters:
+        - in: path
+          name: filename
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Delete result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteResponse'
+              example:
+                status: success
+                message: File deleted
+                filename: example.webp
+        '401':
+          description: Unauthorized (missing or invalid x-api-key)
+  /files/{filename}:
+    get:
+      tags:
+        - Public
+      summary: Get file content
+      operationId: getFile
+      security: []
+      parameters:
+        - in: path
+          name: filename
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: File content
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: File not found
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+  schemas:
+    UploadItem:
+      type: object
+      properties:
+        original_name:
+          type: string
+        filename:
+          type: string
+        url:
+          type: string
+        mimetype:
+          type: string
+      required:
+        - original_name
+        - filename
+        - url
+        - mimetype
+    UploadResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success]
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/UploadItem'
+      required:
+        - status
+        - data
+    DeleteResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success, error]
+        message:
+          type: string
+        filename:
+          type: string
+      required:
+        - status
+        - message

@@ -20,4 +20,6 @@ uuid = { version = "1", features = ["v4", "fast-rng"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
 mime_guess = "2.0"
-image = { version = "0.25.9", default-features = false, features = ["jpeg", "png", "webp"] }
+
+[dev-dependencies]
+tempfile = "3"

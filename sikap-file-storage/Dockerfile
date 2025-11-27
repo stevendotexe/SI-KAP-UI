@@ -1,5 +1,5 @@
 # STAGE 1: Builder
-FROM rust:1-slim-bookworm as builder
+FROM rust:1-slim-bookworm AS builder
 WORKDIR /app
 
 # 1. Copy Cargo.toml DAN Cargo.lock dulu (tanpa source code)
