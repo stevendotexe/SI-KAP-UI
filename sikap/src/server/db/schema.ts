@@ -10,7 +10,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
-export const createTable = pgTableCreator((name) => `pg-drizzle_${name}`);
+export const createTable = pgTableCreator((name) => `${name}`);
 
 /**
  * Enums

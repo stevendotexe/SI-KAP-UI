@@ -28,6 +28,9 @@ yarn-error.log*
 .env*.local
 .env
 
+./sikap-file-storage/.env
+./sikap-file-storage/target/
+
 # vercel
 .vercel
 
