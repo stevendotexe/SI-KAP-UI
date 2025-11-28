@@ -33,11 +33,11 @@ export default function SignInPage() {
         {
           email,
           password,
-          callbackURL: "/",
+          callbackURL: "/dashboard",
         },
         {
           onSuccess: () => {
-            router.push("/");
+            router.push("/dashboard");
           },
           onError: (ctx) => {
             setError(ctx.error.message);

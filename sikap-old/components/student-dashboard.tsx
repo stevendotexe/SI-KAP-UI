@@ -17,7 +17,7 @@ export function StudentDashboard() {
       week: "Week 1",
       date: "2024-01-08",
       status: "submitted",
-      title: "Initial Setup & Orientation",
+      title: "Initial Setup & Orientat",
     },
     {
       id: 2,
