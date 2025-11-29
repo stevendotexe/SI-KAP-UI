@@ -47,7 +47,7 @@ export default function ReportsPage() {
       week: "Week 3",
       date: "2024-01-22",
       status: "pending",
-      title: "API Development",
+      title: "API Developm",
       author: user.role === "admin" ? "Siti Nurhaliza" : undefined,
     },
   ]

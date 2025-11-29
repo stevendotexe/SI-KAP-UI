@@ -100,7 +100,7 @@ export default function NewReportPage() {
               <Input
                 id="title"
                 name="title"
-                placeholder="e.g., Initial Setup & Orientation"
+                placeholder="e.g., Initial Setup & Orientat"
                 value={formData.title}
                 onChange={handleChange}
                 required
