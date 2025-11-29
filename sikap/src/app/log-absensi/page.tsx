@@ -25,8 +25,8 @@ export default function LogAbsensiPage() {
               <thead>
                 <tr className="bg-destructive text-primary-foreground">
                   <th className="text-left font-medium px-4 py-3 border-r border-border last:border-r-0">Tanggal</th>
-                  <th className="text-left font-medium px-4 py-3 border-r border-border last:border-r-0">Absen masuk</th>
-                  <th className="text-left font-medium px-4 py-3">Absen keluar</th>
+                  <th className="text-left font-medium px-4 py-3 border-r border-border last:border-r-0">Absen Masuk</th>
+                  <th className="text-left font-medium px-4 py-3">Absen Keluar</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">

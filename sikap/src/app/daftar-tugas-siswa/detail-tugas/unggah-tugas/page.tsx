@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Send, ChevronLeft, X } from "lucide-react"
 import { useRef, useState } from "react"
 
-export default function UploadTugasPage() {
+export default function UnggahTugasPage() {
   const [text, setText] = useState("")
   const [fileName, setFileName] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState(false)
@@ -43,7 +43,7 @@ export default function UploadTugasPage() {
           </Button>
           <div className="space-y-1">
             <h1 className="text-2xl sm:text-3xl font-semibold">Unggah Tugas</h1>
-            <p className="text-muted-foreground">Unggah hasil pengerjaan tugas anda pada form yang disediakan di bawah ini</p>
+            <p className="text-muted-foreground">Unggah hasil pengerjaan tugas Anda pada form di bawah ini</p>
           </div>
         </div>
 
@@ -71,7 +71,7 @@ export default function UploadTugasPage() {
               className="hidden"
               onChange={(e) => {
                 if (submitted) return
-                const f = e.target.files?.[0] || null
+                const f = e.target.files?.[0] ?? null
                 if (f && f.size > MAX_FILE_SIZE) {
                   alert("Ukuran file tidak boleh melebihi 10MB")
                   e.target.value = ""
@@ -96,7 +96,7 @@ export default function UploadTugasPage() {
               className="relative w-full sm:flex-1 min-w-[220px] rounded-full border border-destructive/60 bg-card text-destructive/80 text-sm h-9 px-4 py-2 break-all text-left"
               style={{ borderStyle: "dashed" }}
             >
-              {fileName ? fileName : "Belum ada lampiran"}
+              {fileName ?? "Belum ada lampiran"}
               {/* Clear file button (X) only when not submitted */}
               {fileName && !submitted && (
                 <button
@@ -122,9 +122,9 @@ export default function UploadTugasPage() {
                 variant="outline"
                 onClick={handleReset}
                 className="px-5 h-9 rounded-md border-destructive text-destructive hover:bg-destructive/10"
-                title="Clear"
+                title="Bersihkan"
               >
-                Clear
+                Bersihkan
               </Button>
             )}
             <Button
@@ -132,10 +132,10 @@ export default function UploadTugasPage() {
               className="px-5 h-9 rounded-md"
               onClick={handleSubmit}
               disabled={submitted || (!text.trim() && !fileName)}
-              title={submitted ? "Sudah dikirim" : "Kirim"}
+              title={submitted ? "Sudah terkirim" : "Kirim"}
             >
               <Send className="size-4" />
-              <span className="ml-2">{submitted ? "Dikirim" : "Kirim"}</span>
+              <span className="ml-2">{submitted ? "Terkirim" : "Kirim"}</span>
             </Button>
           </div>
         </section>

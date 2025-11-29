@@ -175,7 +175,7 @@ export default function RaporAkhirPage() {
                         </td>
                       </tr>
 
-                      {/* Total & Rata-rata */}
+                      {/* Total & Rata-Rata */}
                       <tr>
                         <td className="border border-border px-3 py-2 font-medium" colSpan={2}>
                           Total Nilai
@@ -184,7 +184,7 @@ export default function RaporAkhirPage() {
                       </tr>
                       <tr>
                         <td className="border border-border px-3 py-2 font-medium" colSpan={2}>
-                          Rata-rata
+                          Rata-Rata
                         </td>
                         <td className="border border-border px-3 py-2">92</td>
                       </tr>

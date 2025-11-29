@@ -14,7 +14,10 @@ import {
 export default function LaporanSiswaPage() {
   const [q, setQ] = useState("")
   const [selectedDate, setSelectedDate] = useState<number | null>(null)
-  const [selectedStatus, setSelectedStatus] = useState<"terkumpul" | "ditinjau" | null>(null)
+  const [selectedStatus, setSelectedStatus] = useState<"Terkumpul" | "Ditinjau" | null>(null)
+
+  // gunakan Array.from agar lebih jelas dan bebas lint
+  const days = Array.from({ length: 31 }, (_, i) => i + 1)
 
   return (
     <main className="w-full max-w-none p-0 pr-4 sm:pr-6 lg:pr-10 pl-4 sm:pl-6 lg:pl-10 space-y-5">
@@ -39,7 +42,7 @@ export default function LaporanSiswaPage() {
         <Input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Cari Berdasarkan Judul Laporan atau Nama Siswa"
+          placeholder="Cari judul laporan atau nama siswa"
           className="w-full rounded-full bg-white border text-gray-700 placeholder:text-gray-400 h-10 px-4"
         />
       </div>
@@ -55,8 +58,7 @@ export default function LaporanSiswaPage() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-44 rounded-xl border bg-card shadow-sm p-0">
             <div className="max-h-64 overflow-auto py-1">
-              {[...Array(31)].map((_, i) => {
-                const day = i + 1
+              {days.map((day) => {
                 const active = selectedDate === day
                 return (
                   <DropdownMenuItem
@@ -89,7 +91,7 @@ export default function LaporanSiswaPage() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-44 rounded-xl border bg-card shadow-sm p-0">
             <div className="max-h-64 overflow-auto py-1">
-              {(["terkumpul", "ditinjau"] as const).map((st) => {
+              {(["Terkumpul", "Ditinjau"] as const).map((st) => {
                 const active = selectedStatus === st
                 return (
                   <DropdownMenuItem
@@ -127,7 +129,7 @@ export default function LaporanSiswaPage() {
 
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center rounded-full bg-green-100 text-green-700 px-3 py-1 text-xs font-medium">
-                terkumpul
+                Terkumpul
               </span>
               <Button className="bg-red-500 hover:bg-red-600 text-white h-9 px-3 rounded-md" asChild>
                 <Link href="/laporan-siswa/detail-laporan">Lihat Detail</Link>
@@ -147,7 +149,7 @@ export default function LaporanSiswaPage() {
 
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center rounded-full bg-amber-100 text-amber-700 px-3 py-1 text-xs font-medium">
-                ditinjau
+                Ditinjau
               </span>
               <Button className="bg-red-500 hover:bg-red-600 text-white h-9 px-3 rounded-md" asChild>
                 <Link href="/laporan-siswa/detail-laporan">Lihat Detail</Link>
