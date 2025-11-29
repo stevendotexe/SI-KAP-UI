@@ -459,6 +459,8 @@ export const report = createTable(
     submittedAt: d.timestamp({ withTimezone: true }),
     reviewedByMentorId: d.integer().references(() => mentorProfile.id),
     reviewStatus: reviewStatus("review_status").notNull().default("pending"),
+    reviewNotes: d.text(),
+    reviewedAt: d.timestamp({ withTimezone: true }),
     score: d.numeric({ precision: 5, scale: 2 }),
     createdAt: d
       .timestamp({ withTimezone: true })
@@ -638,6 +640,7 @@ export const calendarEvent = createTable("calendar_event", (d) => ({
   title: d.text().notNull(),
   description: d.text(),
   scheduledAt: d.timestamp({ withTimezone: true }).notNull(),
+  endDate: d.timestamp({ withTimezone: true }),
   location: d.text(),
   createdById: d.varchar({ length: 255 }).references(() => user.id),
   createdAt: d
