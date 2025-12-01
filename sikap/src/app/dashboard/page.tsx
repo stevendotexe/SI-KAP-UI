@@ -90,7 +90,10 @@ export default function DashboardPage() {
 			if (!navigator.geolocation) return reject(new Error("Geolocation tidak didukung"))
 			navigator.geolocation.getCurrentPosition(
 				(pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-				(err) => reject(err),
+					(err) => {
+						if (err instanceof Error) reject(err)
+						else reject(new Error(typeof err === "string" ? err : JSON.stringify(err)))
+					},
 				{ enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
 			)
 		})
@@ -104,8 +107,8 @@ export default function DashboardPage() {
 				{ headers: { "Accept-Language": "id" } }
 			)
 			if (!res.ok) throw new Error("reverse geocode gagal")
-			const data = await res.json()
-			return data?.display_name || "Alamat tidak ditemukan"
+			const data = (await res.json()) as { display_name?: string } | null
+			return data?.display_name ?? "Alamat tidak ditemukan"
 		} catch {
 			return "Alamat tidak ditemukan"
 		}
@@ -140,7 +143,7 @@ export default function DashboardPage() {
 		// keep which context is active before closing dialog
 		const forWhich = cameraOpenFor
 
-		canvas.toBlob(async (blob) => {
+		canvas.toBlob((blob) => {
 			if (!blob || !forWhich) return
 			const fileName = `capture-${Date.now()}.png`
 			if (forWhich === "masuk") setMasukImageName(fileName)
@@ -154,18 +157,20 @@ export default function DashboardPage() {
 			setCameraOpenFor(null)
 			stopCamera()
 
-			// then get geolocation and reverse-geocode
-			try {
-				const { latitude, longitude } = await getCoords()
-				const addr = await reverseGeocode(latitude, longitude)
-				const label = `${addr} (${latitude.toFixed(6)}, ${longitude.toFixed(6)})`
-				if (forWhich === "masuk") setMasukLocation(label)
-				else setKeluarLocation(label)
-			} catch {
-				const fallback = "Lokasi tidak tersedia"
-				if (forWhich === "masuk") setMasukLocation(fallback)
-				else setKeluarLocation(fallback)
-			}
+			// then get geolocation and reverse-geocode (run async work inside IIFE)
+			void (async () => {
+				try {
+					const { latitude, longitude } = await getCoords()
+					const addr = await reverseGeocode(latitude, longitude)
+					const label = `${addr} (${latitude.toFixed(6)}, ${longitude.toFixed(6)})`
+					if (forWhich === "masuk") setMasukLocation(label)
+					else setKeluarLocation(label)
+				} catch {
+					const fallback = "Lokasi tidak tersedia"
+					if (forWhich === "masuk") setMasukLocation(fallback)
+					else setKeluarLocation(fallback)
+				}
+			})()
 
 			// TODO: convert blob to File if you need to upload immediately:
 			// const file = new File([blob], fileName, { type: "image/png" })
@@ -174,7 +179,7 @@ export default function DashboardPage() {
 	}
 
 	// Mock persist helper (replace with real API call)
-	async function saveAttendance(which: "masuk" | "keluar") {
+	async function saveAttendance(_which: "masuk" | "keluar") {
 		// TODO: call your backend API here with imageName, location, timestamp, etc.
 		// await fetch("/api/attendance", { method: "POST", body: JSON.stringify(payload) })
 		return Promise.resolve()
@@ -290,12 +295,12 @@ export default function DashboardPage() {
 												type="file"
 												accept="image/*"
 												className="hidden"
-												onChange={async (e) => {
+												onChange={(e) => {
 													const f = e.target.files?.[0]
 													if (f) {
 														setMasukImageName(f.name)
 														setMasukAt(formatTs()) // NEW: stamp at upload time
-														await setLocationFor("masuk")
+														void setLocationFor("masuk")
 													} else {
 														setMasukImageName("")
 														setMasukLocation("")
@@ -318,7 +323,7 @@ export default function DashboardPage() {
 													}`}
 													onClick={() => {
 														setCameraOpenFor("masuk")
-														setTimeout(startCamera, 0)
+															setTimeout(() => void startCamera(), 0)
 													}}
 													title={isMasukSaved || isIzinSaved ? "Tidak tersedia" : "Ambil Foto"}
 												>
@@ -391,12 +396,12 @@ export default function DashboardPage() {
 												type="file"
 												accept="image/*"
 												className="hidden"
-												onChange={async (e) => {
+												onChange={(e) => {
 													const f = e.target.files?.[0]
 													if (f) {
 														setKeluarImageName(f.name)
 														setKeluarAt(formatTs()) // NEW: stamp at upload time
-														await setLocationFor("keluar")
+														void setLocationFor("keluar")
 													} else {
 														setKeluarImageName("")
 														setKeluarLocation("")
@@ -421,7 +426,7 @@ export default function DashboardPage() {
 													onClick={() => {
 														if (!isMasukSaved) return
 														setCameraOpenFor("keluar")
-														setTimeout(startCamera, 0)
+															setTimeout(() => void startCamera(), 0)
 													}}
 												>
 													<LogOut className="w-4 h-4" />
@@ -517,7 +522,7 @@ export default function DashboardPage() {
 								onClick={() => {
 									setUseFrontCamera((prev) => !prev)
 									// restart with the other facing mode
-									setTimeout(startCamera, 0)
+									setTimeout(() => void startCamera(), 0)
 								}}
 								title="Ganti Kamera"
 							>

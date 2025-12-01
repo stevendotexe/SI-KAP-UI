@@ -55,7 +55,7 @@ export default function LaporanSiswaPage() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-44 rounded-xl border bg-card shadow-sm p-0">
             <div className="max-h-64 overflow-auto py-1">
-              {[...Array(31)].map((_, i) => {
+              {Array.from({ length: 31 }).map((_, i) => {
                 const day = i + 1
                 const active = selectedDate === day
                 return (

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { alias } from "drizzle-orm/pg-core";
-import { and, eq, gte, lte, or, sql } from "drizzle-orm";
+import { and, eq, gte, lte, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 import {

@@ -71,7 +71,7 @@ export default function BuatLaporanPage() {
               className="hidden"
               onChange={(e) => {
                 if (submitted) return
-                const f = e.target.files?.[0] || null
+                const f = e.target.files?.[0] ?? null
                 if (f && f.size > MAX_FILE_SIZE) {
                   alert("Ukuran file melebihi 10MB")
                   e.target.value = ""
@@ -95,7 +95,7 @@ export default function BuatLaporanPage() {
               className="relative w-full sm:flex-1 min-w-[220px] rounded-full border border-destructive/60 bg-card text-destructive/80 text-sm h-9 px-4 py-2 break-all text-left" // + text-left
               style={{ borderStyle: "dashed" }}
             >
-              {fileName ? fileName : "Belum ada file"}
+              {fileName ?? "Belum ada file"}
               {/* Clear file button (X) only when not submitted */}
               {fileName && !submitted && (
                 <button
