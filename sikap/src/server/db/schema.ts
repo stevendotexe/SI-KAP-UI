@@ -45,6 +45,7 @@ export const ownerType = pgEnum("owner_type", [
   "report",
   "final_report",
   "assessment",
+  "attendance_log",
 ]);
 export const notificationType = pgEnum("notification_type", [
   "assignment",

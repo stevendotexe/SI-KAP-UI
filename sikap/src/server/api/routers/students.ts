@@ -18,8 +18,10 @@ import {
   task,
   studentProfile,
   user,
+  attachment,
 } from "@/server/db/schema";
 import { calculateDistanceInMeters } from "@/lib/haversine";
+import { buildPublicUrlAction } from "@/server/storage";
 
 const docs = {
   list: {
@@ -56,11 +58,11 @@ const docs = {
   },
   checkIn: {
     description:
-      "## Check In (Siswa)\n\nMelakukan absensi masuk dengan validasi jarak maksimum 100 meter.\n\n### Parameters\n- `latitude` (number)\n- `longitude` (number)\n\n### Response\n`{ success: true }`.\n\n### Example (React)\n```ts\nconst m = api.students.checkIn.useMutation();\nm.mutate({ latitude, longitude });\n```",
+      "## Check In (Siswa)\n\nMelakukan absensi masuk dengan validasi jarak maksimum 100 meter dan wajib menyertakan nama file selfie yang sudah di-upload oleh FE.\n\n### Parameters\n- `latitude` (number)\n- `longitude` (number)\n- `selfieFilename` (string)\n\n### Response\n`{ success: true }`.\n\n### Example (React)\n```ts\nconst m = api.students.checkIn.useMutation();\nm.mutate({ latitude, longitude, selfieFilename: 'in.jpg' });\n```",
   },
   checkOut: {
     description:
-      "## Check Out (Siswa)\n\nMelakukan absensi keluar dengan validasi jarak maksimum 100 meter dan memastikan sudah check-in.\n\n### Parameters\n- `latitude` (number)\n- `longitude` (number)\n\n### Response\n`{ success: true }`.\n\n### Example (React)\n```ts\nconst m = api.students.checkOut.useMutation();\nm.mutate({ latitude, longitude });\n```",
+      "## Check Out (Siswa)\n\nMelakukan absensi keluar dengan validasi jarak maksimum 100 meter, memastikan sudah check-in, dan wajib menyertakan nama file selfie yang sudah di-upload oleh FE.\n\n### Parameters\n- `latitude` (number)\n- `longitude` (number)\n- `selfieFilename` (string)\n\n### Response\n`{ success: true }`.\n\n### Example (React)\n```ts\nconst m = api.students.checkOut.useMutation();\nm.mutate({ latitude, longitude, selfieFilename: 'out.jpg' });\n```",
   },
 };
 
@@ -549,7 +551,13 @@ export const studentsRouter = createTRPCRouter({
         studentProfile: ["read"],
       }),
     )
-    .input(z.object({ latitude: z.number(), longitude: z.number() }))
+    .input(
+      z.object({
+        latitude: z.number(),
+        longitude: z.number(),
+        selfieFilename: z.string().min(1),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const student = await ctx.db.query.studentProfile.findFirst({
         where: eq(studentProfile.userId, ctx.session.user.id),
@@ -620,7 +628,23 @@ export const studentsRouter = createTRPCRouter({
         latitude: input.latitude.toString(),
         longitude: input.longitude.toString(),
       });
-
+      const saved = await ctx.db.query.attendanceLog.findFirst({
+        where: and(
+          eq(attendanceLog.placementId, activePlacement.id),
+          eq(attendanceLog.date, todayStr),
+        ),
+      });
+      if (!saved) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      }
+      const url = buildPublicUrlAction(input.selfieFilename);
+      await ctx.db.insert(attachment).values({
+        ownerType: "attendance_log",
+        ownerId: saved.id,
+        filename: input.selfieFilename,
+        url,
+        createdById: ctx.session.user.id,
+      });
       return { success: true };
     }),
 
@@ -633,7 +657,13 @@ export const studentsRouter = createTRPCRouter({
         studentProfile: ["read"],
       }),
     )
-    .input(z.object({ latitude: z.number(), longitude: z.number() }))
+    .input(
+      z.object({
+        latitude: z.number(),
+        longitude: z.number(),
+        selfieFilename: z.string().min(1),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const student = await ctx.db.query.studentProfile.findFirst({
         where: eq(studentProfile.userId, ctx.session.user.id),
@@ -703,7 +733,14 @@ export const studentsRouter = createTRPCRouter({
         .update(attendanceLog)
         .set({ checkOutAt: new Date() })
         .where(eq(attendanceLog.id, existing.id));
-
+      const url = buildPublicUrlAction(input.selfieFilename);
+      await ctx.db.insert(attachment).values({
+        ownerType: "attendance_log",
+        ownerId: existing.id,
+        filename: input.selfieFilename,
+        url,
+        createdById: ctx.session.user.id,
+      });
       return { success: true };
     }),
 });

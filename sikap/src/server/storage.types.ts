@@ -16,4 +16,9 @@ export type DeleteResponse = {
   filename?: string;
 };
 
-export type OwnerType = "task" | "report" | "final_report" | "assessment";
+export type OwnerType =
+  | "task"
+  | "report"
+  | "final_report"
+  | "assessment"
+  | "attendance_log";
