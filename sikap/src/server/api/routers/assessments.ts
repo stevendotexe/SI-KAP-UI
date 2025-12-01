@@ -3,14 +3,13 @@ import { and, eq, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 import {
-  adminOrMentorProcedure,
+  protectedProcedure,
   createTRPCRouter,
   requirePermissions,
 } from "@/server/api/trpc";
 import {
   assessment,
   assessmentItem,
-  mentorProfile,
   placement,
   studentProfile,
 } from "@/server/db/schema";
@@ -18,12 +17,12 @@ import {
 const docs = {
   detailFinalReport: {
     description:
-      "## Detail Final Report (Admin/Mentor)\n\nMengambil profil siswa dan seluruh asesmen beserta item untuk perhitungan total dan rata-rata.\n\n### Parameters\n- `studentUserId` (string)\n\n### Response\n`{ profile, assessments, totals, lastUpdated }` di mana `totals = { totalScore: number, averageScore: number, itemsCount: number }`.\n\n### Example (React)\n```ts\nconst { data } = api.assessments.detailFinalReport.useQuery({ studentUserId });\n```",
+      "## Detail Final Report (Siswa)\n\nMengambil profil siswa yang sedang login dan seluruh asesmen beserta item untuk perhitungan total dan rata-rata.\n\n### Parameters\nTidak ada.\n\n### Response\n`{ profile, assessments, totals, lastUpdated }` di mana `totals = { totalScore: number, averageScore: number, itemsCount: number }`.\n\n### Example (React)\n```ts\nconst { data } = api.assessments.detailFinalReport.useQuery();\n```",
   },
 };
 
 export const assessmentsRouter = createTRPCRouter({
-  detailFinalReport: adminOrMentorProcedure
+  detailFinalReport: protectedProcedure
     .meta(docs.detailFinalReport)
     .use(
       requirePermissions({
@@ -32,33 +31,13 @@ export const assessmentsRouter = createTRPCRouter({
         placement: ["read"],
       }),
     )
-    .input(z.object({ studentUserId: z.string() }))
-    .query(async ({ ctx, input }) => {
+    .query(async ({ ctx }) => {
       const sp = await ctx.db.query.studentProfile.findFirst({
-        where: eq(studentProfile.userId, input.studentUserId),
+        where: eq(studentProfile.userId, ctx.session.user.id),
         with: { user: true },
       });
-      if (!sp) throw new TRPCError({ code: "NOT_FOUND" });
-
-      let mentorFilterId: number | null = null;
-      if (ctx.session.user.role === "mentor") {
-        const mp = await ctx.db.query.mentorProfile.findFirst({
-          where: eq(mentorProfile.userId, ctx.session.user.id),
-        });
-        if (!mp) throw new TRPCError({ code: "FORBIDDEN" });
-        mentorFilterId = mp.id;
-        const placementRows = await ctx.db
-          .select({ id: placement.id })
-          .from(placement)
-          .where(
-            and(
-              eq(placement.studentId, sp.id),
-              eq(placement.mentorId, mentorFilterId),
-            ),
-          )
-          .limit(1);
-        if (!placementRows[0]) throw new TRPCError({ code: "FORBIDDEN" });
-      }
+      if (!sp)
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Not a student" });
 
       const rows = await ctx.db
         .select({
@@ -77,12 +56,7 @@ export const assessmentsRouter = createTRPCRouter({
           assessmentItem,
           eq(assessmentItem.assessmentId, assessment.id),
         )
-        .where(
-          and(
-            eq(placement.studentId, sp.id),
-            mentorFilterId ? eq(placement.mentorId, mentorFilterId) : undefined,
-          ),
-        )
+        .where(and(eq(placement.studentId, sp.id)))
         .orderBy(assessment.createdAt, assessmentItem.position);
 
       const grouped = new Map<

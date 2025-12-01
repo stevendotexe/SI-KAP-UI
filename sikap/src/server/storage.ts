@@ -1,5 +1,3 @@
-"use server";
-
 import { env } from "@/env";
 import { db } from "@/server/db";
 import { attachment } from "@/server/db/schema";
@@ -48,6 +46,8 @@ async function maybeCompress(blob: Blob): Promise<Blob> {
 export async function uploadFilesAction(
   formData: FormData,
 ): Promise<UploadResponse> {
+  "use server";
+
   const session = await getSession();
   if (!session?.user) {
     throw new Error("UNAUTHORIZED");
@@ -134,6 +134,8 @@ export async function deleteFileAction(
   filename: string,
   owner?: { ownerType: OwnerType; ownerId: number },
 ): Promise<DeleteResponse> {
+  "use server";
+
   const session = await getSession();
   if (!session?.user) {
     throw new Error("UNAUTHORIZED");
