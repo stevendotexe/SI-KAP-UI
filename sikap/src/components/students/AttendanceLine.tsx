@@ -21,10 +21,10 @@ function normalize(points: Point[], width: number, height: number, padding = 8) 
   return { path, area, coords }
 }
 
-export default function AttendanceLine({ data }: { data: Point[] }) {
+export default function AttendanceLine({ data, height = 120, padding = 8 }: { data: Point[]; height?: number; padding?: number }) {
   const w = 320
-  const h = 120
-  const { path, coords } = normalize(data, w, h)
+  const h = height
+  const { path, coords } = normalize(data, w, h, padding)
   const [hover, setHover] = React.useState<{ i: number; x: number; y: number } | null>(null)
 
   function onMove(e: React.MouseEvent<SVGSVGElement>) {
@@ -44,10 +44,10 @@ export default function AttendanceLine({ data }: { data: Point[] }) {
   }
 
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-32 text-primary" onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-full text-primary" style={{ height }} onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
       {/* axes */}
-      <line x1={8} y1={h - 8} x2={w - 8} y2={h - 8} stroke="var(--border)" strokeWidth={1} />
-      <line x1={8} y1={8} x2={8} y2={h - 8} stroke="var(--border)" strokeWidth={1} />
+      <line x1={padding} y1={h - padding} x2={w - padding} y2={h - padding} stroke="var(--border)" strokeWidth={1} />
+      <line x1={padding} y1={padding} x2={padding} y2={h - padding} stroke="var(--border)" strokeWidth={1} />
       {/* line */}
       {path && (
         <path
