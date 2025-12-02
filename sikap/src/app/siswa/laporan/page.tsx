@@ -14,13 +14,13 @@ import {
 export default function LaporanSiswaPage() {
   const [q, setQ] = useState("")
   const [selectedDate, setSelectedDate] = useState<number | null>(null)
-  const [selectedStatus, setSelectedStatus] = useState<"Terkumpul" | "Direview" | "Belum direview" | null>(null)
+  const [selectedStatus, setSelectedStatus] = useState<"Terkumpul" | "Direview" | "Belum Direview" | null>(null)
 
   // gunakan Array.from agar lebih jelas dan bebas lint
   const days = Array.from({ length: 31 }, (_, i) => i + 1)
 
   return (
-    <main className="w-full max-w-none p-0 pr-4 sm:pr-6 lg:pr-10 pl-4 sm:pl-6 lg:pl-10 space-y-5">
+    <main className="w-full max-w-none p-5 pr-4 sm:pr-6 lg:pr-10 pl-4 sm:pl-6 lg:pl-10 space-y-5">
       {/* Header judul + aksi */}
       <div className="flex items-center justify-between">
         <div>
@@ -91,7 +91,7 @@ export default function LaporanSiswaPage() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-44 rounded-xl border bg-card shadow-sm p-0">
             <div className="max-h-64 overflow-auto py-1">
-              {(["Terkumpul", "Direview", "Menunggu Direview"] as const).map((st) => {
+              {(["Terkumpul", "Direview", "Belum Direview"] as const).map((st) => {
                 const active = selectedStatus === st
                 return (
                   <DropdownMenuItem

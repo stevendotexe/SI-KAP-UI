@@ -298,7 +298,7 @@ export default function DashboardPage() {
         <QueryClientProvider client={queryClientRef.current}>
             <div className="min-h-screen bg-muted/30 p-0 m-0">
                 <div className="w-full max-w-none p-0 m-0">
-                    <main className="space-y-6 p-0 pr-4 sm:pr-6 lg:pr-10 pl-4 sm:pl-6 lg:pl-10">
+                    <main className="space-y-6 p-5 pr-4 sm:pr-6 lg:pr-10 pl-4 sm:pl-6 lg:pl-10">
                         <section className="p-0">
                             <h1 className="text-2xl sm:text-3xl font-semibold">Selamat datang, Siswa!</h1>
                             <p className="text-muted-foreground mt-1">ID Siswa: 010101</p>

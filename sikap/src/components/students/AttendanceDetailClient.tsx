@@ -28,7 +28,7 @@ export default function AttendanceDetailClient({ date, initial }: { date: string
 
       <div className="mt-3">
         <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="min-w-[240px] w-full sm:w-fit">
+          <SelectTrigger className="min-w-60 w-full sm:w-fit">
             <SelectValue placeholder="Semua Status" />
           </SelectTrigger>
           <SelectContent>
