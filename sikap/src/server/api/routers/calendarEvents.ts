@@ -3,27 +3,36 @@ import { alias } from "drizzle-orm/pg-core";
 import { and, eq, gte, lte, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
+import { adminOrMentorProcedure, createTRPCRouter, requirePermissions } from "@/server/api/trpc";
 import {
-  adminOrMentorProcedure,
-  createTRPCRouter,
-  requirePermissions,
-} from "@/server/api/trpc";
-import {
+  attachment,
   calendarEvent,
+  eventType,
   mentorProfile,
   placement,
+  type AttachmentInsert,
+  type CalendarEventInsert,
   user,
 } from "@/server/db/schema";
 
 const docs = {
   list: {
     description:
-      "## List Calendar Events (Admin/Mentor)\n\nFilter per bulan untuk menampilkan rentang event (start–due) dalam sebuah company.\n\n### Parameters\n- `companyId` (number)\n- `month` (1-12, optional, default bulan ini)\n- `year` (number, optional, default tahun ini)\n\n### Response\nArray `items` berisi `{ id, title, startDate, dueDate, type, placementId }` untuk ditampilkan di kalender.\n\n### Example (React)\n```ts\nconst { data } = api.calendarEvents.list.useQuery({ companyId: 1, month: 8, year: 2025 });\n```",
+      "## List Calendar Events (Admin/Mentor)\n\nFilter per bulan + tipe + pencarian judul/penyelenggara.\n\n### Parameters\n- `companyId` (number)\n- `month` (1-12, optional, default bulan ini)\n- `year` (number, optional, default tahun ini)\n- `type` (in_class | field_trip | meet_greet | meeting | deadline | milestone, optional)\n- `search` (string, optional; judul atau penyelenggara)\n\n### Response\nArray `items` berisi `{ id, title, startDate, dueDate, type, organizerName, colorHex, placementId }`.\n\n### Example (React)\n```ts\nconst { data } = api.calendarEvents.list.useQuery({ companyId: 1, month: 8, year: 2025, type: 'field_trip' });\n```",
   },
   detail: {
     description:
-      "## Detail Calendar Event (Admin/Mentor)\n\nMengembalikan semua field event untuk tampilan detail.\n\n### Parameters\n- `eventId` (number)\n\n### Response\n`{ id, title, description, type, startDate, dueDate, placementId, createdBy }`.\n\n### Example (React)\n```ts\nconst { data } = api.calendarEvents.detail.useQuery({ eventId: 10 });\n```",
+      "## Detail Calendar Event (Admin/Mentor)\n\nMengembalikan semua field event termasuk lampiran.\n\n### Parameters\n- `eventId` (number)\n\n### Response\n`{ id, title, description, type, startDate, dueDate, organizerName, organizerLogoUrl, colorHex, placementId, attachments, createdBy }`.\n\n### Example (React)\n```ts\nconst { data } = api.calendarEvents.detail.useQuery({ eventId: 10 });\n```",
   },
+  create: {
+    description:
+      "## Create Calendar Event\n\nMembuat event baru.\n\n### Parameters\n- `title` (string)\n- `type` (in_class | field_trip | meet_greet | meeting | deadline | milestone)\n- `date` (Date)\n- `endDate` (Date, optional)\n- `description` (string, optional)\n- `location` (string, optional)\n- `organizerName` (string, optional)\n- `organizerLogoUrl` (string, optional)\n- `colorHex` (string, optional)\n- `placementId` (number, optional)\n- `attachments` (array `{ url, filename? }`, optional)\n\n### Response\n`{ id }`.\n\n### Example (React)\n```ts\nconst m = api.calendarEvents.create.useMutation();\nm.mutate({ title: 'Workshop', type: 'in_class', date: new Date(), organizerName: 'PT TI' });\n```",
+  },
+  update: {
+    description:
+      "## Update Calendar Event\n\nMengubah event dan lampiran.\n\n### Parameters\n- `eventId` (number)\n- field sama seperti create (opsional)\n\n### Response\n`{ ok: true }`.",
+  },
+  delete: { description: "## Delete Calendar Event\n\nHapus event beserta lampirannya." },
 };
 
 const creatorUser = alias(user, "creator_user");
@@ -46,6 +55,8 @@ export const calendarEventsRouter = createTRPCRouter({
         companyId: z.number(),
         month: z.number().min(1).max(12).optional(),
         year: z.number().optional(),
+        type: z.enum(eventType.enumValues).optional(),
+        search: z.string().optional(),
       }),
     )
     .query(async ({ ctx, input }) => {
@@ -64,10 +75,7 @@ export const calendarEventsRouter = createTRPCRouter({
 
       const startDateExpr = sql`(${calendarEvent.scheduledAt})::date`;
       const dueDateExpr = sql`coalesce(${calendarEvent.endDate}, ${calendarEvent.scheduledAt})::date`;
-      const overlapWhere = and(
-        lte(startDateExpr, endStr),
-        gte(dueDateExpr, startStr),
-      );
+      const overlapWhere = and(lte(startDateExpr, endStr), gte(dueDateExpr, startStr));
 
       const rows = await ctx.db
         .select({
@@ -77,6 +85,8 @@ export const calendarEventsRouter = createTRPCRouter({
           type: calendarEvent.type,
           startDate: calendarEvent.scheduledAt,
           dueDate: calendarEvent.endDate,
+          organizerName: calendarEvent.organizerName,
+          colorHex: calendarEvent.colorHex,
           placementId: placement.id,
         })
         .from(calendarEvent)
@@ -86,6 +96,10 @@ export const calendarEventsRouter = createTRPCRouter({
             eq(placement.companyId, input.companyId),
             mentorFilterId ? eq(placement.mentorId, mentorFilterId) : undefined,
             overlapWhere,
+            input.type ? eq(calendarEvent.type, input.type) : undefined,
+            input.search
+              ? sql`(lower(${calendarEvent.title}) like ${"%" + input.search.toLowerCase() + "%"} or lower(${calendarEvent.organizerName}) like ${"%" + input.search.toLowerCase() + "%"})`
+              : undefined,
           ),
         )
         .orderBy(calendarEvent.scheduledAt);
@@ -96,18 +110,15 @@ export const calendarEventsRouter = createTRPCRouter({
         type: r.type,
         startDate: r.startDate,
         dueDate: r.dueDate ?? r.startDate,
+        organizerName: r.organizerName ?? null,
+        colorHex: r.colorHex ?? null,
         placementId: r.placementId,
       }));
     }),
 
   detail: adminOrMentorProcedure
     .meta(docs.detail)
-    .use(
-      requirePermissions({
-        calendarEvent: ["read"],
-        placement: ["read"],
-      }),
-    )
+    .use(requirePermissions({ calendarEvent: ["read"], placement: ["read"] }))
     .input(z.object({ eventId: z.number() }))
     .query(async ({ ctx, input }) => {
       const rows = await ctx.db
@@ -118,6 +129,9 @@ export const calendarEventsRouter = createTRPCRouter({
           type: calendarEvent.type,
           startDate: calendarEvent.scheduledAt,
           dueDate: calendarEvent.endDate,
+          organizerName: calendarEvent.organizerName,
+          organizerLogoUrl: calendarEvent.organizerLogoUrl,
+          colorHex: calendarEvent.colorHex,
           placementId: placement.id,
           createdById: calendarEvent.createdById,
           createdByName: creatorUser.name,
@@ -145,6 +159,10 @@ export const calendarEventsRouter = createTRPCRouter({
         }
       }
 
+      const files = await ctx.db.query.attachment.findMany({
+        where: and(eq(attachment.ownerType, "calendar_event"), eq(attachment.ownerId, ev.id)),
+      });
+
       return {
         id: ev.id,
         title: ev.title,
@@ -152,6 +170,9 @@ export const calendarEventsRouter = createTRPCRouter({
         type: ev.type,
         startDate: ev.startDate,
         dueDate: ev.dueDate ?? ev.startDate,
+        organizerName: ev.organizerName ?? null,
+        organizerLogoUrl: ev.organizerLogoUrl ?? null,
+        colorHex: ev.colorHex ?? null,
         placementId: ev.placementId,
         createdBy: ev.createdById
           ? {
@@ -160,6 +181,147 @@ export const calendarEventsRouter = createTRPCRouter({
               email: ev.createdByEmail ?? null,
             }
           : null,
+        attachments: files.map((f) => ({
+          id: f.id,
+          url: f.url,
+          filename: f.filename ?? null,
+          mimeType: f.mimeType ?? null,
+          sizeBytes: f.sizeBytes ?? null,
+        })),
       };
+    }),
+
+  create: adminOrMentorProcedure
+    .meta(docs.create)
+    .use(requirePermissions({ calendarEvent: ["create"], placement: ["read"] }))
+    .input(
+      z.object({
+        title: z.string().min(1),
+        type: z.enum(eventType.enumValues),
+        date: z.date(),
+        endDate: z.date().optional(),
+        description: z.string().optional(),
+        location: z.string().optional(),
+        organizerName: z.string().optional(),
+        organizerLogoUrl: z.string().url().optional(),
+        colorHex: z.string().optional(),
+        placementId: z.number().optional(),
+        attachments: z
+          .array(
+            z.object({
+              url: z.string().url(),
+              filename: z.string().optional(),
+            }),
+          )
+          .optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const payload: CalendarEventInsert = {
+        title: input.title,
+        type: input.type,
+        scheduledAt: input.date,
+        endDate: input.endDate ?? null,
+        description: input.description ?? null,
+        location: input.location ?? null,
+        organizerName: input.organizerName ?? null,
+        organizerLogoUrl: input.organizerLogoUrl ?? null,
+        colorHex: input.colorHex ?? null,
+        placementId: input.placementId ?? null,
+        createdById: ctx.session.user.id,
+      };
+      const inserted = await ctx.db.insert(calendarEvent).values(payload).returning({ id: calendarEvent.id });
+      const eventId = inserted[0]?.id;
+      if (!eventId) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      if (input.attachments?.length) {
+        const values = input.attachments.map(
+          (a): AttachmentInsert => ({
+            ownerType: "calendar_event",
+            ownerId: eventId,
+            url: a.url,
+            filename: a.filename ?? null,
+            createdById: ctx.session.user.id,
+          }),
+        );
+        await ctx.db.insert(attachment).values(values);
+      }
+
+      return { id: eventId };
+    }),
+
+  update: adminOrMentorProcedure
+    .meta(docs.update)
+    .use(requirePermissions({ calendarEvent: ["update"], placement: ["read"] }))
+    .input(
+      z.object({
+        eventId: z.number(),
+        title: z.string().optional(),
+        type: z.enum(eventType.enumValues).optional(),
+        date: z.date().optional(),
+        endDate: z.date().optional(),
+        description: z.string().optional(),
+        location: z.string().optional(),
+        organizerName: z.string().optional(),
+        organizerLogoUrl: z.string().url().optional(),
+        colorHex: z.string().optional(),
+        placementId: z.number().optional(),
+        attachments: z
+          .array(
+            z.object({
+              url: z.string().url(),
+              filename: z.string().optional(),
+            }),
+          )
+          .optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const existing = await ctx.db.query.calendarEvent.findFirst({ where: eq(calendarEvent.id, input.eventId) });
+      if (!existing) throw new TRPCError({ code: "NOT_FOUND" });
+
+      await ctx.db
+        .update(calendarEvent)
+        .set({
+          title: input.title ?? undefined,
+          type: input.type ?? undefined,
+          scheduledAt: input.date ?? undefined,
+          endDate: input.endDate ?? undefined,
+          description: input.description ?? undefined,
+          location: input.location ?? undefined,
+          organizerName: input.organizerName ?? undefined,
+          organizerLogoUrl: input.organizerLogoUrl ?? undefined,
+          colorHex: input.colorHex ?? undefined,
+          placementId: input.placementId ?? undefined,
+        })
+        .where(eq(calendarEvent.id, input.eventId));
+
+      if (input.attachments) {
+        await ctx.db.delete(attachment).where(and(eq(attachment.ownerType, "calendar_event"), eq(attachment.ownerId, input.eventId)));
+        if (input.attachments.length) {
+          const values = input.attachments.map(
+            (a): AttachmentInsert => ({
+              ownerType: "calendar_event",
+              ownerId: input.eventId,
+              url: a.url,
+              filename: a.filename ?? null,
+              createdById: ctx.session.user.id,
+            }),
+          );
+          await ctx.db.insert(attachment).values(values);
+        }
+      }
+
+      return { ok: true };
+    }),
+
+  delete: adminOrMentorProcedure
+    .meta(docs.delete)
+    .use(requirePermissions({ calendarEvent: ["delete"] }))
+    .input(z.object({ eventId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db.delete(attachment).where(and(eq(attachment.ownerType, "calendar_event"), eq(attachment.ownerId, input.eventId)));
+      await ctx.db.delete(calendarEvent).where(eq(calendarEvent.id, input.eventId));
+      return { ok: true };
     }),
 });
