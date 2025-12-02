@@ -548,12 +548,11 @@ export default function DashboardPage() {
 
                                 {/* Stats (tetap) */}
                                 <div className="order-2 md:order-1">
-                                    <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                         {[
-                                            { title: "Ditugaskan", value: "2", sub: "Minggu ini" },
-                                            { title: "Menunggu Tinjauan", value: "1", sub: "Menunggu respon Mentor" },
+                                            { title: "Belum Dikerjakan", value: "2", sub: "Minggu ini" },
+                                            { title: "Menunggu Direview", value: "1", sub: "Menunggu respon Mentor" },
                                             { title: "Laporan Terkirim", value: "3", sub: "Minggu ini" },
-                                            { title: "Skor Rata-Rata", value: "8.5", sub: "Dari 10" },
                                         ].map((card) => (
                                             <div key={card.title} className="rounded-2xl border bg-card p-5 shadow-sm">
                                                 <div className="text-sm font-semibold text-foreground">{card.title}</div>
@@ -578,39 +577,61 @@ export default function DashboardPage() {
                         }
                     }}
                 >
-                    <DialogContent className="sm:max-w-md rounded-sm">
-                        <DialogHeader>
-                            <DialogTitle>Ambil Foto {cameraOpenFor === "masuk" ? "Masuk" : "Keluar"}</DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-3">
-                            <div className="relative bg-black rounded-sm overflow-hidden">
-                                <video ref={videoRef} className="w-full h-auto" playsInline />
-                            </div>
-                            <canvas ref={canvasRef} className="hidden" />
-                            <div className="flex items-center justify-between gap-3">
-                                <Button
-                                    variant="outline"
-                                    className="h-9"
-                                    onClick={() => {
-                                        setUseFrontCamera((prev) => !prev)
-                                        setTimeout(() => void startCamera(), 0)
-                                    }}
-                                    title="Ganti Kamera"
-                                >
-                                    <RefreshCcw className="mr-2 h-4 w-4" />
-                                    Ganti Kamera
-                                </Button>
-                                <div className="flex items-center gap-2">
-                                    <Button variant="outline" className="h-9" onClick={() => { setCameraOpenFor(null); void stopCamera() }}>
-                                        Batal
-                                    </Button>
-                                    <Button variant="destructive" className="h-9" onClick={() => void capturePhoto()}>
-                                        Ambil Foto
-                                    </Button>
-                                </div>
-                            </div>
+                    <DialogContent
+                      className="w-full max-w sm:max-w-lg rounded-10" // square dialog
+                    >
+                      <DialogHeader>
+                        <DialogTitle>Ambil Foto {cameraOpenFor === "masuk" ? "Masuk" : "Keluar"}</DialogTitle>
+                      </DialogHeader>
+
+                      <div className="space-y-3">
+                        {/* Preview area: square corners */}
+                        <div className="aspect-video w-full bg-black rounded-none overflow-hidden">
+                          <video
+                            ref={videoRef}
+                            className="w-full h-full object-cover"
+                            playsInline
+                          />
                         </div>
-                        <DialogFooter />
+                        <canvas ref={canvasRef} className="hidden" />
+
+                        {/* Controls: make buttons square */}
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <Button
+                            variant="outline"
+                            className="h-9 rounded-md"
+                            onClick={() => {
+                              setUseFrontCamera((prev) => !prev)
+                              setTimeout(() => void startCamera(), 0)
+                            }}
+                            title="Ganti Kamera"
+                          >
+                            <RefreshCcw className="mr-2 h-4 w-4" />
+                            Ganti Kamera
+                          </Button>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button
+                              variant="outline"
+                              className="h-9 rounded-md"
+                              onClick={() => {
+                                setCameraOpenFor(null)
+                                void stopCamera()
+                              }}
+                            >
+                              Batal
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              className="h-9 rounded-md"
+                              onClick={() => void capturePhoto()}
+                            >
+                              Ambil Foto
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <DialogFooter />
                     </DialogContent>
                 </Dialog>
 

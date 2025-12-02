@@ -14,7 +14,7 @@ import {
 export default function LaporanSiswaPage() {
   const [q, setQ] = useState("")
   const [selectedDate, setSelectedDate] = useState<number | null>(null)
-  const [selectedStatus, setSelectedStatus] = useState<"Terkumpul" | "Ditinjau" | null>(null)
+  const [selectedStatus, setSelectedStatus] = useState<"Terkumpul" | "Direview" | "Belum direview" | null>(null)
 
   // gunakan Array.from agar lebih jelas dan bebas lint
   const days = Array.from({ length: 31 }, (_, i) => i + 1)
@@ -91,7 +91,7 @@ export default function LaporanSiswaPage() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-44 rounded-xl border bg-card shadow-sm p-0">
             <div className="max-h-64 overflow-auto py-1">
-              {(["Terkumpul", "Ditinjau"] as const).map((st) => {
+              {(["Terkumpul", "Direview", "Menunggu Direview"] as const).map((st) => {
                 const active = selectedStatus === st
                 return (
                   <DropdownMenuItem
@@ -149,7 +149,7 @@ export default function LaporanSiswaPage() {
 
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center rounded-full bg-amber-100 text-amber-700 px-3 py-1 text-xs font-medium">
-                Ditinjau
+                Direview
               </span>
               <Button className="bg-red-500 hover:bg-red-600 text-white h-9 px-3 rounded-md" asChild>
                 <Link href="/siswa/laporan/detail-laporan">Lihat Detail</Link>
