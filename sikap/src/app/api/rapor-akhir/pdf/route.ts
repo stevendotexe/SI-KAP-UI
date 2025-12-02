@@ -1,11 +1,16 @@
-import { NextRequest } from "next/server"
+import { type NextRequest } from "next/server"
 import { spawn } from "child_process"
 
 export const runtime = "nodejs"
 
 export async function POST(req: NextRequest) {
   try {
-    const { html } = await req.json()
+    const body = (await req.json()) as unknown
+    const html =
+      typeof body === "object" && body !== null && "html" in body
+        ? (body as { html?: unknown }).html
+        : undefined
+
     if (!html || typeof html !== "string") {
       return new Response("HTML tidak valid", { status: 400 })
     }
@@ -21,11 +26,17 @@ export async function POST(req: NextRequest) {
     const chunks: Buffer[] = []
     const errors: Buffer[] = []
 
-    child.stdout.on("data", (d) => chunks.push(Buffer.from(d)))
-    child.stderr.on("data", (e) => errors.push(Buffer.from(e)))
+    child.stdout.on("data", (d: unknown) => {
+      if (d instanceof Buffer) chunks.push(d)
+      else chunks.push(Buffer.from(String(d)))
+    })
+    child.stderr.on("data", (e: unknown) => {
+      if (e instanceof Buffer) errors.push(e)
+      else errors.push(Buffer.from(String(e)))
+    })
 
     const exitCode: number = await new Promise((resolve) => {
-      child.on("close", resolve)
+      child.on("close", (code) => resolve(code ?? 1))
     })
 
     if (exitCode !== 0) {
@@ -41,7 +52,17 @@ export async function POST(req: NextRequest) {
         "Content-Disposition": 'attachment; filename="rapor-akhir.pdf"',
       },
     })
-  } catch (e: any) {
-    return new Response(e?.message || "Kesalahan server", { status: 500 })
+  } catch (err: unknown) {
+    if (err instanceof Error) {
+      return new Response(err.message ?? "Kesalahan server", { status: 500 })
+    }
+    if (typeof err === "string") {
+      return new Response(err, { status: 500 })
+    }
+    try {
+      return new Response(JSON.stringify(err ?? "Kesalahan server"), { status: 500 })
+    } catch {
+      return new Response("Kesalahan server", { status: 500 })
+    }
   }
 }
