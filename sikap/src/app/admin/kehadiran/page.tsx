@@ -7,13 +7,69 @@ import { Search, Download, Calendar, ChevronLeft, ChevronRight } from "lucide-re
 
 // Dummy data
 const attendanceData = [
-  { id: 1, name: "Ahmad Fauzi", school: "SMK Negeri 1", status: "Hadir", checkIn: "07:45", checkOut: "16:00" },
-  { id: 2, name: "Siti Aisyah", school: "SMK Negeri 2", status: "Hadir", checkIn: "07:30", checkOut: "16:15" },
-  { id: 3, name: "Rudi Hermawan", school: "SMK Negeri 1", status: "Izin", checkIn: "-", checkOut: "-" },
-  { id: 4, name: "Maya Putri", school: "SMK Negeri 3", status: "Hadir", checkIn: "08:00", checkOut: "16:00" },
-  { id: 5, name: "Dian Prasetyo", school: "SMK Negeri 2", status: "Tidak Hadir", checkIn: "-", checkOut: "-" },
-  { id: 6, name: "Eko Prasetyo", school: "SMK Negeri 1", status: "Hadir", checkIn: "07:55", checkOut: "16:10" },
-  { id: 7, name: "Fitri Handayani", school: "SMK Negeri 3", status: "Terlambat", checkIn: "08:30", checkOut: "16:00" },
+  {
+    id: 1,
+    name: "Ahmad Fauzi",
+    school: "SMK Negeri 1",
+    status: "Hadir",
+    checkIn: "07:45",
+    checkOut: "16:00",
+    counters: { hadir: 45, tidakHadir: 2, izin: 1, terlambat: 3 }
+  },
+  {
+    id: 2,
+    name: "Siti Aisyah",
+    school: "SMK Negeri 2",
+    status: "Hadir",
+    checkIn: "07:30",
+    checkOut: "16:15",
+    counters: { hadir: 48, tidakHadir: 1, izin: 0, terlambat: 2 }
+  },
+  {
+    id: 3,
+    name: "Rudi Hermawan",
+    school: "SMK Negeri 1",
+    status: "Izin",
+    checkIn: "-",
+    checkOut: "-",
+    counters: { hadir: 42, tidakHadir: 3, izin: 4, terlambat: 2 }
+  },
+  {
+    id: 4,
+    name: "Maya Putri",
+    school: "SMK Negeri 3",
+    status: "Hadir",
+    checkIn: "08:00",
+    checkOut: "16:00",
+    counters: { hadir: 50, tidakHadir: 0, izin: 1, terlambat: 0 }
+  },
+  {
+    id: 5,
+    name: "Dian Prasetyo",
+    school: "SMK Negeri 2",
+    status: "Tidak Hadir",
+    checkIn: "-",
+    checkOut: "-",
+    counters: { hadir: 38, tidakHadir: 8, izin: 2, terlambat: 3 }
+  },
+  {
+    id: 6,
+    name: "Eko Prasetyo",
+    school: "SMK Negeri 1",
+    status: "Hadir",
+    checkIn: "07:55",
+    checkOut: "16:10",
+    counters: { hadir: 47, tidakHadir: 1, izin: 1, terlambat: 2 }
+  },
+  {
+    id: 7,
+    name: "Fitri Handayani",
+    school: "SMK Negeri 3",
+    status: "Terlambat",
+    checkIn: "08:30",
+    checkOut: "16:00",
+    counters: { hadir: 40, tidakHadir: 2, izin: 3, terlambat: 6 }
+  },
 ];
 
 const statusConfig: Record<string, string> = {
@@ -134,9 +190,13 @@ export default function AdminKehadiranPage() {
                   <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">No</th>
                   <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">Nama Siswa</th>
                   <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">Sekolah</th>
-                  <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">Status</th>
+                  <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">Status Hari Ini</th>
                   <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">Jam Masuk</th>
                   <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">Jam Keluar</th>
+                  <th className="text-center text-sm font-medium text-emerald-700 px-4 py-3 bg-emerald-50">H</th>
+                  <th className="text-center text-sm font-medium text-red-700 px-4 py-3 bg-red-50">TH</th>
+                  <th className="text-center text-sm font-medium text-blue-700 px-4 py-3 bg-blue-50">I</th>
+                  <th className="text-center text-sm font-medium text-amber-700 px-4 py-3 bg-amber-50">T</th>
                 </tr>
               </thead>
               <tbody>
@@ -147,15 +207,18 @@ export default function AdminKehadiranPage() {
                     <td className="px-4 py-3 text-sm">{attendance.school}</td>
                     <td className="px-4 py-3">
                       <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          statusConfig[attendance.status] ?? "bg-gray-100 text-gray-700"
-                        }`}
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusConfig[attendance.status] ?? "bg-gray-100 text-gray-700"
+                          }`}
                       >
                         {attendance.status}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm font-mono">{attendance.checkIn}</td>
                     <td className="px-4 py-3 text-sm font-mono">{attendance.checkOut}</td>
+                    <td className="px-4 py-3 text-center text-sm font-semibold text-emerald-700">{attendance.counters.hadir}</td>
+                    <td className="px-4 py-3 text-center text-sm font-semibold text-red-700">{attendance.counters.tidakHadir}</td>
+                    <td className="px-4 py-3 text-center text-sm font-semibold text-blue-700">{attendance.counters.izin}</td>
+                    <td className="px-4 py-3 text-center text-sm font-semibold text-amber-700">{attendance.counters.terlambat}</td>
                   </tr>
                 ))}
               </tbody>

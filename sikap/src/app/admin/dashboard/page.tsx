@@ -115,7 +115,9 @@ export default async function AdminDashboardPage() {
                 <AttendanceLine data={avgScores} />
               </div>
               <div className="text-xs text-muted-foreground mt-2">
-                Senin - Minggu
+                {avgScores.length > 0
+                  ? `${avgScores[0]?.period} - ${avgScores[avgScores.length - 1]?.period}`
+                  : "Periode"}
               </div>
             </StatisticCard>
 
@@ -132,7 +134,9 @@ export default async function AdminDashboardPage() {
                 <AttendanceLine data={avgAttendances} />
               </div>
               <div className="text-xs text-muted-foreground mt-2">
-                Senin - Minggu
+                {avgAttendances.length > 0
+                  ? `${avgAttendances[0]?.period} - ${avgAttendances[avgAttendances.length - 1]?.period}`
+                  : "Periode"}
               </div>
             </StatisticCard>
           </div>
@@ -142,7 +146,7 @@ export default async function AdminDashboardPage() {
             <div>
               <StatisticCard
                 title="Pertumbuhan Siswa"
-                subtitle="Seluruh Periode"
+                subtitle="Periode"
                 value={studentGrowth.length ? `${growthPercent}%` : "-"}
               >
                 <div className="mt-2">
@@ -189,7 +193,7 @@ export default async function AdminDashboardPage() {
                   {counts?.graduates ?? "-"}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  Seluruh Periode
+                  Periode
                 </div>
               </div>
             </div>

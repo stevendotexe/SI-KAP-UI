@@ -17,6 +17,7 @@ import {
   LogOut,
   ChevronDown,
   Settings,
+  Sparkles,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -42,6 +43,7 @@ const navItems: Record<SidebarProps["role"], NavItem[]> = {
     { label: "Kalender", href: "/siswa/kalender", icon: <Calendar size={20} /> },
     { label: "Log Absensi", href: "/siswa/log-absensi", icon: <Clock size={20} /> },
     { label: "Biodata", href: "/siswa/biodata", icon: <User size={20} /> },
+    { label: "Aktivitas", href: "/siswa/aktivitas", icon: <Sparkles size={20} /> },
     { label: "Rapor Akhir", href: "/siswa/rapor-akhir", icon: <Award size={20} /> },
   ],
   mentor: [
@@ -51,6 +53,7 @@ const navItems: Record<SidebarProps["role"], NavItem[]> = {
     { label: "Laporan", href: "/mentor/laporan", icon: <FileText size={20} /> },
     { label: "Kehadiran", href: "/mentor/kehadiran", icon: <CheckSquare size={20} /> },
     { label: "Kalender", href: "/mentor/kalender", icon: <Calendar size={20} /> },
+    { label: "Aktivitas", href: "/mentor/aktivitas", icon: <Sparkles size={20} /> },
     { label: "Rapor Akhir", href: "/mentor/rapor-akhir", icon: <Award size={20} /> },
   ],
   admin: [
@@ -60,6 +63,8 @@ const navItems: Record<SidebarProps["role"], NavItem[]> = {
     { label: "Laporan", href: "/admin/laporan", icon: <FileText size={20} /> },
     { label: "Kehadiran", href: "/admin/kehadiran", icon: <CheckSquare size={20} /> },
     { label: "Kalender", href: "/admin/kalender", icon: <Calendar size={20} /> },
+    { label: "Aktivitas", href: "/admin/aktivitas", icon: <Sparkles size={20} /> },
+    { label: "Rapor Akhir", href: "/admin/rapor-akhir", icon: <Award size={20} /> },
   ],
 };
 

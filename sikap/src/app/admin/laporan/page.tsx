@@ -16,7 +16,7 @@ import {
 const reports = [
   { id: 1, studentId: 1, student: "Ahmad Fauzi", title: "Laporan Minggu 1", type: "Mingguan", date: "2024-11-25", status: "Disetujui", mentor: "Budi Santoso", score: 85 },
   { id: 2, studentId: 2, student: "Siti Aisyah", title: "Laporan Minggu 2", type: "Mingguan", date: "2024-11-24", status: "Menunggu", mentor: "Dewi Lestari", score: null },
-  { id: 3, studentId: 3, student: "Rudi Hermawan", title: "Laporan Minggu 1", type: "Mingguan", date: "2024-11-23", status: "Ditolak", mentor: "Budi Santoso", score: null },
+  { id: 3, studentId: 3, student: "Rudi Hermawan", title: "Laporan Minggu 1", type: "Mingguan", date: "2024-11-23", status: "Belum Diserahkan", mentor: "Budi Santoso", score: null },
   { id: 4, studentId: 4, student: "Maya Putri", title: "Laporan Akhir", type: "Akhir", date: "2024-11-22", status: "Disetujui", mentor: "Andi Wijaya", score: 92 },
   { id: 5, studentId: 5, student: "Dian Prasetyo", title: "Laporan Minggu 3", type: "Mingguan", date: "2024-11-21", status: "Menunggu", mentor: "Dewi Lestari", score: null },
 ];
@@ -24,7 +24,7 @@ const reports = [
 const statusConfig = {
   Disetujui: { icon: <CheckCircle className="w-4 h-4" />, class: "bg-emerald-100 text-emerald-700" },
   Menunggu: { icon: <Clock className="w-4 h-4" />, class: "bg-amber-100 text-amber-700" },
-  Ditolak: { icon: <XCircle className="w-4 h-4" />, class: "bg-red-100 text-red-700" },
+  "Belum Diserahkan": { icon: <XCircle className="w-4 h-4" />, class: "bg-gray-100 text-gray-700" },
 };
 
 export default function AdminLaporanPage() {
@@ -80,12 +80,12 @@ export default function AdminLaporanPage() {
           </div>
           <div className="rounded-2xl border bg-card p-4 shadow-sm">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-full bg-red-100">
-                <XCircle className="w-5 h-5 text-red-600" />
+              <div className="p-2 rounded-full bg-gray-100">
+                <XCircle className="w-5 h-5 text-gray-600" />
               </div>
               <div>
-                <div className="text-2xl font-semibold">{reports.filter((r) => r.status === "Ditolak").length}</div>
-                <div className="text-sm text-muted-foreground">Ditolak</div>
+                <div className="text-2xl font-semibold">{reports.filter((r) => r.status === "Belum Diserahkan").length}</div>
+                <div className="text-sm text-muted-foreground">Belum Diserahkan</div>
               </div>
             </div>
           </div>
@@ -112,7 +112,7 @@ export default function AdminLaporanPage() {
               <DropdownMenuItem onClick={() => setStatusFilter(null)}>Semua Status</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setStatusFilter("Disetujui")}>Disetujui</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setStatusFilter("Menunggu")}>Menunggu</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setStatusFilter("Ditolak")}>Ditolak</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setStatusFilter("Belum Diserahkan")}>Belum Diserahkan</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
