@@ -53,7 +53,7 @@ export default function AppShell({
         )}
 
         {/* Page Content */}
-        <main className="flex-1 pt-6">{children}</main>
+        <main className="flex-1 pt-0">{children}</main>
 
         {/* Footer */}
         {showFooter && <Footer />}
