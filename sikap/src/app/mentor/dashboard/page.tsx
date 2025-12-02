@@ -164,7 +164,7 @@ export default async function DashboardPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Kolom kiri: dua kolom kartu statistik */}
-          <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 items-start content-start">
             <StatisticCard
               title="Rata - Rata Skor Siswa"
               subtitle="Keseluruhan"
@@ -211,7 +211,7 @@ export default async function DashboardPage() {
             </StatisticCard>
 
             {/* Ringkasan singkat (kartu kecil) */}
-            <div className="space-y-4">
+            <div className="space-y-3 mt-0">
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-card border rounded-xl shadow-sm p-4">
                   <div className="text-xs text-muted-foreground">Jumlah Siswa</div>

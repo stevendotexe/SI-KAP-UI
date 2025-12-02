@@ -51,7 +51,7 @@ export default function DetailTugasSiswaPage() {
                   className="h-9 px-4"
                   asChild
                 >
-                  <Link href="/daftar-tugas-siswa/detail-tugas/unggah-tugas">
+                  <Link href="/siswa/tugas/detail-tugas/unggah-tugas">
                     <span className="mr-2 text-lg leading-none">＋</span>
                     Unggah tugas
                   </Link>

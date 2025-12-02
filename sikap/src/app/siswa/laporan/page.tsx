@@ -30,7 +30,7 @@ export default function LaporanSiswaPage() {
 
         {/* tombol buat laporan dipindahkan ke halaman daftar tugas siswa */}
         {/* <Button className="bg-red-500 hover:bg-red-600 text-white h-9 px-4 rounded-md" asChild>
-          <Link href="/laporan-siswa/buat-laporan">
+          <Link href="/siswa/laporan/buat-laporan">
             <span className="mr-2 text-lg leading-none">＋</span>
             buat laporan
           </Link>
@@ -132,7 +132,7 @@ export default function LaporanSiswaPage() {
                 Terkumpul
               </span>
               <Button className="bg-red-500 hover:bg-red-600 text-white h-9 px-3 rounded-md" asChild>
-                <Link href="/laporan-siswa/detail-laporan">Lihat Detail</Link>
+                <Link href="/siswa/laporan/detail-laporan">Lihat Detail</Link>
               </Button>
             </div>
           </div>
@@ -152,7 +152,7 @@ export default function LaporanSiswaPage() {
                 Ditinjau
               </span>
               <Button className="bg-red-500 hover:bg-red-600 text-white h-9 px-3 rounded-md" asChild>
-                <Link href="/laporan-siswa/detail-laporan">Lihat Detail</Link>
+                <Link href="/siswa/laporan/detail-laporan">Lihat Detail</Link>
               </Button>
             </div>
           </div>

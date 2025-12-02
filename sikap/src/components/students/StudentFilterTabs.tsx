@@ -10,25 +10,27 @@ type Props = {
 
 export default function StudentFilterTabs({ mode, onModeChange }: Props) {
   return (
-    <div className="space-y-4">
-      <div className="bg-card border rounded-xl shadow-sm p-3 inline-flex gap-2">
-        <Button
-          variant={mode === "laporan" ? "destructive" : "secondary"}
-          size="sm"
-          className="rounded-(--radius-md)"
-          onClick={() => onModeChange("laporan")}
-        >
-          Laporan
-        </Button>
-        <Button
-          variant={mode === "informasi" ? "destructive" : "secondary"}
-          size="sm"
-          className="rounded-(--radius-md)"
-          onClick={() => onModeChange("informasi")}
-        >
-          Informasi
-        </Button>
-      </div>
+    <div className="flex gap-2">
+      <button
+        onClick={() => onModeChange("laporan")}
+        className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+          mode === "laporan"
+            ? "bg-red-500 text-white"
+            : "bg-gray-100 text-gray-900 hover:bg-gray-200"
+        }`}
+      >
+        Laporan
+      </button>
+      <button
+        onClick={() => onModeChange("informasi")}
+        className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+          mode === "informasi"
+            ? "bg-red-500 text-white"
+            : "bg-gray-100 text-gray-900 hover:bg-gray-200"
+        }`}
+      >
+        Informasi
+      </button>
     </div>
   )
 }

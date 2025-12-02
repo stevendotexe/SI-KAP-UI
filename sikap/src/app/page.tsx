@@ -5,7 +5,15 @@ export default async function Home() {
   const session = await getSession();
 
   if (session) {
-    redirect("dashboard");
+    // Redirect based on user role
+    const role = session.user.role;
+    if (role === "admin") {
+      redirect("/admin/dashboard");
+    } else if (role === "mentor") {
+      redirect("/mentor/dashboard");
+    } else {
+      redirect("/siswa/dashboard");
+    }
   }
 
   return (

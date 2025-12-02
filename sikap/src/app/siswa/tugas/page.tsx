@@ -53,7 +53,7 @@ export default function DaftarTugasSiswaPage() {
 
                   <div className="flex items-center">
                     <Button variant="destructive" className="h-9 px-4" asChild>
-                      <Link href="/daftar-tugas-siswa/detail-tugas">Lihat Detail</Link>
+                      <Link href="/siswa/tugas/detail-tugas">Lihat Detail</Link>
                     </Button>
                   </div>
                 </div>

@@ -40,13 +40,13 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   ]
 
   const info = {
-    email: "-",
-    sekolah,
+    email: found?.email ?? "rafif@gmail.com",
+    sekolah: sekolah || "SMK 13 Tasikmalaya",
     jurusan: found?.major ?? "-",
     mulai: "15-06-2025",
     selesai: "15-12-2025",
-    mesh: status,
-    alamat: "-",
+    mesh: "Masuk",
+    alamat: "Jl.Pendidikan No.31",
   }
 
   return (
