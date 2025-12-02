@@ -2,21 +2,9 @@ import { z } from "zod";
 import { and, eq, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
-import {
-  createTRPCRouter,
-  adminOrMentorProcedure,
-  requirePermissions,
-} from "@/server/api/trpc";
+import { createTRPCRouter, adminOrMentorProcedure, protectedProcedure, requirePermissions } from "@/server/api/trpc";
 import { auth } from "@/server/better-auth";
-import {
-  assessment,
-  attendanceLog,
-  mentorProfile,
-  placement,
-  report,
-  studentProfile,
-  user,
-} from "@/server/db/schema";
+import { assessment, attendanceLog, mentorProfile, placement, report, studentProfile, user } from "@/server/db/schema";
 
 const docs = {
   list: {
@@ -42,6 +30,14 @@ const docs = {
   delete: {
     description:
       "## Delete Siswa\n\nMenghapus akun siswa dan seluruh relasi yang dikaitkan.\n\n### Parameters\n- `userId` (string)\n\n### Response\n`{ ok: true }`.\n\n### Example (React)\n```ts\nconst m = api.students.delete.useMutation();\nm.mutate({ userId });\n```",
+  },
+  me: {
+    description:
+      "## Profile Siswa (Self)\n\nAmbil biodata siswa yang sedang login.\n\n### Response\n`{ id, userId, name, email, nis, birthPlace, birthDate, gender, semester, school, major, cohort, address, phone }`.\n\n### Example (React)\n```ts\nconst { data } = api.students.me.useQuery();\n```",
+  },
+  updateProfile: {
+    description:
+      "## Update Profile Siswa (Self)\n\nPerbarui biodata siswa yang sedang login.\n\n### Parameters\n- `name` (string, optional)\n- `nis` (string, optional)\n- `birthPlace` (string, optional)\n- `birthDate` (Date, optional)\n- `gender` (string, optional)\n- `semester` (number, optional)\n- `school` (string, optional)\n- `major` (string, optional)\n- `cohort` (string, optional)\n- `address` (string, optional)\n- `phone` (string, optional)\n\n### Response\nProfil yang sudah diperbarui.\n\n### Example (React)\n```ts\nconst m = api.students.updateProfile.useMutation();\nm.mutate({ name: 'Rafif', nis: '123', semester: 6 });\n```",
   },
 };
 
@@ -340,5 +336,99 @@ export const studentsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await ctx.db.delete(user).where(eq(user.id, input.userId));
       return { ok: true };
+    }),
+
+  me: protectedProcedure
+    .meta(docs.me)
+    .query(async ({ ctx }) => {
+      if (ctx.session.user.role !== "student") throw new TRPCError({ code: "FORBIDDEN" });
+      const sp = await ctx.db.query.studentProfile.findFirst({
+        where: eq(studentProfile.userId, ctx.session.user.id),
+        with: { user: true },
+      });
+      if (!sp) throw new TRPCError({ code: "NOT_FOUND" });
+      return {
+        id: sp.id,
+        userId: sp.userId,
+        name: sp.user?.name ?? "",
+        email: sp.user?.email ?? "",
+        nis: sp.nis ?? null,
+        birthPlace: sp.birthPlace ?? null,
+        birthDate: sp.birthDate ?? null,
+        gender: sp.gender ?? null,
+        semester: sp.semester ?? null,
+        school: sp.school ?? null,
+        major: sp.major ?? null,
+        cohort: sp.cohort ?? null,
+        address: sp.address ?? null,
+        phone: sp.phone ?? null,
+      };
+    }),
+
+  updateProfile: protectedProcedure
+    .meta(docs.updateProfile)
+    .input(
+      z.object({
+        name: z.string().min(1).optional(),
+        nis: z.string().optional(),
+        birthPlace: z.string().optional(),
+        birthDate: z.date().optional(),
+        gender: z.string().optional(),
+        semester: z.number().optional(),
+        school: z.string().optional(),
+        major: z.string().optional(),
+        cohort: z.string().optional(),
+        address: z.string().optional(),
+        phone: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.session.user.role !== "student") throw new TRPCError({ code: "FORBIDDEN" });
+      const sp = await ctx.db.query.studentProfile.findFirst({
+        where: eq(studentProfile.userId, ctx.session.user.id),
+      });
+      if (!sp) throw new TRPCError({ code: "NOT_FOUND" });
+
+      await ctx.db
+        .update(studentProfile)
+        .set({
+          nis: input.nis ?? undefined,
+          birthPlace: input.birthPlace ?? undefined,
+          birthDate: input.birthDate ? input.birthDate.toISOString().slice(0, 10) : undefined,
+          gender: input.gender ?? undefined,
+          semester: input.semester ?? undefined,
+          school: input.school ?? undefined,
+          major: input.major ?? undefined,
+          cohort: input.cohort ?? undefined,
+          address: input.address ?? undefined,
+          phone: input.phone ?? undefined,
+        })
+        .where(eq(studentProfile.id, sp.id));
+
+      if (input.name) {
+        await ctx.db.update(user).set({ name: input.name }).where(eq(user.id, ctx.session.user.id));
+      }
+
+      const updated = await ctx.db.query.studentProfile.findFirst({
+        where: eq(studentProfile.userId, ctx.session.user.id),
+        with: { user: true },
+      });
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND" });
+      return {
+        id: updated.id,
+        userId: updated.userId,
+        name: updated.user?.name ?? "",
+        email: updated.user?.email ?? "",
+        nis: updated.nis ?? null,
+        birthPlace: updated.birthPlace ?? null,
+        birthDate: updated.birthDate ?? null,
+        gender: updated.gender ?? null,
+        semester: updated.semester ?? null,
+        school: updated.school ?? null,
+        major: updated.major ?? null,
+        cohort: updated.cohort ?? null,
+        address: updated.address ?? null,
+        phone: updated.phone ?? null,
+      };
     }),
 });

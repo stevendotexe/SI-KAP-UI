@@ -245,9 +245,15 @@ export const studentProfile = createTable(
       .varchar({ length: 255 })
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    nis: d.text(),
+    birthPlace: d.text(),
+    birthDate: d.date(),
+    gender: d.text(),
+    semester: d.integer(),
     school: d.text(),
     major: d.text(),
     cohort: d.text(),
+    address: d.text(),
     phone: d.varchar({ length: 30 }),
     active: d.boolean().notNull().default(true),
     createdAt: d
@@ -353,6 +359,8 @@ export const task = createTable(
       .$defaultFn(() => new Date())
       .notNull(),
     updatedAt: d.timestamp({ withTimezone: true }).$onUpdate(() => new Date()),
+    submissionNote: d.text(),
+    submittedAt: d.timestamp({ withTimezone: true }),
   }),
   (t) => [
     index("task_placement_status_idx").on(t.placementId, t.status),
