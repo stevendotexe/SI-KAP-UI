@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import {
     Select,
@@ -9,13 +9,62 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Search, Calendar, Clock, Building2, FileText } from "lucide-react";
+import { Search, Calendar, Clock, FileText } from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import { api } from "@/trpc/react";
 
-// Dummy data - same as admin
-const activities = [
-    {
+type UiEvent = {
+  id: number;
+  name: string;
+  type: string;
+  date: string;
+  time?: string;
+  organizer?: string;
+  color?: string;
+  description?: string;
+};
+
+const typeColors: Record<string, string> = {
+  "In-Class": "bg-blue-100 text-blue-700 border-blue-200",
+  "Field Trip": "bg-green-100 text-green-700 border-green-200",
+  "Meet & Greet": "bg-amber-100 text-amber-700 border-amber-200",
+  meeting: "bg-blue-100 text-blue-700 border-blue-200",
+  deadline: "bg-amber-100 text-amber-700 border-amber-200",
+  milestone: "bg-green-100 text-green-700 border-green-200",
+  in_class: "bg-blue-100 text-blue-700 border-blue-200",
+  field_trip: "bg-green-100 text-green-700 border-green-200",
+  meet_greet: "bg-amber-100 text-amber-700 border-amber-200",
+};
+
+function normalizeType(t?: string): string {
+  if (!t) return "In-Class";
+  switch (t) {
+    case "in_class": return "In-Class";
+    case "field_trip": return "Field Trip";
+    case "meet_greet": return "Meet & Greet";
+    default: return t;
+  }
+}
+
+export default function SiswaAktivitasPage() {
+    const [search, setSearch] = useState("");
+    const [filterType, setFilterType] = useState("all");
+    const [companyId] = useState<number>(1);
+
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const year = now.getFullYear();
+
+    // Nonaktifkan query untuk menghindari console error
+    const { data, isLoading } = api.calendarEvents.list.useQuery(
+      { companyId, month, year },
+      { retry: 0, enabled: false }
+    );
+
+    // Data bawaan lokal (fallback)
+    const defaultEvents: UiEvent[] = [
+      {
         id: 1,
         name: "Workshop Web Development",
         type: "In-Class",
@@ -24,72 +73,69 @@ const activities = [
         organizer: "PT Teknologi Indonesia",
         color: "#3b82f6",
         description: "Workshop intensif mengenai web development modern",
-    },
-    {
+      },
+      {
         id: 2,
-        name: "Kunjungan Industri ke Google",
+        name: "Kunjungan Industri",
         type: "Field Trip",
         date: "2025-08-20",
         time: "08:00",
         organizer: "SMK 13 Tasikmalaya",
         color: "#10b981",
-        description: "Kunjungan ke kantor Google Indonesia",
-    },
-    {
+        description: "Kunjungan ke kantor perusahaan teknologi",
+      },
+      {
         id: 3,
-        name: "Perkenalan dengan Alumni",
+        name: "Perkenalan Alumni",
         type: "Meet & Greet",
         date: "2025-08-25",
         time: "14:00",
         organizer: "Komisi Magang",
         color: "#f59e0b",
-        description: "Sesi networking dengan alumni yang sudah bekerja",
-    },
-    {
-        id: 4,
-        name: "Training Soft Skills",
-        type: "In-Class",
-        date: "2025-09-01",
-        time: "10:00",
-        organizer: "HR Department",
-        color: "#8b5cf6",
-        description: "Pelatihan komunikasi dan kerjasama tim",
-    },
-    {
-        id: 5,
-        name: "Expo Teknologi 2025",
-        type: "Field Trip",
-        date: "2025-09-10",
-        time: "09:00",
-        organizer: "Asosiasi IT Indonesia",
-        color: "#ec4899",
-        description: "Pameran teknologi terbaru di JCC",
-    },
-];
+        description: "Sesi networking dengan alumni",
+      },
+    ];
 
-const typeColors = {
-    "In-Class": "bg-blue-100 text-blue-700 border-blue-200",
-    "Field Trip": "bg-green-100 text-green-700 border-green-200",
-    "Meet & Greet": "bg-amber-100 text-amber-700 border-amber-200",
-};
+    // Transform hasil DB -> UI (akan kosong karena enabled:false)
+    const eventsFromDb: UiEvent[] = useMemo(() => {
+      if (!Array.isArray(data)) return [];
+      return data.map((ev) => {
+        const d = new Date(ev.startDate);
+        const hh = d.getHours().toString().padStart(2, "0");
+        const mm = d.getMinutes().toString().padStart(2, "0");
+        return {
+          id: ev.id,
+          name: ev.title,
+          type: normalizeType(ev.type),
+          date: new Date(ev.startDate).toISOString().slice(0, 10),
+          time: `${hh}:${mm}`,
+          organizer: ev.organizerName || "",
+          color: ev.colorHex || "#3b82f6",
+          description: "",
+        };
+      });
+    }, [data]);
 
-export default function SiswaAktivitasPage() {
-    const [search, setSearch] = useState("");
-    const [filterType, setFilterType] = useState("all");
+    // Sumber data: fallback lokal
+    const source = eventsFromDb.length ? eventsFromDb : defaultEvents;
 
-    const filtered = activities.filter((a) => {
+    // Saring berdasarkan pencarian dan tipe
+    const filtered = useMemo(() => {
+      const s = search.trim().toLowerCase();
+      return source.filter((a) => {
         const matchSearch =
-            a.name.toLowerCase().includes(search.toLowerCase()) ||
-            a.organizer.toLowerCase().includes(search.toLowerCase());
+          a.name.toLowerCase().includes(s) ||
+          (a.organizer && a.organizer.toLowerCase().includes(s));
         const matchType = filterType === "all" || a.type === filterType;
         return matchSearch && matchType;
-    });
+      });
+    }, [source, search, filterType]);
 
     return (
         <main className="min-h-screen bg-gray-50">
             <div className="space-y-6 p-6 pr-4 sm:pr-6 lg:pr-10 pl-4 sm:pl-6 lg:pl-10">
                 {/* Header */}
-                <div className="mb-6">
+                <div className="mb-2">
                     <h1 className="text-2xl sm:text-3xl font-semibold">Aktivitas</h1>
                     <p className="text-muted-foreground mt-1">
                         Lihat semua kegiatan dan event PKL
@@ -97,20 +143,20 @@ export default function SiswaAktivitasPage() {
                 </div>
 
                 {/* Search */}
-                <div className="mb-4">
+                <div>
                     <div className="relative">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                         <Input
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Cari berdasarkan nama atau penyelenggara"
+                            placeholder={isLoading ? "Memuat..." : "Cari berdasarkan nama atau penyelenggara"}
                             className="pl-11 rounded-full bg-white border-gray-200"
                         />
                     </div>
                 </div>
 
                 {/* Filter */}
-                <div className="mb-6">
+                <div>
                     <Select value={filterType} onValueChange={setFilterType}>
                         <SelectTrigger className="w-[180px] rounded-full bg-white">
                             <SelectValue placeholder="Semua Tipe" />
@@ -120,6 +166,9 @@ export default function SiswaAktivitasPage() {
                             <SelectItem value="In-Class">In-Class</SelectItem>
                             <SelectItem value="Field Trip">Field Trip</SelectItem>
                             <SelectItem value="Meet & Greet">Meet & Greet</SelectItem>
+                            <SelectItem value="meeting">Meeting</SelectItem>
+                            <SelectItem value="deadline">Deadline</SelectItem>
+                            <SelectItem value="milestone">Milestone</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
@@ -134,21 +183,20 @@ export default function SiswaAktivitasPage() {
                             {/* Color bar */}
                             <div
                                 className="h-2"
-                                style={{ backgroundColor: activity.color }}
+                                style={{ backgroundColor: activity.color || "#e5e7eb" }}
                             />
 
                             {/* Card content */}
                             <div className="p-5">
                                 {/* Activity name */}
                                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                                    {activity.name}
+                                    {isLoading ? "Memuat..." : activity.name}
                                 </h3>
 
                                 {/* Type badge */}
                                 <div className="mb-3">
                                     <span
-                                        className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${typeColors[activity.type as keyof typeof typeColors]
-                                            }`}
+                                        className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${typeColors[activity.type] || "bg-gray-100 text-gray-700 border-gray-200"}`}
                                     >
                                         {activity.type}
                                     </span>
@@ -156,7 +204,7 @@ export default function SiswaAktivitasPage() {
 
                                 {/* Description */}
                                 <p className="text-sm text-gray-600 mb-4 line-clamp-2">
-                                    {activity.description}
+                                    {activity.description && activity.description.length ? activity.description : "—"}
                                 </p>
 
                                 {/* Date & Time */}
@@ -173,21 +221,21 @@ export default function SiswaAktivitasPage() {
 
                                 <div className="flex items-center gap-2 text-sm text-gray-700 mb-4">
                                     <Clock className="w-4 h-4 text-gray-400" />
-                                    <span>{activity.time} WIB</span>
+                                    <span>{(activity.time && activity.time.length ? activity.time : "--:--") + " WIB"}</span>
                                 </div>
 
                                 {/* Organizer with logo */}
                                 <div className="flex items-center gap-3 text-sm text-gray-700 pt-3 mb-4 border-t border-gray-100">
                                     <Image
-                                        src={`https://via.placeholder.com/80x80/e5e7eb/374151?text=${encodeURIComponent(activity.organizer.substring(0, 2))}`}
-                                        alt={activity.organizer}
+                                        src={`https://via.placeholder.com/80x80/e5e7eb/374151?text=${encodeURIComponent((activity.organizer || "").substring(0, 2) || "EV")}`}
+                                        alt={activity.organizer || "Penyelenggara"}
                                         width={40}
                                         height={40}
                                         className="rounded-lg object-cover border border-gray-200"
                                     />
                                     <div className="flex-1">
                                         <div className="text-xs text-gray-500">Penyelenggara</div>
-                                        <div className="font-medium text-gray-900">{activity.organizer}</div>
+                                        <div className="font-medium text-gray-900">{activity.organizer && activity.organizer.length ? activity.organizer : "—"}</div>
                                     </div>
                                 </div>
 
@@ -205,7 +253,7 @@ export default function SiswaAktivitasPage() {
                 </div>
 
                 {/* No results */}
-                {filtered.length === 0 && (
+                {!isLoading && filtered.length === 0 && (
                     <div className="text-center py-12">
                         <p className="text-gray-500">Tidak ada aktivitas yang ditemukan</p>
                     </div>

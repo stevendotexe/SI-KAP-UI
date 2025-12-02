@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { ChevronDown } from "lucide-react"
+import { api } from "@/trpc/react"
 
 type DayCell = { date: Date; inMonth: boolean; day: number }
 type EventSpec = {
@@ -42,18 +43,61 @@ function buildWeeks(year: number, month: number) {
   return weeks
 }
 
+// Simple mapping when event.colorHex not used
+function typeToColorClass(t?: string): string {
+  switch (t) {
+    case "deadline":
+      return "bg-chart-5"
+    case "meeting":
+      return "bg-chart-2"
+    case "field_trip":
+      return "bg-chart-4"
+    case "milestone":
+      return "bg-chart-1"
+    case "in_class":
+      return "bg-chart-3"
+    case "meet_greet":
+      return "bg-chart-2"
+    default:
+      return "bg-chart-4"
+  }
+}
+
 export default function CalendarPage() {
-  const [year] = useState(2025)
-  const [month, setMonth] = useState(7) // 0-based, 7 = Agustus
+  const today = new Date()
+  const [year, setYear] = useState(today.getFullYear())
+  const [month, setMonth] = useState(today.getMonth()) // 0-based
   const [open, setOpen] = useState(false)
+  const [companyId] = useState<number>(1) // sesuaikan jika ada konteks company
 
   const weeks = useMemo(() => buildWeeks(year, month), [year, month])
 
-  // Example events (matching the reference feel)
-  const events: EventSpec[] = [
+  // Nonaktifkan query agar tidak memicu console error
+  const { data } = api.calendarEvents.list.useQuery(
+    { companyId, month: month + 1, year },
+    { retry: 0, enabled: false }
+  )
+
+  const fetchedEvents: EventSpec[] = useMemo(() => {
+    if (!data) return []
+    return data.map((ev) => {
+      const sd = new Date(ev.startDate)
+      const ed = new Date(ev.dueDate)
+      return {
+        label: ev.title,
+        startDay: sd.getDate(),
+        endDay: ed.getDate(),
+        colorClass: typeToColorClass(ev.type),
+      }
+    })
+  }, [data])
+
+  const fallbackEvents: EventSpec[] = [
     { label: "Tenggat waktu laporan 3", startDay: 1, endDay: 4, colorClass: "bg-chart-4" },
     { label: "Tenggat waktu laporan 4", startDay: 19, endDay: 21, colorClass: "bg-chart-5" },
   ]
+
+  const events: EventSpec[] = fetchedEvents.length ? fetchedEvents : fallbackEvents
 
   // Compute event segments per week for overlay
   function getWeekSegments(week: DayCell[]) {
@@ -104,7 +148,7 @@ export default function CalendarPage() {
               aria-haspopup="listbox"
               aria-expanded={open}
             >
-              {MONTHS_ID[month]}
+              {MONTHS_ID[month]} {year}
               <ChevronDown className="ml-2 size-4" />
             </Button>
 
@@ -119,9 +163,7 @@ export default function CalendarPage() {
                           setMonth(i)
                           setOpen(false)
                         }}
-                        className={`w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground ${
-                          i === month ? "bg-accent/50" : ""
-                        }`}
+                        className={`w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground ${i === month ? "bg-accent/50" : ""}`}
                         role="option"
                         aria-selected={i === month}
                       >

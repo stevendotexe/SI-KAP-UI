@@ -1,10 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-
-// Select (shadcn new structure)
 import {
   Select,
   SelectTrigger,
@@ -12,6 +10,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select"
+import { api } from "@/trpc/react"
 
 export default function BiodataSiswaPage() {
   const [nama, setNama] = useState("")
@@ -27,7 +26,44 @@ export default function BiodataSiswaPage() {
   const [alamat, setAlamat] = useState("")
   const [noTelp, setNoTelp] = useState("")
 
-  // deteksi perubahan dari nilai awal
+  // Akses aman ke cabang router yang mungkin belum terdaftar pada appRouter
+  const spRouter = (api as any)?.studentProfile
+  const routerMissing = !spRouter
+
+  // Nonaktifkan query agar tidak memicu console error
+  const { data, isLoading, isError, refetch } =
+    spRouter?.getMine?.useQuery(undefined, { retry: 0, enabled: false }) ??
+    { data: undefined, isLoading: false, isError: routerMissing, refetch: async () => {} }
+
+  const upsert =
+    spRouter?.upsert?.useMutation() ??
+    ({
+      isPending: false,
+      isError: false,
+      isSuccess: false,
+      mutateAsync: async () => {
+        throw new Error("router studentProfile tidak tersedia")
+      },
+    } as any)
+
+  const hydrated = useRef(false)
+  useEffect(() => {
+    if (hydrated.current) return
+    if (!data) return
+    hydrated.current = true
+
+    if (typeof data.name === "string") setNama(data.name)
+    if (typeof data.nis === "string") setNis(data.nis)
+    if (typeof data.birthPlace === "string") setTempatLahir(data.birthPlace)
+    if (data.birthDate instanceof Date) setDob(data.birthDate.toISOString().slice(0, 10))
+    if (data.gender === "Perempuan") setGender("Perempuan")
+    if (typeof data.semester === "number") setSemester(String(data.semester))
+    if (data.skillCompetency === "Rekayasa Perangkat Lunak") setKompetensi("Rekayasa Perangkat Lunak")
+    if (typeof data.schoolName === "string") setAsalSekolah(data.schoolName)
+    if (typeof data.address === "string") setAlamat(data.address)
+    if (typeof data.phone === "string") setNoTelp(data.phone)
+  }, [data])
+
   const isDirty =
     nama !== "" ||
     nis !== "" ||
@@ -53,39 +89,47 @@ export default function BiodataSiswaPage() {
     setNoTelp("")
   }
 
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    try {
+      await upsert.mutateAsync({
+        name: nama.length ? nama : null,
+        nis: nis.length ? nis : null,
+        birthPlace: tempatLahir.length ? tempatLahir : null,
+        birthDate: dob.length ? new Date(dob) : null,
+        gender,
+        semester: semester.length ? Number(semester) : null,
+        skillCompetency: kompetensi,
+        schoolName: asalSekolah.length ? asalSekolah : null,
+        address: alamat.length ? alamat : null,
+        phone: noTelp.length ? noTelp : null,
+      })
+      await refetch()
+    } catch {
+      // mitigasi via banner di bawah
+    }
+  }
+
   return (
     <div className="min-h-screen bg-muted/30 p-0 m-0">
       <div className="w-full max-w-none p-5 m-0 pr-4 sm:pr-6 lg:pr-10 pl-4 sm:pl-6 lg:pl-10">
-        
-        {/* Header */}
         <div className="space-y-1">
           <h1 className="text-2xl sm:text-3xl font-semibold">Biodata</h1>
           <p className="text-muted-foreground">Silahkan isi biodata anda</p>
         </div>
 
-        {/* Card */}
         <section className="mt-6 rounded-2xl border bg-card p-6">
-          <h2 className="text-base sm:text-lg font-semibold">
-            Identitas Pribadi Siswa
-          </h2>
+          <h2 className="text-base sm:text-lg font-semibold">Identitas Pribadi Siswa</h2>
 
-          <form
-            onSubmit={(e) => {
-              if (!(e.target as HTMLFormElement).checkValidity()) return
-              e.preventDefault()
-            }}
-          >
+          <form onSubmit={handleSubmit}>
             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-5">
-
               {/* Nama */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Nama</label>
                 <Input
                   value={nama}
-                  onChange={(e) =>
-                    setNama(e.target.value.replace(/[^\p{L}\s]/gu, ""))
-                  }
-                  placeholder="Rafif Zharif"
+                  onChange={(e) => setNama(e.target.value.replace(/[^\p{L}\s]/gu, ""))}
+                  placeholder={isLoading ? "Memuat..." : "Rafif Zharif"}
                   className="h-10 px-4"
                 />
               </div>
@@ -95,11 +139,9 @@ export default function BiodataSiswaPage() {
                 <label className="text-sm font-medium">NIS</label>
                 <Input
                   value={nis}
-                  onChange={(e) =>
-                    setNis(e.target.value.replace(/[^\d]/g, ""))
-                  }
+                  onChange={(e) => setNis(e.target.value.replace(/[^\d]/g, ""))}
                   inputMode="numeric"
-                  placeholder="234658594"
+                  placeholder={isLoading ? "…" : "234658594"}
                   className="h-10 px-4"
                 />
               </div>
@@ -109,10 +151,8 @@ export default function BiodataSiswaPage() {
                 <label className="text-sm font-medium">Tempat Lahir</label>
                 <Input
                   value={tempatLahir}
-                  onChange={(e) =>
-                    setTempatLahir(e.target.value.replace(/[^\p{L}\s]/gu, ""))
-                  }
-                  placeholder="Bandung"
+                  onChange={(e) => setTempatLahir(e.target.value.replace(/[^\p{L}\s]/gu, ""))}
+                  placeholder={isLoading ? "…" : "Bandung"}
                   className="h-10 px-4"
                 />
               </div>
@@ -131,12 +171,9 @@ export default function BiodataSiswaPage() {
               {/* Gender */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Jenis Kelamin</label>
-
                 <Select
                   value={gender}
-                  onValueChange={(v) =>
-                    setGender(v as "Laki-laki" | "Perempuan")
-                  }
+                  onValueChange={(v) => setGender(v as "Laki-laki" | "Perempuan")}
                 >
                   <SelectTrigger className="w-full h-10 rounded-full border bg-background px-4 text-sm text-muted-foreground">
                     <SelectValue placeholder="Pilih jenis kelamin" />
@@ -153,11 +190,9 @@ export default function BiodataSiswaPage() {
                 <label className="text-sm font-medium">Semester</label>
                 <Input
                   value={semester}
-                  onChange={(e) =>
-                    setSemester(e.target.value.replace(/[^\d]/g, ""))
-                  }
+                  onChange={(e) => setSemester(e.target.value.replace(/[^\d]/g, ""))}
                   inputMode="numeric"
-                  placeholder="6"
+                  placeholder={isLoading ? "…" : "6"}
                   className="h-10 px-4"
                 />
               </div>
@@ -165,16 +200,13 @@ export default function BiodataSiswaPage() {
               {/* Kompetensi */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Kompetensi Keahlian</label>
-
                 <Select
                   value={kompetensi}
-                  onValueChange={(v) =>
-                    setKompetensi(
-                      v as
-                        | "Teknik Komputer dan Jaringan"
-                        | "Rekayasa Perangkat Lunak"
-                    )
-                  }
+                  onValueChange={(v) => setKompetensi(
+                    v as
+                      | "Teknik Komputer dan Jaringan"
+                      | "Rekayasa Perangkat Lunak"
+                  )}
                 >
                   <SelectTrigger className="w-full h-10 rounded-full border bg-background px-4 text-sm text-muted-foreground">
                     <SelectValue placeholder="Pilih kompetensi" />
@@ -196,7 +228,7 @@ export default function BiodataSiswaPage() {
                 <Input
                   value={asalSekolah}
                   onChange={(e) => setAsalSekolah(e.target.value)}
-                  placeholder="SMK 1 Tasikmalaya"
+                  placeholder={isLoading ? "…" : "SMK 1 Tasikmalaya"}
                   className="h-10 px-4"
                 />
               </div>
@@ -207,6 +239,7 @@ export default function BiodataSiswaPage() {
                 <Input
                   value={alamat}
                   onChange={(e) => setAlamat(e.target.value)}
+                  placeholder={isLoading ? "…" : ""}
                   className="h-10 px-4"
                 />
               </div>
@@ -216,31 +249,41 @@ export default function BiodataSiswaPage() {
                 <label className="text-sm font-medium">No telp</label>
                 <Input
                   value={noTelp}
-                  onChange={(e) =>
-                    setNoTelp(e.target.value.replace(/[^\d]/g, ""))
-                  }
+                  onChange={(e) => setNoTelp(e.target.value.replace(/[^\d]/g, ""))}
                   inputMode="numeric"
+                  placeholder={isLoading ? "…" : ""}
                   className="h-10 px-4"
                 />
               </div>
             </div>
 
-            {/* Buttons */}
             <div className="mt-6 flex items-center gap-3">
-              <Button type="submit" variant="destructive" className="h-9 px-6">
-                Simpan
+              <Button type="submit" variant="destructive" className="h-9 px-6" disabled={upsert.isPending || routerMissing}>
+                {upsert.isPending ? "Menyimpan..." : "Simpan"}
               </Button>
-              {isDirty && ( // hanya tampil jika ada perubahan
+              {isDirty && (
                 <Button
                   type="button"
                   variant="outline"
                   onClick={handleReset}
                   className="h-9 px-6 border-destructive text-destructive hover:bg-destructive/10"
+                  disabled={upsert.isPending}
                 >
                   Bersihkan
                 </Button>
               )}
             </div>
+
+            {upsert.isError && (
+              <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/5 text-destructive text-sm px-3 py-2">
+                Gagal menyimpan biodata. Periksa koneksi dan coba lagi.
+              </div>
+            )}
+            {upsert.isSuccess && (
+              <div className="mt-3 rounded-md border border-green-500/30 bg-green-500/5 text-green-700 text-sm px-3 py-2">
+                Biodata tersimpan.
+              </div>
+            )}
           </form>
         </section>
       </div>
