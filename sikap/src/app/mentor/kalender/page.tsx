@@ -1,126 +1,158 @@
 "use client"
 
-import React from "react"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { TASKS, getReports, type ReportItem } from "@/lib/reports-data"
+import { useMemo, useState } from "react"
+import { Button } from "@/components/ui/button"
+import { ChevronDown } from "lucide-react"
 
-type CalendarTask = { id: string; title: string; deadline: string; status: "Selesai" | "Dalam Proses" | "Belum Mulai" }
+type DayCell = { date: Date; inMonth: boolean; day: number }
+type EventSpec = { label: string; startDay: number; endDay: number; colorClass: string }
 
-function bulanNama(i: number) {
-  const names = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"]
-  return names[i]!
-}
+const MONTHS_ID = [
+  "Januari",
+  "Februari",
+  "Maret",
+  "April",
+  "Mei",
+  "Juni",
+  "Juli",
+  "Agustus",
+  "September",
+  "Oktober",
+  "November",
+  "Desember",
+]
+const WEEKDAYS_ID = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"]
 
-function getDaysInMonth(year: number, month: number) {
-  const date = new Date(year, month, 1)
-  const days = [] as Array<{ day: number; date: Date }>
-  while (date.getMonth() === month) {
-    days.push({ day: date.getDate(), date: new Date(date) })
-    date.setDate(date.getDate() + 1)
+function buildWeeks(year: number, month: number) {
+  const first = new Date(year, month, 1)
+  const offset = first.getFullYear() === 1970 ? 4 : first.getDay()
+  const start = 1 - offset
+  const cells: DayCell[] = []
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(year, month, start + i)
+    cells.push({ date: d, inMonth: d.getMonth() === month, day: d.getDate() })
   }
-  return days
-}
-
-function computeTaskStatus(taskId: string, reports: ReportItem[]): CalendarTask["status"] {
-  const related = reports.filter((r) => r.taskId === taskId)
-  if (!related.length) return "Belum Mulai"
-  const anyBelumDikerjakan = related.some((r) => r.status === "belum_dikerjakan")
-  const allSudah = related.every((r) => r.status === "sudah_direview")
-  const anyBelumDireview = related.some((r) => r.status === "belum_direview")
-  if (allSudah) return "Selesai"
-  if (anyBelumDireview) return "Dalam Proses"
-  if (anyBelumDikerjakan) return "Belum Mulai"
-  return "Belum Mulai"
-}
-
-async function fetchCalendarTasks(): Promise<CalendarTask[]> {
-  const reports = getReports()
-  return TASKS.map((t) => ({ id: t.id, title: t.title, deadline: t.deadline, status: computeTaskStatus(t.id, reports) }))
+  const weeks: DayCell[][] = []
+  for (let i = 0; i < 6; i++) weeks.push(cells.slice(i * 7, i * 7 + 7))
+  return weeks
 }
 
 export default function Page() {
-  const now = new Date()
-  const [month, setMonth] = React.useState(now.getMonth())
-  const [year] = React.useState(now.getFullYear())
-  const [tasks, setTasks] = React.useState<CalendarTask[]>([])
+  const [year] = useState(2025)
+  const [month, setMonth] = useState(7)
+  const [open, setOpen] = useState(false)
 
-  React.useEffect(() => {
-    void fetchCalendarTasks().then(setTasks)
-  }, [])
+  const weeks = useMemo(() => buildWeeks(year, month), [year, month])
 
-  const days = getDaysInMonth(year, month)
-  const firstDayIndex = new Date(year, month, 1).getDay() // 0 Minggu
+  const events: EventSpec[] = [
+    { label: "Tenggat waktu laporan 3", startDay: 1, endDay: 4, colorClass: "bg-chart-4" },
+    { label: "Tenggat waktu laporan 4", startDay: 19, endDay: 21, colorClass: "bg-chart-5" },
+  ]
 
-  const byDate = React.useMemo(() => {
-    const map = new Map<number, CalendarTask[]>()
-    for (const t of tasks) {
-      const d = new Date(t.deadline)
-      if (d.getFullYear() === year && d.getMonth() === month) {
-        const day = d.getDate()
-        const arr = map.get(day) ?? []
-        arr.push(t)
-        map.set(day, arr)
-      }
-    }
-    return map
-  }, [tasks, year, month])
+  function getWeekSegments(week: DayCell[]) {
+    const minDay = Math.min(...week.filter(w => w.inMonth).map(w => w.day))
+    const maxDay = Math.max(...week.filter(w => w.inMonth).map(w => w.day))
+    if (!isFinite(minDay) || !isFinite(maxDay)) return []
+
+    return events
+      .map(evt => {
+        const segStartDay = Math.max(evt.startDay, minDay)
+        const segEndDay = Math.min(evt.endDay, maxDay)
+        if (segStartDay > segEndDay) return null
+
+        const startIdx = week.findIndex(c => c.inMonth && c.day === segStartDay)
+        const endIdx = week.findIndex(c => c.inMonth && c.day === segEndDay)
+        if (startIdx < 0 || endIdx < 0) return null
+
+        const span = endIdx - startIdx + 1
+        const leftPct = (startIdx / 7) * 100
+        const widthPct = (span / 7) * 100
+
+        return { leftPct, widthPct, label: evt.label, colorClass: evt.colorClass }
+      })
+      .filter(Boolean) as { leftPct: number; widthPct: number; label: string; colorClass: string }[]
+  }
 
   return (
-    <main className="min-h-screen bg-muted text-foreground">
-      <div className="max-w-[1200px] mx-auto px-6 py-8">
-        <h1 className="text-2xl font-semibold">Kalender</h1>
-        <p className="text-sm text-muted-foreground">Daftar Jadwal</p>
-
-        <div className="mt-4">
-          <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
-            <SelectTrigger className="min-w-[240px] w-full sm:w-fit">
-              <SelectValue placeholder={bulanNama(month)} />
-            </SelectTrigger>
-            <SelectContent>
-              {Array.from({ length: 12 }).map((_, i) => (
-                <SelectItem key={i} value={String(i)}>{bulanNama(i)}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+    <div className="min-h-screen bg-muted/30 p-0 m-0">
+      <div className="w-full max-w-none p-0 m-0 pr-4 sm:pr-6 lg:pr-10 pl-4 sm:pl-6 lg:pl-10">
+        <div className="space-y-1">
+          <h1 className="text-2xl sm:text-3xl font-semibold">Kalender</h1>
+          <p className="text-muted-foreground">Daftar jadwal</p>
         </div>
 
-        <div className="mt-4 bg-card border rounded-xl shadow-sm p-4">
-          <div className="grid grid-cols-7 text-center font-medium">
-            {[
-              "Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu",
-            ].map((d, i) => (
-              <div key={i} className="py-2 bg-destructive text-white rounded-(--radius-sm)">{d}</div>
+        <div className="mt-4">
+          <div className="relative inline-block">
+            <Button
+              variant="outline"
+              onClick={() => setOpen(v => !v)}
+              className="px-4 cursor-pointer"
+              aria-haspopup="listbox"
+              aria-expanded={open}
+            >
+              {MONTHS_ID[month]}
+              <ChevronDown className="ml-2 size-4" />
+            </Button>
+
+            {open && (
+              <div className="absolute z-20 mt-2 w-44 rounded-xl border bg-card shadow-sm">
+                <ul className="max-h-64 overflow-auto py-1" role="listbox">
+                  {MONTHS_ID.map((m, i) => (
+                    <li key={m}>
+                      <button
+                        type="button"
+                        onClick={() => { setMonth(i); setOpen(false) }}
+                        className={`w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer ${i === month ? "bg-accent/50" : ""}`}
+                        role="option"
+                        aria-selected={i === month}
+                      >
+                        {m}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <section className="mt-4 rounded-2xl border bg-card p-4 sm:p-6">
+          <div className="grid grid-cols-7 rounded-xl overflow-hidden">
+            {WEEKDAYS_ID.map((d) => (
+              <div key={d} className="bg-destructive text-primary-foreground px-3 py-2 text-center font-medium border-r last:border-r-0">
+                {d}
+              </div>
             ))}
           </div>
 
-          <div className="mt-2 grid grid-cols-7 gap-2 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]">
-            {Array.from({ length: firstDayIndex }).map((_, i) => (
-              <div key={`pad-${i}`} className="h-24 rounded-(--radius-sm) border bg-background" />
-            ))}
-            {days.map((d) => {
-              const items = byDate.get(d.day) ?? []
+          <div className="mt-0">
+            {weeks.map((week, wi) => {
+              const segments = getWeekSegments(week)
               return (
-                <div key={d.day} className="h-24 rounded-(--radius-sm) border p-2 flex flex-col gap-1 bg-background">
-                  <div className="text-xs font-medium">{d.day}</div>
-                  <div className="flex-1 overflow-hidden">
-                    {items.map((t, idx) => (
-                      <div
-                        key={idx}
-                        className={`text-[10px] px-2 py-1 rounded-(--radius-sm) whitespace-nowrap overflow-hidden text-ellipsis ${
-                          t.status === "Selesai" ? "bg-green-100 text-green-800" : t.status === "Dalam Proses" ? "bg-yellow-100 text-yellow-800" : "bg-gray-200 text-gray-800"
-                        }`}
-                        title={`${t.title} • ${t.deadline} • ${t.status}`}
-                      >
-                        {t.title}
+                <div key={wi} className="relative">
+                  <div className="grid grid-cols-7">
+                    {week.map((c, ci) => (
+                      <div key={ci} className={`h-28 border ${c.inMonth ? "bg-card" : "bg-muted/40"}`}>
+                        <div className="px-2 pt-2 text-xs text-muted-foreground">{c.day}</div>
                       </div>
                     ))}
                   </div>
+
+                  {segments.map((s, si) => (
+                    <div
+                      key={si}
+                      className={`absolute z-10 pointer-events-none h-7 ${s.colorClass} rounded-full flex items-center justify-center text-xs font-medium text-primary-foreground`}
+                      style={{ top: 34, left: `${s.leftPct}%`, width: `${s.widthPct}%`, paddingLeft: 12, paddingRight: 12 }}
+                    >
+                      {s.label}
+                    </div>
+                  ))}
                 </div>
               )
             })}
           </div>
-        </div>
+        </section>
       </div>
-    </main>
+    </div>
   )
 }
