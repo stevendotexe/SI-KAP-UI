@@ -5,26 +5,37 @@ import { FieldSet, FieldGroup, Field, FieldTitle, FieldContent } from "@/compone
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { STUDENTS } from "@/lib/reports-data"
+import { RUBRIC_CATEGORIES } from "@/lib/rubrics"
+import AttendanceLine from "@/components/students/AttendanceLine"
 
 type ScoreMap = Record<string, number | undefined>
 
-const kategori = {
-  "Kompetensi Kepribadian": ["Disiplin","Kerja sama","Inisiatif","Kerajinan","Tanggung jawab"],
-  "Kompetensi Kejuruan": [
-    "Penerapan KSLH",
-    "Merakit Komputer",
-    "Menginstalasi sistem operasi",
-    "Perawatan komputer",
-    "Perbaikan peripheral",
-    "Menginstal software jaringan",
-    "Perbaikan software jaringan",
-  ],
-} as const
+const kategori = RUBRIC_CATEGORIES
 
 export default function Page() {
   const [nama, setNama] = React.useState("")
   const [scores, setScores] = React.useState<ScoreMap>({})
   const [error, setError] = React.useState<string | null>(null)
+  const selectedStudent = React.useMemo(() => STUDENTS.find((s) => s.student.toLowerCase() === nama.toLowerCase()) || null, [nama])
+
+  const attendanceSeries = React.useMemo(() => {
+    const base = selectedStudent ? (selectedStudent.major === "RPL" ? 85 : 82) : 80
+    return [0,1,2,3,4,5].map((i) => ({ period: `M${i+1}`, count: Math.max(60, Math.min(98, Math.round(base + (i-3)*2 + (i%2?3:-2)))) }))
+  }, [selectedStudent])
+  const scoreSeries = React.useMemo(() => {
+    const base = selectedStudent ? (selectedStudent.major === "RPL" ? 78 : 75) : 76
+    return [0,1,2,3,4,5].map((i) => ({ period: `M${i+1}`, count: Math.max(60, Math.min(98, Math.round(base + (i-3)*2 + (i%2?2:-1)))) }))
+  }, [selectedStudent])
+  const attGrowth = React.useMemo(() => {
+    const first = attendanceSeries[0]?.count ?? 0
+    const last = attendanceSeries[attendanceSeries.length-1]?.count ?? 0
+    return first ? Math.round(((last-first)/first)*100) : 0
+  }, [attendanceSeries])
+  const scoreGrowth = React.useMemo(() => {
+    const first = scoreSeries[0]?.count ?? 0
+    const last = scoreSeries[scoreSeries.length-1]?.count ?? 0
+    return first ? Math.round(((last-first)/first)*100) : 0
+  }, [scoreSeries])
 
   const total = Object.values(scores).reduce((s, v) => s + (v ?? 0), 0)
   const count = Object.values(scores).filter((v) => typeof v === "number").length
@@ -73,6 +84,48 @@ export default function Page() {
             </FieldGroup>
           </FieldSet>
         </div>
+
+        {selectedStudent && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mt-6">
+            <div className="lg:col-span-4 bg-card border rounded-(--radius-xl) shadow-sm p-4">
+              <div className="text-sm font-medium mb-2">Informasi Siswa</div>
+              <div className="space-y-1 text-sm">
+                <div><span className="text-muted-foreground">Nama:</span> {selectedStudent.student}</div>
+                <div><span className="text-muted-foreground">ID:</span> {selectedStudent.id}</div>
+                <div><span className="text-muted-foreground">Sekolah:</span> {selectedStudent.school}</div>
+                <div><span className="text-muted-foreground">Jurusan:</span> {selectedStudent.major}</div>
+                <div><span className="text-muted-foreground">Status:</span> {selectedStudent.state}</div>
+                <div><span className="text-muted-foreground">Angkatan:</span> {selectedStudent.batch}</div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-4 bg-card border rounded-(--radius-xl) shadow-sm p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-sm text-muted-foreground">Rata Kehadiran</div>
+                </div>
+                <div className="text-2xl font-semibold">{attendanceSeries.length ? `${attendanceSeries[attendanceSeries.length-1]!.count}%` : "-"}</div>
+              </div>
+              <div className="mt-2">
+                <AttendanceLine data={attendanceSeries} />
+              </div>
+              <div className="text-xs text-muted-foreground mt-2">Pertumbuhan: {attGrowth}%</div>
+            </div>
+
+            <div className="lg:col-span-4 bg-card border rounded-(--radius-xl) shadow-sm p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-sm text-muted-foreground">Rata Skor</div>
+                </div>
+                <div className="text-2xl font-semibold">{scoreSeries.length ? `${scoreSeries[scoreSeries.length-1]!.count}` : "-"}</div>
+              </div>
+              <div className="mt-2">
+                <AttendanceLine data={scoreSeries} />
+              </div>
+              <div className="text-xs text-muted-foreground mt-2">Pertumbuhan: {scoreGrowth}%</div>
+            </div>
+          </div>
+        )}
 
         <div className="bg-card border rounded-xl shadow-sm p-4 mt-6">
           {Object.entries(kategori).map(([kat, list]) => (

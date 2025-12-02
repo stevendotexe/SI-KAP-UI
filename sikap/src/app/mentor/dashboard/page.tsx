@@ -162,106 +162,57 @@ export default async function DashboardPage() {
           </div>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Kolom kiri: dua kolom kartu statistik */}
-          <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 items-start content-start">
-            <StatisticCard
-              title="Rata - Rata Skor Siswa"
-              subtitle="Keseluruhan"
-              value={
-                avgScores.length
-                  ? `${Math.round(avgScores[avgScores.length - 1]!.count)}`
-                  : "-"
-              }
-            >
-              <div className="mt-2">
-                <AttendanceLine data={avgScores} />
-              </div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Baris 1: dua kartu metrik */}
+          <div className="lg:col-span-6">
+            <StatisticCard title="Rata - Rata Skor Siswa" subtitle="Keseluruhan" value={avgScores.length ? `${Math.round(avgScores[avgScores.length - 1]!.count)}` : "-"}>
+              <div className="mt-2"><AttendanceLine data={avgScores} /></div>
               <div className="text-xs text-muted-foreground mt-2">Periode hingga hari ini</div>
             </StatisticCard>
+          </div>
 
-            <StatisticCard
-              title="Rata - Rata Kehadiran Siswa"
-              subtitle="Keseluruhan"
-              value={
-                avgAttendances.length
-                  ? `${Math.round(avgAttendances[avgAttendances.length - 1]!.count)}%`
-                  : "-"
-              }
-            >
-              <div className="mt-2">
-                <AttendanceLine data={avgAttendances} />
-              </div>
+          <div className="lg:col-span-6">
+            <StatisticCard title="Rata - Rata Kehadiran Siswa" subtitle="Keseluruhan" value={avgAttendances.length ? `${Math.round(avgAttendances[avgAttendances.length - 1]!.count)}%` : "-"}>
+              <div className="mt-2"><AttendanceLine data={avgAttendances} /></div>
               <div className="text-xs text-muted-foreground mt-2">Periode hingga hari ini</div>
             </StatisticCard>
+          </div>
 
-            <StatisticCard
-              title="Pertumbuhan Siswa"
-              subtitle="Seluruh Periode"
-              value={
-                studentGrowth.length ? `${growthPercent}%` : "-"
-              }
-            >
-              <div className="mt-2">
-                <AttendanceLine data={studentGrowth} />
-              </div>
-              {periodRange && (
-                <div className="text-xs text-muted-foreground mt-2">{periodRange}</div>
-              )}
+          {/* Baris 2: pertumbuhan kiri, ringkasan kecil kanan */}
+          <div className="lg:col-span-6">
+            <StatisticCard title="Pertumbuhan Siswa" subtitle="Seluruh Periode" value={studentGrowth.length ? `${growthPercent}%` : "-"}>
+              <div className="mt-2"><AttendanceLine data={studentGrowth} height={256} padding={4} /></div>
+              {periodRange && (<div className="text-xs text-muted-foreground mt-2">{periodRange}</div>)}
             </StatisticCard>
-
-            {/* Ringkasan singkat (kartu kecil) */}
-            <div className="space-y-3 mt-0">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-card border rounded-xl shadow-sm p-4">
-                  <div className="text-xs text-muted-foreground">Jumlah Siswa</div>
-                  <div className="text-2xl font-semibold">{counts?.students ?? "-"}</div>
-                  <div className="text-xs text-muted-foreground">Siswa Aktif</div>
+          </div>
+          <div className="lg:col-span-6">
+            <div className="bg-card border rounded-(--radius-xl) shadow-sm p-6 h-full">
+              <h3 className="text-sm font-medium mb-4">Diagram Kehadiran Siswa Hari ini</h3>
+              <div className="flex flex-col sm:flex-row gap-4 items-center">
+                <div className="w-full sm:w-64 h-64 flex items-center justify-center">
+                  <PieChart data={pieData.filter((p) => p.name !== "late")} />
                 </div>
-                <div className="bg-card border rounded-xl shadow-sm p-4">
-                  <div className="text-xs text-muted-foreground">Total Mentor</div>
-                  <div className="text-2xl font-semibold">{counts?.mentors ?? "-"}</div>
-                  <div className="text-xs text-muted-foreground">Mentor Aktif</div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-card border rounded-xl shadow-sm p-4">
-                  <div className="text-xs text-muted-foreground">Laporan Diserahkan</div>
-                  <div className="text-2xl font-semibold">{counts?.reports ?? "-"}</div>
-                  <div className="text-xs text-muted-foreground">Bulan ini</div>
-                </div>
-                <div className="bg-card border rounded-xl shadow-sm p-4">
-                  <div className="text-xs text-muted-foreground">Siswa Lulus</div>
-                  <div className="text-2xl font-semibold">{counts?.graduates ?? "-"}</div>
-                  <div className="text-xs text-muted-foreground">Seluruh Periode</div>
+                <div className="flex-1">
+                  <div className="text-sm text-muted-foreground">Total Kehadiran</div>
+                  <div className="text-lg font-semibold mt-2">{pieData.filter((p) => p.name !== "late").reduce((s, it) => s + Number(it.value ?? 0), 0)}</div>
+                  <StatusButtons pie={pieData} table={attendanceList.map((r) => ({ studentName: r.name, status: r.status }))} />
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Kolom kanan: pie + tabel */}
-          <div className="space-y-6">
-            <div className="bg-card border rounded-xl shadow-sm p-6">
-              <h3 className="text-sm font-medium mb-4">Diagram Kehadiran Siswa Hari ini</h3>
-              <div className="flex flex-col sm:flex-row gap-4 items-center">
-                <div className="w-full sm:w-48 h-48 flex items-center justify-center">
-                  <PieChart data={pieData.filter((p) => p.name !== "late")} />
-                </div>
-                <div className="flex-1">
-                  <div className="text-sm text-muted-foreground">Total Kehadiran</div>
-                  <div className="text-lg font-semibold mt-2">
-                    {pieData.filter((p) => p.name !== "late").reduce((s, it) => s + Number(it.value ?? 0), 0)}
-                  </div>
-                  <StatusButtons
-                    pie={pieData}
-                    table={attendanceList.map((r) => ({ studentName: r.name, status: r.status }))}
-                  />
-                </div>
-              </div>
+          {/* Baris 3: ringkasan kecil lebar penuh */}
+          <div className="lg:col-span-12">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <StatisticCard title="Jumlah Siswa" subtitle="Siswa Aktif" value={counts?.students ?? "-"} />
+              <StatisticCard title="Laporan Diserahkan" subtitle="Bulan ini" value={counts?.reports ?? "-"} />
+              <StatisticCard title="Siswa Lulus" subtitle="Seluruh Periode" value={counts?.graduates ?? "-"} />
             </div>
+          </div>
 
-            <div className="bg-card border rounded-xl shadow-sm p-6">
+          {/* Baris 4: tabel lebar penuh */}
+          <div className="lg:col-span-12">
+            <div className="bg-card border rounded-(--radius-xl) shadow-sm p-6">
               <h3 className="text-sm font-medium mb-4">Tabel Kehadiran Siswa Hari ini</h3>
               <AttendanceTable rows={attendanceList} />
             </div>
