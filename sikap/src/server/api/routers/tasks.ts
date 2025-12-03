@@ -2,7 +2,12 @@ import { z } from "zod";
 import { and, eq, sql, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
-import { adminOrMentorProcedure, createTRPCRouter, protectedProcedure, requirePermissions } from "@/server/api/trpc";
+import {
+  adminOrMentorProcedure,
+  createTRPCRouter,
+  protectedProcedure,
+  requirePermissions,
+} from "@/server/api/trpc";
 import {
   attachment,
   mentorProfile,
@@ -69,7 +74,8 @@ export const tasksRouter = createTRPCRouter({
         eq(placement.studentId, sp.id),
         input.status ? eq(task.status, input.status) : undefined,
         input.search
-          ? sql`(lower(${task.title}) like ${"%" + input.search.toLowerCase() + "%"} or lower(${task.description}) like ${"%" + input.search.toLowerCase() + "%"
+          ? sql`(lower(${task.title}) like ${"%" + input.search.toLowerCase() + "%"} or lower(${task.description}) like ${
+              "%" + input.search.toLowerCase() + "%"
             })`
           : undefined,
       );
@@ -104,7 +110,11 @@ export const tasksRouter = createTRPCRouter({
           dueDate: r.dueDate ?? null,
           status: r.status,
         })),
-        pagination: { total: Number(total ?? 0), limit: input.limit, offset: input.offset },
+        pagination: {
+          total: Number(total ?? 0),
+          limit: input.limit,
+          offset: input.offset,
+        },
         lastUpdated: new Date().toISOString(),
       };
     }),
@@ -137,12 +147,19 @@ export const tasksRouter = createTRPCRouter({
       if (t.studentId !== sp.id) throw new TRPCError({ code: "FORBIDDEN" });
 
       const allFiles = await ctx.db.query.attachment.findMany({
-        where: and(eq(attachment.ownerType, "task"), eq(attachment.ownerId, t.id)),
+        where: and(
+          eq(attachment.ownerType, "task"),
+          eq(attachment.ownerId, t.id),
+        ),
       });
 
       // Separate files into mentor's (task materials) and student's (submission)
-      const taskAttachments = allFiles.filter(f => f.createdById === t.createdById);
-      const submissionFiles = allFiles.filter(f => f.createdById !== t.createdById);
+      const taskAttachments = allFiles.filter(
+        (f) => f.createdById === t.createdById,
+      );
+      const submissionFiles = allFiles.filter(
+        (f) => f.createdById !== t.createdById,
+      );
 
       return {
         id: t.id,
@@ -176,7 +193,7 @@ export const tasksRouter = createTRPCRouter({
     .input(
       z.object({
         taskId: z.number(),
-        fileUrl: z.string().url(),
+        fileUrl: z.string(),
         fileName: z.string().optional(),
         notes: z.string().optional(),
       }),
@@ -196,7 +213,8 @@ export const tasksRouter = createTRPCRouter({
         .limit(1);
       const t = rows[0];
       if (!t) throw new TRPCError({ code: "NOT_FOUND" });
-      if (t.placementStudentId !== sp.id) throw new TRPCError({ code: "FORBIDDEN" });
+      if (t.placementStudentId !== sp.id)
+        throw new TRPCError({ code: "FORBIDDEN" });
 
       // Validate task status - only allow submission for 'todo' or 'in_progress' tasks
       if (t.status !== "todo" && t.status !== "in_progress") {
@@ -211,12 +229,14 @@ export const tasksRouter = createTRPCRouter({
         and(
           eq(attachment.ownerType, "task"),
           eq(attachment.ownerId, t.id),
-          eq(attachment.createdById, ctx.session.user.id) // Only delete files created by the student
-        )
+          eq(attachment.createdById, ctx.session.user.id), // Only delete files created by the student
+        ),
       );
 
       await ctx.db.insert(attachment).values({
-        ownerType: ownerType.enumValues.includes("task") ? "task" : ("task" as any),
+        ownerType: ownerType.enumValues.includes("task")
+          ? "task"
+          : ("task" as any),
         ownerId: t.id,
         url: input.fileUrl,
         filename: input.fileName ?? null,
@@ -263,10 +283,15 @@ export const tasksRouter = createTRPCRouter({
         input.companyId ? eq(placement.companyId, input.companyId) : undefined,
         mentorFilterId ? eq(placement.mentorId, mentorFilterId) : undefined,
         input.status ? eq(task.status, input.status) : undefined,
-        input.from ? sql`${task.dueDate} >= ${input.from.toISOString()}` : undefined,
-        input.to ? sql`${task.dueDate} <= ${input.to.toISOString()}` : undefined,
+        input.from
+          ? sql`${task.dueDate} >= ${input.from.toISOString()}`
+          : undefined,
+        input.to
+          ? sql`${task.dueDate} <= ${input.to.toISOString()}`
+          : undefined,
         input.search
-          ? sql`(lower(${task.title}) like ${"%" + input.search.toLowerCase() + "%"} or lower(${task.description}) like ${"%" + input.search.toLowerCase() + "%"
+          ? sql`(lower(${task.title}) like ${"%" + input.search.toLowerCase() + "%"} or lower(${task.description}) like ${
+              "%" + input.search.toLowerCase() + "%"
             })`
           : undefined,
       );
@@ -285,7 +310,13 @@ export const tasksRouter = createTRPCRouter({
         .from(task)
         .innerJoin(placement, eq(task.placementId, placement.id))
         .where(where)
-        .groupBy(task.title, task.description, task.dueDate, task.targetMajor, task.createdAt)
+        .groupBy(
+          task.title,
+          task.description,
+          task.dueDate,
+          task.targetMajor,
+          task.createdAt,
+        )
         .orderBy(sql`${task.dueDate} desc`)
         .limit(input.limit)
         .offset(input.offset);
@@ -308,7 +339,11 @@ export const tasksRouter = createTRPCRouter({
           submittedCount: Number(r.submittedCount),
           status: "todo",
         })),
-        pagination: { total: Number(totalRows[0]?.count ?? 0), limit: input.limit, offset: input.offset },
+        pagination: {
+          total: Number(totalRows[0]?.count ?? 0),
+          limit: input.limit,
+          offset: input.offset,
+        },
         lastUpdated: new Date().toISOString(),
       };
     }),
@@ -323,7 +358,9 @@ export const tasksRouter = createTRPCRouter({
         dueDate: z.date(),
         targetMajor: z.string().optional(),
         placementIds: z.array(z.number()).optional(),
-        attachments: z.array(z.object({ url: z.string(), filename: z.string().optional() })).optional(),
+        attachments: z
+          .array(z.object({ url: z.string(), filename: z.string().optional() }))
+          .optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -347,26 +384,36 @@ export const tasksRouter = createTRPCRouter({
           and(
             eq(placement.status, "active"),
             mentorId ? eq(placement.mentorId, mentorId) : undefined,
-            input.targetMajor ? eq(studentProfile.major, input.targetMajor) : undefined,
-            input.placementIds ? inArray(placement.id, input.placementIds) : undefined
-          )
+            input.targetMajor
+              ? eq(studentProfile.major, input.targetMajor)
+              : undefined,
+            input.placementIds
+              ? inArray(placement.id, input.placementIds)
+              : undefined,
+          ),
         );
 
       if (placements.length === 0) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Tidak ada siswa aktif yang ditemukan untuk kriteria ini" });
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Tidak ada siswa aktif yang ditemukan untuk kriteria ini",
+        });
       }
 
       await ctx.db.transaction(async (tx) => {
         for (const p of placements) {
-          const [newTask] = await tx.insert(task).values({
-            placementId: p.id,
-            title: input.title,
-            description: input.description,
-            dueDate: input.dueDate.toISOString(),
-            targetMajor: input.targetMajor,
-            createdById: ctx.session.user.id,
-            status: "todo",
-          }).returning({ id: task.id });
+          const [newTask] = await tx
+            .insert(task)
+            .values({
+              placementId: p.id,
+              title: input.title,
+              description: input.description,
+              dueDate: input.dueDate.toISOString(),
+              targetMajor: input.targetMajor,
+              createdById: ctx.session.user.id,
+              status: "todo",
+            })
+            .returning({ id: task.id });
 
           if (input.attachments && input.attachments.length > 0 && newTask) {
             for (const att of input.attachments) {
@@ -403,7 +450,10 @@ export const tasksRouter = createTRPCRouter({
       });
       if (!original) throw new TRPCError({ code: "NOT_FOUND" });
 
-      if (ctx.session.user.role === "mentor" && original.createdById !== ctx.session.user.id) {
+      if (
+        ctx.session.user.role === "mentor" &&
+        original.createdById !== ctx.session.user.id
+      ) {
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 
@@ -420,8 +470,8 @@ export const tasksRouter = createTRPCRouter({
             eq(task.createdById, original.createdById),
             eq(task.title, original.title),
             eq(task.description, original.description ?? ""),
-            eq(task.dueDate, original.dueDate ?? "")
-          )
+            eq(task.dueDate, original.dueDate ?? ""),
+          ),
         );
 
       return { ok: true };
@@ -437,18 +487,23 @@ export const tasksRouter = createTRPCRouter({
       });
       if (!original) throw new TRPCError({ code: "NOT_FOUND" });
 
-      if (ctx.session.user.role === "mentor" && original.createdById !== ctx.session.user.id) {
+      if (
+        ctx.session.user.role === "mentor" &&
+        original.createdById !== ctx.session.user.id
+      ) {
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 
-      await ctx.db.delete(task).where(
-        and(
-          eq(task.createdById, original.createdById),
-          eq(task.title, original.title),
-          eq(task.description, original.description ?? ""),
-          eq(task.dueDate, original.dueDate ?? "")
-        )
-      );
+      await ctx.db
+        .delete(task)
+        .where(
+          and(
+            eq(task.createdById, original.createdById),
+            eq(task.title, original.title),
+            eq(task.description, original.description ?? ""),
+            eq(task.dueDate, original.dueDate ?? ""),
+          ),
+        );
 
       return { ok: true };
     }),
@@ -483,18 +538,21 @@ export const tasksRouter = createTRPCRouter({
             eq(task.createdById, refTask.createdById),
             eq(task.title, refTask.title),
             eq(task.description, refTask.description ?? ""),
-            eq(task.dueDate, refTask.dueDate ?? "")
-          )
+            eq(task.dueDate, refTask.dueDate ?? ""),
+          ),
         );
 
       // 3. Get attachments for these tasks (if any submission files)
-      const taskIds = groupTasks.map(t => t.id);
-      const attachments = taskIds.length > 0 ? await ctx.db.query.attachment.findMany({
-        where: and(
-          eq(attachment.ownerType, "task"),
-          inArray(attachment.ownerId, taskIds)
-        )
-      }) : [];
+      const taskIds = groupTasks.map((t) => t.id);
+      const attachments =
+        taskIds.length > 0
+          ? await ctx.db.query.attachment.findMany({
+              where: and(
+                eq(attachment.ownerType, "task"),
+                inArray(attachment.ownerId, taskIds),
+              ),
+            })
+          : [];
 
       // 4. Calculate stats
       const stats = {
@@ -506,7 +564,7 @@ export const tasksRouter = createTRPCRouter({
         rejected: 0,
       };
 
-      const submissions = groupTasks.map(t => {
+      const submissions = groupTasks.map((t) => {
         // Count stats
         if (t.status === "todo") stats.todo++;
         else if (t.status === "in_progress") stats.inProgress++;
@@ -522,13 +580,15 @@ export const tasksRouter = createTRPCRouter({
           status: t.status,
           submittedAt: t.submittedAt,
           submissionNote: t.submissionNote,
-          files: attachments.filter(a => a.ownerId === t.id).map(a => ({
-            id: a.id,
-            url: a.url,
-            filename: a.filename,
-            mimeType: a.mimeType,
-            sizeBytes: a.sizeBytes
-          }))
+          files: attachments
+            .filter((a) => a.ownerId === t.id)
+            .map((a) => ({
+              id: a.id,
+              url: a.url,
+              filename: a.filename,
+              mimeType: a.mimeType,
+              sizeBytes: a.sizeBytes,
+            })),
         };
       });
 
@@ -541,7 +601,7 @@ export const tasksRouter = createTRPCRouter({
           createdAt: refTask.createdAt,
         },
         submissions,
-        stats
+        stats,
       };
     }),
 });
