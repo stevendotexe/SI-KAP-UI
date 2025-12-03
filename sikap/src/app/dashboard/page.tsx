@@ -4,12 +4,22 @@ import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { LogIn, LogOut } from "lucide-react"
 import { useRef, useState } from "react"
+import { api } from "@/trpc/react" // <-- TRPC client
 
 export default function DashboardPage() {
 	const masukInputRef = useRef<HTMLInputElement | null>(null)
 	const keluarInputRef = useRef<HTMLInputElement | null>(null)
 	const [masukImageName, setMasukImageName] = useState("")
 	const [keluarImageName, setKeluarImageName] = useState("")
+
+	// ambil data dari DB (koneksi ke router calendarEvents)
+	const now = new Date()
+	const [companyId] = useState<number>(1) // TODO: sesuaikan dengan companyId aktual
+	const { data: events, isLoading, isError } = api.calendarEvents.list.useQuery(
+		{ companyId, month: now.getMonth() + 1, year: now.getFullYear() },
+		{ retry: 1 }
+	)
+	const eventsCount = typeof events?.length === "number" ? events.length : null
 
 	return (
 		<div className="min-h-screen bg-muted/30 p-0 m-0">
@@ -19,17 +29,31 @@ export default function DashboardPage() {
 						<h1 className="text-2xl sm:text-3xl font-semibold">Selamat datang, Siswa!</h1>
 						<p className="text-muted-foreground mt-1">ID Siswa: 010101</p>
 
+						{/* mitigasi ketika DB gagal */}
+						{isError && (
+							<div className="mt-4 rounded-md border border-destructive/30 bg-destructive/5 text-destructive text-sm px-3 py-2">
+								Gagal memuat data dari database. Menampilkan data bawaan.
+							</div>
+						)}
+
 						{/* Stats */}
 						<div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 							{[
-								{ title: "Ditugaskan", value: "2", sub: "Minggu ini" },
+								{
+									title: "Ditugaskan",
+									value: eventsCount != null ? String(eventsCount) : "2",
+									sub: "Minggu ini",
+									loading: isLoading,
+								},
 								{ title: "Menunggu tinjauan", value: "1", sub: "Menunggu respon mentor" },
 								{ title: "Laporan Terkirim", value: "3", sub: "Minggu ini" },
 								{ title: "Skor Rata-Rata", value: "8.5", sub: "Dari 10" },
 							].map((card) => (
 								<div key={card.title} className="rounded-2xl border bg-card p-5 shadow-sm">
 									<div className="text-sm text-muted-foreground">{card.title}</div>
-									<div className="mt-2 text-3xl font-semibold">{card.value}</div>
+									<div className="mt-2 text-3xl font-semibold">
+										{"loading" in card && card.loading ? "…" : card.value}
+									</div>
 									<div className="mt-1 text-xs text-muted-foreground">{card.sub}</div>
 								</div>
 							))}
