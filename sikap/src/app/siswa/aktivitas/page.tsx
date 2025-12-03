@@ -70,12 +70,12 @@ export default function SiswaAktivitasPage() {
     const totalPages = Math.ceil(totalItems / PAGE_SIZE);
 
     return (
-        <main className="min-h-screen bg-gray-50">
-            <div className="max-w-[1200px] mx-auto px-6 py-8">
+        <main className="space-y-6 p-5 pr-4 sm:pr-6 lg:pr-10 pl-4 sm:pl-6 lg:pl-10">
+            <div className="w-full max-w-none p-0 m-0">
                 {/* Header */}
                 <div className="mb-6">
-                    <h1 className="text-2xl font-semibold text-gray-900">Aktivitas</h1>
-                    <p className="text-sm text-gray-600 mt-1">
+                    <h1 className="text-2xl sm:text-3xl font-semibold">Aktivitas</h1>
+                    <p className="text-muted-foreground mt-1">
                         Lihat semua kegiatan dan tugas PKL
                     </p>
                 </div>

@@ -138,7 +138,7 @@ export default function DetailTugasSiswaPage() {
 
   return (
     <div className="bg-muted/30 m-0 min-h-screen p-0">
-      <div className="w-full max-w-none space-y-6 p-0 pr-4 pl-4 sm:pr-6 sm:pl-6 lg:pr-10 lg:pl-10">
+      <div className="w-full max-w-none space-y-6 p-5 pr-4 pl-4 sm:pr-6 sm:pl-6 lg:pr-10 lg:pl-10">
         {/* Header: back button + title */}
         <div className="flex items-start gap-3">
           <Button

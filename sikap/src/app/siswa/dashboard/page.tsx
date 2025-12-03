@@ -143,7 +143,7 @@ export default function DashboardPage() {
     }, [])
 
     const formatTs = () =>
-        new Intl.DateTimeFormat("id-ID", {
+        new Intl.DateTimeFormat("en-GB", {
             hour: "2-digit",
             minute: "2-digit",
             second: "2-digit",
@@ -277,7 +277,7 @@ export default function DashboardPage() {
             })
             setIsMasukSaved(true)
         } catch (err) {
-            const message = err instanceof Error ? err.message : "Terjadi kesalahan saat menyimpan absen masuk"
+            const message = err instanceof Error ? err.message : "Terjadi kesalahan saat menyimpan presensi masuk"
             setAttendanceError(message)
             alert(message)
         }
@@ -296,7 +296,7 @@ export default function DashboardPage() {
             })
             setIsKeluarSaved(true)
         } catch (err) {
-            const message = err instanceof Error ? err.message : "Terjadi kesalahan saat menyimpan absen keluar"
+            const message = err instanceof Error ? err.message : "Terjadi kesalahan saat menyimpan presensi keluar"
             setAttendanceError(message)
             alert(message)
         }
@@ -341,35 +341,34 @@ export default function DashboardPage() {
     return (
         <div className="min-h-screen bg-muted/30 p-0 m-0">
             <div className="w-full max-w-none p-0 m-0">
-                <main className="space-y-6 p-0 pr-4 sm:pr-6 lg:pr-10 pl-4 sm:pl-6 lg:pl-10">
+                <main className="space-y-6 p-5 pr-4 sm:pr-6 lg:pr-10 pl-4 sm:pl-6 lg:pl-10">
                     <section className="p-0">
                         <h1 className="text-2xl sm:text-3xl font-semibold">Selamat datang, Siswa!</h1>
                         <p className="text-muted-foreground mt-1">ID Siswa: 010101</p>
-                        <div className="mt-6 flex flex-col gap-6">
+                        <div className="mt-1 flex flex-col gap-6">
                             {/* NOTE: Attendance form posts to /api/attendance endpoint. Backend implementation may be required. */}
                             <div className="order-1 md:order-2">
                                 <div className="rounded-2xl border bg-card p-6">
                                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
                                         <div>
-                                            <h2 className="text-lg font-semibold">Form absensi</h2>
+                                            <h2 className="text-lg font-semibold">Form presensi</h2>
                                             <p className="text-sm text-muted-foreground mt-1">Pilih status kehadiran anda</p>
-                                            <p className="text-xs text-muted-foreground">Pengisian absen masuk hanya dapat dilakukan antara 07:00:00 hingga 07:59:59</p>
-                                            <p className="text-xs text-muted-foreground">Pengisian absen keluar hanya dapat dilakukan antara 15:00:00 hingga 15:59:59</p>
+                                            <p className="text-xs text-muted-foreground">Pengisian presensi masuk hanya dapat dilakukan antara 07:00:00 hingga 07:59:59</p>
+                                            <p className="text-xs text-muted-foreground">Pengisian presensi keluar hanya dapat dilakukan antara 15:00:00 hingga 15:59:59</p>
                                         </div>
                                         <div className="text-sm mt-4 sm:mt-0" suppressHydrationWarning>
                                             {now
-                                                ? new Intl.DateTimeFormat("id-ID", {
+                                                ? new Intl.DateTimeFormat("en-GB", {
                                                     weekday: "long",
                                                     day: "numeric",
                                                     month: "long",
-                                                    year: "numeric",
                                                     year: "numeric",
                                                 }).format(now)
                                                 : "—"}
                                             <br />
                                             <span className="text-muted-foreground">
                                                 {now
-                                                    ? new Intl.DateTimeFormat("id-ID", {
+                                                    ? new Intl.DateTimeFormat("en-GB", {
                                                         hour: "2-digit",
                                                         minute: "2-digit",
                                                         second: "2-digit",
@@ -385,7 +384,7 @@ export default function DashboardPage() {
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         {/* Masuk */}
                                         <div className="rounded-2xl border bg-card p-6">
-                                            <h3 className="text-xl font-semibold">Absen Masuk</h3>
+                                            <h3 className="text-xl font-semibold">Presensi Masuk</h3>
                                             <p className="text-muted-foreground mt-2">
                                                 {masukAt ? <span className="font-semibold text-foreground">{masukAt}</span> : "--:--:--"}
                                             </p>
@@ -416,8 +415,8 @@ export default function DashboardPage() {
                                                     variant={(isMasukSaved || isIzinSaved) ? "outline" : "destructive"}
                                                     disabled={isMasukSaved || isIzinSaved}
                                                     className={`h-9 rounded-md px-5 inline-flex items-center gap-2 ${(isMasukSaved || isIzinSaved)
-                                                            ? "bg-muted text-muted-foreground border hover:bg-muted cursor-not-allowed"
-                                                            : ""
+                                                        ? "bg-muted text-muted-foreground border hover:bg-muted cursor-not-allowed"
+                                                        : ""
                                                         }`}
                                                     onClick={() => {
                                                         setCameraOpenFor("masuk")
@@ -435,7 +434,7 @@ export default function DashboardPage() {
                                                         variant="outline"
                                                         onClick={handleResetMasuk}
                                                         className="h-9 rounded-md px-5 border-destructive text-destructive hover:bg-destructive/10"
-                                                        title="Reset absen masuk"
+                                                        title="Reset presensi masuk"
                                                     >
                                                         Reset
                                                     </Button>
@@ -492,7 +491,7 @@ export default function DashboardPage() {
 
                                         {/* Keluar */}
                                         <div className="rounded-2xl border bg-card p-6">
-                                            <h3 className="text-xl font-semibold">Absen Keluar</h3>
+                                            <h3 className="text-xl font-semibold">Presensi Keluar</h3>
                                             <p className="text-muted-foreground mt-2">
                                                 {keluarAt ? <span className="font-semibold text-foreground">{keluarAt}</span> : "--:--:--"}
                                             </p>
@@ -522,10 +521,10 @@ export default function DashboardPage() {
                                                 <Button
                                                     variant={(!isMasukSaved || isKeluarSaved || isIzinSaved) ? "outline" : "destructive"}
                                                     disabled={!isMasukSaved || isKeluarSaved || isIzinSaved}
-                                                    title={!isMasukSaved ? "Lakukan absen masuk terlebih dahulu" : "Ambil Foto"}
+                                                    title={!isMasukSaved ? "Lakukan presensi masuk terlebih dahulu" : "Ambil Foto"}
                                                     className={`h-9 rounded-md px-5 inline-flex items-center gap-2 ${(!isMasukSaved || isKeluarSaved || isIzinSaved)
-                                                            ? "bg-muted text-muted-foreground border hover:bg-muted cursor-not-allowed"
-                                                            : ""
+                                                        ? "bg-muted text-muted-foreground border hover:bg-muted cursor-not-allowed"
+                                                        : ""
                                                         }`}
                                                     onClick={() => {
                                                         if (!isMasukSaved) return
@@ -543,7 +542,7 @@ export default function DashboardPage() {
                                                         variant="outline"
                                                         onClick={handleResetKeluar}
                                                         className="h-9 rounded-md px-5 border-destructive text-destructive hover:bg-destructive/10"
-                                                        title="Reset absen keluar"
+                                                        title="Reset presensi keluar"
                                                     >
                                                         Reset
                                                     </Button>

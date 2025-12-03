@@ -84,7 +84,7 @@ export default function LaporanSiswaPage() {
   }
 
   return (
-    <main className="w-full max-w-none p-0 pr-4 sm:pr-6 lg:pr-10 pl-4 sm:pl-6 lg:pl-10 space-y-5">
+    <main className="w-full max-w-none p-5 pr-4 sm:pr-6 lg:pr-10 pl-4 sm:pl-6 lg:pl-10 space-y-5">
       {/* Header judul + aksi */}
       <div className="flex items-center justify-between">
         <div>
