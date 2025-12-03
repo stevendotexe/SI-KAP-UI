@@ -1,172 +1,192 @@
-"use client"
+"use client";
 
-import React from "react"
-import { FieldSet, FieldGroup, Field, FieldTitle, FieldContent } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { STUDENTS } from "@/lib/reports-data"
-import { RUBRIC_CATEGORIES } from "@/lib/rubrics"
-import AttendanceLine from "@/components/students/AttendanceLine"
+import { useState } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Search, Pencil } from "lucide-react";
+import { api } from "@/trpc/react";
+import { Spinner } from "@/components/ui/spinner";
 
-type ScoreMap = Record<string, number | undefined>
+export default function RaporAkhirPage() {
+  const [search, setSearch] = useState("");
+  const [filterCohort, setFilterCohort] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
 
-const kategori = RUBRIC_CATEGORIES
-
-export default function Page() {
-  const [nama, setNama] = React.useState("")
-  const [scores, setScores] = React.useState<ScoreMap>({})
-  const [error, setError] = React.useState<string | null>(null)
-  const selectedStudent = React.useMemo(() => STUDENTS.find((s) => s.student.toLowerCase() === nama.toLowerCase()) || null, [nama])
-
-  const attendanceSeries = React.useMemo(() => {
-    const base = selectedStudent ? (selectedStudent.major === "RPL" ? 85 : 82) : 80
-    return [0,1,2,3,4,5].map((i) => ({ period: `M${i+1}`, count: Math.max(60, Math.min(98, Math.round(base + (i-3)*2 + (i%2?3:-2)))) }))
-  }, [selectedStudent])
-  const scoreSeries = React.useMemo(() => {
-    const base = selectedStudent ? (selectedStudent.major === "RPL" ? 78 : 75) : 76
-    return [0,1,2,3,4,5].map((i) => ({ period: `M${i+1}`, count: Math.max(60, Math.min(98, Math.round(base + (i-3)*2 + (i%2?2:-1)))) }))
-  }, [selectedStudent])
-  const attGrowth = React.useMemo(() => {
-    const first = attendanceSeries[0]?.count ?? 0
-    const last = attendanceSeries[attendanceSeries.length-1]?.count ?? 0
-    return first ? Math.round(((last-first)/first)*100) : 0
-  }, [attendanceSeries])
-  const scoreGrowth = React.useMemo(() => {
-    const first = scoreSeries[0]?.count ?? 0
-    const last = scoreSeries[scoreSeries.length-1]?.count ?? 0
-    return first ? Math.round(((last-first)/first)*100) : 0
-  }, [scoreSeries])
-
-  const total = Object.values(scores).reduce((s, v) => s + (v ?? 0), 0)
-  const count = Object.values(scores).filter((v) => typeof v === "number").length
-  const rata = count ? Math.round(total / count) : 0
-
-  function setScore(key: string, v: string) {
-    const n = Number(v)
-    setScores((prev) => ({ ...prev, [key]: Number.isInteger(n) && n >= 1 && n <= 100 ? n : undefined }))
-  }
-
-  function submit() {
-    // Validasi dasar
-    if (!nama.trim()) {
-      setError("Nama siswa wajib diisi")
-      return
-    }
-    const invalid = Object.entries(scores).some(([_, v]) => !v || v < 1 || v > 100)
-    if (invalid) {
-      setError("Semua skor harus diisi dan berada pada rentang 1-100")
-      return
-    }
-    setError(null)
-    alert("Penilaian rapor akhir berhasil disubmit")
-  }
+  const { data, isLoading, error, refetch } = api.finalReports.list.useQuery({
+    cohort: filterCohort === 'all' ? undefined : filterCohort,
+    status: filterStatus === 'all' ? undefined : filterStatus as 'active' | 'completed' | 'canceled',
+    search: search || undefined,
+    limit: 50,
+    offset: 0
+  });
 
   return (
     <main className="min-h-screen bg-muted text-foreground">
       <div className="max-w-[1200px] mx-auto px-6 py-8">
-        <h1 className="text-2xl font-semibold">Rapor Akhir</h1>
-        <p className="text-sm text-muted-foreground">Input penilaian akhir siswa</p>
-
-        <div className="bg-card border rounded-xl shadow-sm p-4 mt-4">
-          <FieldSet>
-            <FieldGroup>
-              <Field orientation="responsive">
-                <FieldTitle>Cari Nama Siswa</FieldTitle>
-                <FieldContent>
-                  <Input list="studentsList" value={nama} onChange={(e) => setNama(e.target.value)} placeholder="Cari nama siswa" />
-                  <datalist id="studentsList">
-                    {STUDENTS.map((s) => (
-                      <option key={s.id} value={s.student} />
-                    ))}
-                  </datalist>
-                </FieldContent>
-              </Field>
-            </FieldGroup>
-          </FieldSet>
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-semibold">Rapor Akhir</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Kelola nilai rapor akhir siswa PKL
+          </p>
         </div>
 
-        {selectedStudent && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mt-6">
-            <div className="lg:col-span-4 bg-card border rounded-(--radius-xl) shadow-sm p-4">
-              <div className="text-sm font-medium mb-2">Informasi Siswa</div>
-              <div className="space-y-1 text-sm">
-                <div><span className="text-muted-foreground">Nama:</span> {selectedStudent.student}</div>
-                <div><span className="text-muted-foreground">ID:</span> {selectedStudent.id}</div>
-                <div><span className="text-muted-foreground">Sekolah:</span> {selectedStudent.school}</div>
-                <div><span className="text-muted-foreground">Jurusan:</span> {selectedStudent.major}</div>
-                <div><span className="text-muted-foreground">Status:</span> {selectedStudent.state}</div>
-                <div><span className="text-muted-foreground">Angkatan:</span> {selectedStudent.batch}</div>
-              </div>
-            </div>
-
-            <div className="lg:col-span-4 bg-card border rounded-(--radius-xl) shadow-sm p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="text-sm text-muted-foreground">Rata Kehadiran</div>
-                </div>
-                <div className="text-2xl font-semibold">{attendanceSeries.length ? `${attendanceSeries[attendanceSeries.length-1]!.count}%` : "-"}</div>
-              </div>
-              <div className="mt-2">
-                <AttendanceLine data={attendanceSeries} />
-              </div>
-              <div className="text-xs text-muted-foreground mt-2">Pertumbuhan: {attGrowth}%</div>
-            </div>
-
-            <div className="lg:col-span-4 bg-card border rounded-(--radius-xl) shadow-sm p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="text-sm text-muted-foreground">Rata Skor</div>
-                </div>
-                <div className="text-2xl font-semibold">{scoreSeries.length ? `${scoreSeries[scoreSeries.length-1]!.count}` : "-"}</div>
-              </div>
-              <div className="mt-2">
-                <AttendanceLine data={scoreSeries} />
-              </div>
-              <div className="text-xs text-muted-foreground mt-2">Pertumbuhan: {scoreGrowth}%</div>
-            </div>
+        {/* Search */}
+        <div className="mb-4">
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Cari berdasarkan nama atau kode siswa"
+              className="pl-11 rounded-full bg-background border-border"
+            />
           </div>
-        )}
+        </div>
 
-        <div className="bg-card border rounded-xl shadow-sm p-4 mt-6">
-          {Object.entries(kategori).map(([kat, list]) => (
-            <div key={kat} className="mb-6">
-              <div className="text-sm font-medium mb-3">{kat}</div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {list.map((item) => (
-                  <div key={item} className="flex items-center justify-between gap-3 p-3 rounded-(--radius-sm) border">
-                    <span className="text-sm">{item}</span>
-                    <Input
-                      type="number"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      min={1}
-                      max={100}
-                      placeholder="1-100"
-                      value={scores[item] ?? ""}
-                      onChange={(e) => setScore(item, e.target.value)}
-                      className="w-24 text-center"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="rounded-(--radius-sm) border p-3">
-              <div className="text-sm text-muted-foreground">Total Nilai</div>
-              <div className="text-lg font-semibold">{total}</div>
-            </div>
-            <div className="rounded-(--radius-sm) border p-3">
-              <div className="text-sm text-muted-foreground">Rata-rata</div>
-              <div className="text-lg font-semibold">{rata}</div>
-            </div>
-          </div>
-          {error && <div className="text-destructive text-sm mt-3">{error}</div>}
-          <div className="mt-4 flex justify-end">
-            <Button variant="destructive" onClick={submit}>Submit</Button>
+        {/* Filters */}
+        <div className="flex gap-3 mb-6">
+          <Select value={filterCohort} onValueChange={setFilterCohort}>
+            <SelectTrigger className="w-[180px] rounded-full bg-background">
+              <SelectValue placeholder="Semua Angkatan" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua Angkatan</SelectItem>
+              <SelectItem value="2024">2024</SelectItem>
+              <SelectItem value="2023">2023</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger className="w-[180px] rounded-full bg-background">
+              <SelectValue placeholder="Semua Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua Status</SelectItem>
+              <SelectItem value="completed">Selesai</SelectItem>
+              <SelectItem value="active">Aktif</SelectItem>
+              <SelectItem value="canceled">Non-Aktif</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Table */}
+        <div className="rounded-xl overflow-hidden border bg-card shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-destructive text-white">
+                <tr>
+                  <th className="text-left text-sm font-medium px-4 py-3">
+                    Nama
+                  </th>
+                  <th className="text-left text-sm font-medium px-4 py-3">
+                    Kode
+                  </th>
+                  <th className="text-left text-sm font-medium px-4 py-3">
+                    Asal Sekolah
+                  </th>
+                  <th className="text-left text-sm font-medium px-4 py-3">
+                    Angkatan
+                  </th>
+                  <th className="text-left text-sm font-medium px-4 py-3">
+                    Status
+                  </th>
+                  <th className="text-left text-sm font-medium px-4 py-3">
+                    Total Nilai
+                  </th>
+                  <th className="text-left text-sm font-medium px-4 py-3">
+                    Rata-rata
+                  </th>
+                  <th className="text-left text-sm font-medium px-4 py-3">
+                    Aksi
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-8 text-center">
+                      <div className="flex justify-center">
+                        <Spinner />
+                      </div>
+                    </td>
+                  </tr>
+                ) : error ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-8 text-center text-red-500">
+                      Terjadi kesalahan: {error.message}
+                      <Button variant="outline" size="sm" onClick={() => refetch()} className="ml-2">
+                        Coba Lagi
+                      </Button>
+                    </td>
+                  </tr>
+                ) : data?.items.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
+                      Tidak ada data siswa.
+                    </td>
+                  </tr>
+                ) : (
+                  data?.items.map((student, index) => (
+                    <tr
+                      key={student.id}
+                      className={`border-t ${index % 2 === 0 ? "bg-background" : "bg-muted/30"}`}
+                    >
+                      <td className="px-4 py-3 text-sm font-medium">
+                        {student.studentName}
+                      </td>
+                      <td className="px-4 py-3 text-sm">{student.studentCode}</td>
+                      <td className="px-4 py-3 text-sm">{student.school}</td>
+                      <td className="px-4 py-3 text-sm">{student.cohort}</td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${student.status === "completed"
+                              ? "bg-green-100 text-green-700"
+                              : student.status === "active"
+                                ? "bg-blue-100 text-blue-700"
+                                : "bg-gray-100 text-gray-700"
+                            }`}
+                        >
+                          {student.status === "completed"
+                            ? "Selesai"
+                            : student.status === "active"
+                              ? "Aktif"
+                              : "Non-Aktif"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm font-medium">
+                        {student.totalScore}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-medium">
+                        {student.averageScore}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Link href={`/mentor/rapor-akhir/${student.id}`}>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="hover:bg-muted cursor-pointer"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                        </Link>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
     </main>
-  )
+  );
 }

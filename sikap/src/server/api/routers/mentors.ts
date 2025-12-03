@@ -6,11 +6,16 @@ import {
   createTRPCRouter,
   requirePermissions,
   adminOrMentorProcedure,
+  mentorProcedure,
 } from "@/server/api/trpc";
 import { auth } from "@/server/better-auth";
 import { mentorProfile, placement, studentProfile, user } from "@/server/db/schema";
 
 const docs = {
+  me: {
+    description:
+      "## Get Current Mentor Profile\n\nMengembalikan profil mentor yang sedang login beserta companyId.\n\n### Parameters\nTidak ada.\n\n### Response\n`{ id: number, userId: string, name: string, email: string, active: boolean, companyId: number | null }`.\n\n### Example (React)\n```ts\nconst { data } = api.mentors.me.useQuery();\nconst companyId = data?.companyId;\n```",
+  },
   list: {
     description:
       "## List Mentor\n\nList mentor dalam company dengan filter dan paginasi.\n\n### Parameters\n- `companyId` (number)\n- `active` (boolean, optional)\n- `search` (string, optional)\n- `limit` (number, 1-200, default 100)\n- `offset` (number, >=0, default 0)\n\n### Response\n`{ items: MentorRow[], pagination: { total, limit, offset }, lastUpdated: string }` dengan `MentorRow = { id: number, mentorId: string, name: string, email: string, active: boolean, studentCount: number }`.\n\n### Example (React)\n```ts\nconst { data } = api.mentors.list.useQuery({ companyId: 1, search: 'ahsan' });\n```",
@@ -34,6 +39,24 @@ const docs = {
 };
 
 export const mentorsRouter = createTRPCRouter({
+  me: mentorProcedure
+    .meta(docs.me)
+    .query(async ({ ctx }) => {
+      const mp = await ctx.db.query.mentorProfile.findFirst({
+        where: eq(mentorProfile.userId, ctx.session.user.id),
+        with: { user: true },
+      });
+      if (!mp) throw new TRPCError({ code: "NOT_FOUND", message: "Mentor profile not found" });
+      return {
+        id: mp.id,
+        userId: mp.userId,
+        name: mp.user?.name ?? "",
+        email: mp.user?.email ?? "",
+        active: mp.active,
+        companyId: mp.companyId ?? null,
+      };
+    }),
+
   list: adminOrMentorProcedure
     .meta(docs.list)
     .use(requirePermissions({ mentorProfile: ["read"], placement: ["read"] }))

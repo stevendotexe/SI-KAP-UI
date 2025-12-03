@@ -6,6 +6,7 @@ import { TRPCError } from "@trpc/server";
 import {
   adminOrMentorProcedure,
   createTRPCRouter,
+  protectedProcedure,
   requirePermissions,
 } from "@/server/api/trpc";
 import {
@@ -13,6 +14,7 @@ import {
   attendanceStatus,
   mentorProfile,
   placement,
+  placementStatus,
   studentProfile,
   user,
 } from "@/server/db/schema";
@@ -137,18 +139,18 @@ export const attendancesRouter = createTRPCRouter({
       return {
         summary: summaryRow
           ? (() => {
-              const present = Number(summaryRow.present ?? 0);
-              const absent = Number(summaryRow.absent ?? 0);
-              const total = Number(summaryRow.total ?? 0);
-              const attendancePercent = total === 0 ? 0 : Math.round((present / total) * 100);
-              return {
-                date: summaryDate,
-                presentCount: present,
-                absentCount: absent,
-                total,
-                attendancePercent,
-              };
-            })()
+            const present = Number(summaryRow.present ?? 0);
+            const absent = Number(summaryRow.absent ?? 0);
+            const total = Number(summaryRow.total ?? 0);
+            const attendancePercent = total === 0 ? 0 : Math.round((present / total) * 100);
+            return {
+              date: summaryDate,
+              presentCount: present,
+              absentCount: absent,
+              total,
+              attendancePercent,
+            };
+          })()
           : { date: summaryDate, presentCount: 0, absentCount: 0, total: 0, attendancePercent: 0 },
         items: rows.map(formatRow),
         pagination: { total: Number(totalDays ?? 0), limit: input.limit, offset: input.offset },
@@ -168,7 +170,7 @@ export const attendancesRouter = createTRPCRouter({
     )
     .input(
       z.object({
-        companyId: z.number(),
+        companyId: z.number().optional(),
         date: z.date(),
         mentorId: z.number().optional(),
         status: z.enum(attendanceStatus.enumValues).optional(),
@@ -191,7 +193,7 @@ export const attendancesRouter = createTRPCRouter({
 
       const where = and(
         eq(attendanceLog.date, dateStr),
-        eq(placement.companyId, input.companyId),
+        input.companyId ? eq(placement.companyId, input.companyId) : undefined,
         mentorFilterId ? eq(placement.mentorId, mentorFilterId) : undefined,
         input.status ? eq(attendanceLog.status, input.status) : undefined,
         input.search
@@ -248,5 +250,222 @@ export const attendancesRouter = createTRPCRouter({
         pagination: { total: Number(total ?? 0), limit: input.limit, offset: input.offset },
         lastUpdated: new Date().toISOString(),
       };
+    }),
+
+  myLog: protectedProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(100).default(30),
+        offset: z.number().min(0).default(0),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      // Verify user is a student
+      if (ctx.session.user.role !== "student") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Only students can access their attendance log" });
+      }
+
+      // Get student profile
+      const student = await ctx.db.query.studentProfile.findFirst({
+        where: eq(studentProfile.userId, ctx.session.user.id),
+      });
+
+      if (!student) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Student profile not found" });
+      }
+
+      // Get active placement
+      const activePlacement = await ctx.db.query.placement.findFirst({
+        where: and(
+          eq(placement.studentId, student.id),
+          eq(placement.status, "active"),
+        ),
+      });
+
+      if (!activePlacement) {
+        // If no active placement, return empty list
+        return { items: [], pagination: { total: 0, limit: input.limit, offset: input.offset } };
+      }
+
+      // Query attendance logs
+      const rows = await ctx.db
+        .select({
+          id: attendanceLog.id,
+          date: attendanceLog.date,
+          checkInAt: attendanceLog.checkInAt,
+          checkOutAt: attendanceLog.checkOutAt,
+          status: attendanceLog.status,
+          locationNote: attendanceLog.locationNote,
+        })
+        .from(attendanceLog)
+        .where(eq(attendanceLog.placementId, activePlacement.id))
+        .orderBy(sql`${attendanceLog.date} desc`)
+        .limit(input.limit)
+        .offset(input.offset);
+
+      const totalRows = await ctx.db
+        .select({ total: sql<number>`count(*)` })
+        .from(attendanceLog)
+        .where(eq(attendanceLog.placementId, activePlacement.id));
+
+      const total = totalRows[0]?.total ?? 0;
+
+      return {
+        items: rows,
+        pagination: { total: Number(total), limit: input.limit, offset: input.offset },
+      };
+    }),
+
+  recordCheckIn: protectedProcedure
+    .input(
+      z.object({
+        timestamp: z.date(),
+        latitude: z.number().optional(),
+        longitude: z.number().optional(),
+        locationNote: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Verify user is a student
+      if (ctx.session.user.role !== "student") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Only students can record attendance" });
+      }
+
+      // Get student profile
+      const student = await ctx.db.query.studentProfile.findFirst({
+        where: eq(studentProfile.userId, ctx.session.user.id),
+      });
+
+      if (!student) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Student profile not found" });
+      }
+
+      // Get active placement
+      const activePlacement = await ctx.db.query.placement.findFirst({
+        where: and(
+          eq(placement.studentId, student.id),
+          eq(placement.status, "active"),
+        ),
+      });
+
+      if (!activePlacement) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "No active placement found for this student",
+        });
+      }
+
+      // Get today's date in YYYY-MM-DD format
+      const today = input.timestamp.toISOString().slice(0, 10);
+
+      // Check if attendance record already exists for today
+      const existing = await ctx.db.query.attendanceLog.findFirst({
+        where: and(
+          eq(attendanceLog.placementId, activePlacement.id),
+          eq(attendanceLog.date, today),
+        ),
+      });
+
+      if (existing) {
+        // Update existing record
+        const [updated] = await ctx.db
+          .update(attendanceLog)
+          .set({
+            checkInAt: input.timestamp,
+            latitude: input.latitude?.toString(),
+            longitude: input.longitude?.toString(),
+            locationNote: input.locationNote,
+            status: "present",
+          })
+          .where(eq(attendanceLog.id, existing.id))
+          .returning();
+
+        return updated;
+      } else {
+        // Create new record
+        const [created] = await ctx.db
+          .insert(attendanceLog)
+          .values({
+            placementId: activePlacement.id,
+            date: today,
+            checkInAt: input.timestamp,
+            latitude: input.latitude?.toString(),
+            longitude: input.longitude?.toString(),
+            locationNote: input.locationNote,
+            status: "present",
+          })
+          .returning();
+
+        return created;
+      }
+    }),
+
+  recordCheckOut: protectedProcedure
+    .input(
+      z.object({
+        timestamp: z.date(),
+        latitude: z.number().optional(),
+        longitude: z.number().optional(),
+        locationNote: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Verify user is a student
+      if (ctx.session.user.role !== "student") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Only students can record attendance" });
+      }
+
+      // Get student profile
+      const student = await ctx.db.query.studentProfile.findFirst({
+        where: eq(studentProfile.userId, ctx.session.user.id),
+      });
+
+      if (!student) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Student profile not found" });
+      }
+
+      // Get active placement
+      const activePlacement = await ctx.db.query.placement.findFirst({
+        where: and(
+          eq(placement.studentId, student.id),
+          eq(placement.status, "active"),
+        ),
+      });
+
+      if (!activePlacement) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "No active placement found for this student",
+        });
+      }
+
+      // Get today's date in YYYY-MM-DD format
+      const today = input.timestamp.toISOString().slice(0, 10);
+
+      // Find today's attendance record
+      const existing = await ctx.db.query.attendanceLog.findFirst({
+        where: and(
+          eq(attendanceLog.placementId, activePlacement.id),
+          eq(attendanceLog.date, today),
+        ),
+      });
+
+      if (!existing) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "No check-in record found for today. Please check in first.",
+        });
+      }
+
+      // Update with check-out time
+      const [updated] = await ctx.db
+        .update(attendanceLog)
+        .set({
+          checkOutAt: input.timestamp,
+        })
+        .where(eq(attendanceLog.id, existing.id))
+        .returning();
+
+      return updated;
     }),
 });

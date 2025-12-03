@@ -1,11 +1,10 @@
 "use client"
 
+import { api } from "@/trpc/react"
+import { Spinner } from "@/components/ui/spinner"
+
 export default function LogAbsensiPage() {
-  const rows = [
-    { tanggal: "20-11-2025", masuk: "07:30:45", keluar: "17:12:06" },
-    { tanggal: "21-11-2025", masuk: "07:33:45", keluar: "17:14:06" },
-    { tanggal: "22-11-2025", masuk: "07:35:45", keluar: "17:16:06" },
-  ]
+  const { data, isLoading, isError } = api.attendances.myLog.useQuery({ limit: 100 })
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -21,24 +20,61 @@ export default function LogAbsensiPage() {
           </div>
 
           <div className="mt-4 overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="bg-destructive text-primary-foreground">
-                  <th className="text-left font-medium px-4 py-3 border-r border-border last:border-r-0">Tanggal</th>
-                  <th className="text-left font-medium px-4 py-3 border-r border-border last:border-r-0">Absen Masuk</th>
-                  <th className="text-left font-medium px-4 py-3">Absen Keluar</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {rows.map((r) => (
-                  <tr key={r.tanggal} className="bg-card">
-                    <td className="px-4 py-3 border-r border-border last:border-r-0">{r.tanggal}</td>
-                    <td className="px-4 py-3 border-r border-border last:border-r-0">{r.masuk}</td>
-                    <td className="px-4 py-3">{r.keluar}</td>
+            {isLoading ? (
+              <div className="flex justify-center py-8">
+                <Spinner size="lg" />
+              </div>
+            ) : isError ? (
+              <div className="text-center py-8 text-destructive">
+                Gagal memuat data absensi. Silakan coba lagi nanti.
+              </div>
+            ) : !data?.items.length ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Belum ada data absensi.
+              </div>
+            ) : (
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="bg-destructive text-primary-foreground">
+                    <th className="text-left font-medium px-4 py-3 border-r border-border last:border-r-0">Tanggal</th>
+                    <th className="text-left font-medium px-4 py-3 border-r border-border last:border-r-0">Absen Masuk</th>
+                    <th className="text-left font-medium px-4 py-3">Absen Keluar</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {data.items.map((r) => {
+                    const dateStr = new Date(r.date).toLocaleDateString("id-ID", {
+                      weekday: "long",
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })
+                    const checkIn = r.checkInAt
+                      ? new Date(r.checkInAt).toLocaleTimeString("id-ID", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                      })
+                      : "-"
+                    const checkOut = r.checkOutAt
+                      ? new Date(r.checkOutAt).toLocaleTimeString("id-ID", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                      })
+                      : "-"
+
+                    return (
+                      <tr key={r.id} className="bg-card hover:bg-muted/50 transition-colors">
+                        <td className="px-4 py-3 border-r border-border last:border-r-0 whitespace-nowrap">{dateStr}</td>
+                        <td className="px-4 py-3 border-r border-border last:border-r-0">{checkIn}</td>
+                        <td className="px-4 py-3">{checkOut}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       </div>

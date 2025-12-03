@@ -1,31 +1,85 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Send, ChevronLeft, X } from "lucide-react"
-import { useRef, useState } from "react"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { FileUploadField, type FileUploadValue } from "@/components/ui/file-upload-field"
+import { Send, ChevronLeft } from "lucide-react"
+import { useState } from "react"
+import { api } from "@/trpc/react"
+import { useRouter } from "next/navigation"
+
+type ReportType = "daily" | "weekly" | "monthly"
 
 export default function BuatLaporanPage() {
-  const [text, setText] = useState("")
-  const [fileName, setFileName] = useState<string | null>(null)
-  const [submitted, setSubmitted] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
-  const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+  const router = useRouter()
 
-  // mock save
-  async function handleSubmit() {
-    if (!text.trim() && !fileName) return
-    // Tidak menyimpan data ke API atau storage apa pun untuk saat ini.
-    // Submit hanya akan menonaktifkan input & tombol sesuai state in-memory.
-    setSubmitted(true)
+  // Form state
+  const [title, setTitle] = useState("")
+  const [content, setContent] = useState("")
+  const [type, setType] = useState<ReportType | "">("")
+  const [periodStart, setPeriodStart] = useState("")
+  const [periodEnd, setPeriodEnd] = useState("")
+  const [attachments, setAttachments] = useState<FileUploadValue[]>([])
+
+  // tRPC mutation
+  const createReport = api.reports.create.useMutation({
+    onSuccess: () => {
+      // Navigate back to reports list
+      router.push("/siswa/laporan")
+    },
+    onError: (error) => {
+      alert(`Gagal membuat laporan: ${error.message}`)
+    },
+  })
+
+  // Form submission
+  const handleSubmit = async () => {
+    // Validate required fields
+    if (!title.trim()) {
+      alert("Judul laporan harus diisi")
+      return
+    }
+    if (!content.trim()) {
+      alert("Isi laporan harus diisi")
+      return
+    }
+    if (!type) {
+      alert("Tipe laporan harus dipilih")
+      return
+    }
+
+    // Prepare mutation input
+    createReport.mutate({
+      title: title.trim(),
+      content: content.trim(),
+      type: type as ReportType,
+      periodStart: periodStart ? new Date(periodStart) : undefined,
+      periodEnd: periodEnd ? new Date(periodEnd) : undefined,
+      attachments,
+    })
   }
 
-  // reset handler
+  // Clear form handler
   const handleReset = () => {
-    if (submitted) return
-    setText("") // hanya hapus input paragraf
-    // jangan hapus file yang sudah diupload
-    // if (fileInputRef.current) fileInputRef.current.value = "" // dihapus
+    if (createReport.isPending) return
+    setTitle("")
+    setContent("")
+    setType("")
+    setPeriodStart("")
+    setPeriodEnd("")
+    // Keep attachments (already uploaded to storage)
   }
+
+  const isPending = createReport.isPending
+  const hasContent = title.trim() || content.trim() || type || attachments.length > 0
 
   return (
     <div className="min-h-screen bg-muted/30 p-0 m-0">
@@ -50,72 +104,120 @@ export default function BuatLaporanPage() {
         {/* Card */}
         <section className="mt-6 rounded-2xl border bg-card p-6 shadow-sm">
           {/* Judul area tugas */}
-          <h2 className="text-base sm:text-lg font-semibold">Form Tugas</h2>
+          <h2 className="text-base sm:text-lg font-semibold">Form Laporan</h2>
 
-          {/* Textarea "Ketik di sini" */}
-          <div className="mt-4">
-            <textarea
-              value={text}
-              onChange={(e) => !submitted && setText(e.target.value)}
-              placeholder="Ketik di sini"
-              className="w-full h-32 sm:h-36 rounded-xl border bg-card px-4 py-3 text-sm outline-none disabled:bg-muted/50 disabled:text-muted-foreground"
-              disabled={submitted}
-            />
-          </div>
+          {/* Form fields */}
+          <div className="mt-4 space-y-5">
+            {/* Title field */}
+            <div className="space-y-2">
+              <Label htmlFor="title" className="text-sm font-medium">
+                Judul Laporan <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="title"
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Masukkan judul laporan"
+                disabled={isPending}
+                className="w-full rounded-xl border bg-card px-4 py-2 text-sm"
+              />
+            </div>
 
-          {/* Upload + Dropzone */}
-          <div className="mt-6 flex items-center gap-3 flex-wrap">
-            <input
-              ref={fileInputRef}
-              type="file"
-              className="hidden"
-              onChange={(e) => {
-                if (submitted) return
-                const f = e.target.files?.[0] ?? null
-                if (f && f.size > MAX_FILE_SIZE) {
-                  alert("Ukuran file melebihi 10MB")
-                  e.target.value = ""
-                  setFileName(null)
-                  return
-                }
-                setFileName(f ? f.name : null)
-              }}
-              disabled={submitted}
-            />
-            <Button
-              variant="outline"
-              className="relative w-full sm:flex-1 min-w-[220px] h-9 px-4 rounded-full justify-start text-left"
-              onClick={() => !submitted && fileInputRef.current?.click()}
-              disabled={submitted}
-            >
-              Upload Tugas
-            </Button>
-
-            <div
-              className="relative w-full sm:flex-1 min-w-[220px] rounded-full border border-destructive/60 bg-card text-destructive/80 text-sm h-9 px-4 py-2 break-all text-left" // + text-left
-              style={{ borderStyle: "dashed" }}
-            >
-              {fileName ?? "Belum ada file"}
-              {/* Clear file button (X) only when not submitted */}
-              {fileName && !submitted && (
-                <button
-                  type="button"
-                  aria-label="Hapus file"
-                  onClick={() => {
-                    setFileName(null)
-                    if (fileInputRef.current) fileInputRef.current.value = ""
-                  }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center justify-center rounded-full h-6 w-6 text-destructive hover:bg-destructive/10"
+            {/* Report type selector */}
+            <div className="space-y-2">
+              <Label htmlFor="type" className="text-sm font-medium">
+                Tipe Laporan <span className="text-red-500">*</span>
+              </Label>
+              <Select
+                value={type}
+                onValueChange={(value) => setType(value as ReportType)}
+                disabled={isPending}
+              >
+                <SelectTrigger
+                  id="type"
+                  className="w-full rounded-xl border bg-card px-4 py-2 text-sm"
                 >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
+                  <SelectValue placeholder="Pilih tipe laporan" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="daily">Harian</SelectItem>
+                  <SelectItem value="weekly">Mingguan</SelectItem>
+                  <SelectItem value="monthly">Bulanan</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Period dates (optional) */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">
+                Periode Laporan (Opsional)
+              </Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="periodStart" className="text-xs text-muted-foreground">
+                    Tanggal Mulai
+                  </Label>
+                  <Input
+                    id="periodStart"
+                    type="date"
+                    value={periodStart}
+                    onChange={(e) => setPeriodStart(e.target.value)}
+                    disabled={isPending}
+                    className="w-full rounded-xl border bg-card px-4 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="periodEnd" className="text-xs text-muted-foreground">
+                    Tanggal Selesai
+                  </Label>
+                  <Input
+                    id="periodEnd"
+                    type="date"
+                    value={periodEnd}
+                    onChange={(e) => setPeriodEnd(e.target.value)}
+                    disabled={isPending}
+                    className="w-full rounded-xl border bg-card px-4 py-2 text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Content textarea */}
+            <div className="space-y-2">
+              <Label htmlFor="content" className="text-sm font-medium">
+                Isi Laporan <span className="text-red-500">*</span>
+              </Label>
+              <textarea
+                id="content"
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="Tuliskan laporan Anda di sini..."
+                className="w-full h-32 sm:h-36 rounded-xl border bg-card px-4 py-3 text-sm outline-none resize-none disabled:bg-muted/50 disabled:text-muted-foreground"
+                disabled={isPending}
+              />
+            </div>
+
+            {/* File upload */}
+            <div className="space-y-2">
+              <FileUploadField
+                ownerType="report"
+                ownerId={0} // Temporary ID, will be replaced after report creation
+                value={attachments}
+                onChange={setAttachments}
+                multiple={true}
+                maxFiles={5}
+                accept="image/*,application/pdf"
+                label="Lampiran (Opsional)"
+                description="Upload file pendukung (max 4.5MB per file)"
+                disabled={isPending}
+              />
             </div>
           </div>
 
           {/* Actions: Reset (left) + Send (right) */}
           <div className="mt-8 flex items-center justify-end gap-3">
-            {!submitted && (text.trim().length > 0 || !!fileName) && (
+            {!isPending && hasContent && (
               <Button
                 type="button"
                 variant="outline"
@@ -130,11 +232,11 @@ export default function BuatLaporanPage() {
               variant="destructive"
               className="px-5 h-9 rounded-md"
               onClick={handleSubmit}
-              disabled={submitted || (!text.trim() && !fileName)}
-              title={submitted ? "Sudah dikirim" : "Kirim"}
+              disabled={isPending || !title.trim() || !content.trim() || !type}
+              title={isPending ? "Mengirim..." : "Kirim"}
             >
               <Send className="size-4" />
-              <span className="ml-2">{submitted ? "Dikirim" : "Kirim"}</span>
+              <span className="ml-2">{isPending ? "Mengirim..." : "Kirim"}</span>
             </Button>
           </div>
         </section>
@@ -142,3 +244,4 @@ export default function BuatLaporanPage() {
     </div>
   )
 }
+

@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Field, FieldContent, FieldGroup, FieldSet, FieldTitle } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { api } from "@/trpc/react"
+import { toast } from "sonner"
 
 export default function AddStudentDialog() {
   const [open, setOpen] = React.useState(false)
@@ -18,6 +20,7 @@ export default function AddStudentDialog() {
     alamat: "",
     telepon: "",
     email: "",
+    password: "",
     orangTua: "",
   })
   const [errors, setErrors] = React.useState<Record<string, string>>({})
@@ -31,6 +34,7 @@ export default function AddStudentDialog() {
     if (!form.tanggalLahir) e.tanggalLahir = "Wajib diisi"
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Format email tidak valid"
     if (form.telepon && !/^[0-9+\-() ]{6,}$/.test(form.telepon)) e.telepon = "Format nomor tidak valid"
+    if (!form.password || form.password.length < 8) e.password = "Minimal 8 karakter"
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -39,9 +43,44 @@ export default function AddStudentDialog() {
     setForm((f) => ({ ...f, [key]: value }))
   }
 
+  const utils = api.useUtils()
+  const createStudent = api.students.create.useMutation({
+    onSuccess: () => {
+      toast.success("Siswa berhasil ditambahkan")
+      setOpen(false)
+      utils.students.list.invalidate()
+      setForm({
+        namaLengkap: "",
+        nis: "",
+        kelas: "",
+        jurusan: "",
+        tanggalLahir: "",
+        alamat: "",
+        telepon: "",
+        email: "",
+        password: "",
+        orangTua: "",
+      })
+    },
+    onError: (err) => {
+      toast.error(err.message)
+    },
+  })
+
   function submit() {
     if (!validate()) return
-    setOpen(false)
+    createStudent.mutate({
+      name: form.namaLengkap,
+      email: form.email,
+      password: form.password,
+      nis: form.nis,
+      school: "SMK", // Default or add field if needed
+      major: form.jurusan,
+      cohort: form.kelas,
+      phone: form.telepon,
+      address: form.alamat,
+      birthDate: new Date(form.tanggalLahir),
+    })
   }
 
   return (
@@ -99,21 +138,21 @@ export default function AddStudentDialog() {
                 </FieldContent>
               </Field>
 
-            <Field orientation="vertical">
-              <FieldTitle>Jurusan</FieldTitle>
-              <FieldContent>
-                <Select value={form.jurusan} onValueChange={(v) => update("jurusan", v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih Jurusan" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="TKJ">TKJ</SelectItem>
-                    <SelectItem value="RPL">RPL</SelectItem>
-                  </SelectContent>
-                </Select>
-                {errors.jurusan && <span className="text-destructive text-sm">{errors.jurusan}</span>}
-              </FieldContent>
-            </Field>
+              <Field orientation="vertical">
+                <FieldTitle>Jurusan</FieldTitle>
+                <FieldContent>
+                  <Select value={form.jurusan} onValueChange={(v) => update("jurusan", v)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih Jurusan" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="TKJ">TKJ</SelectItem>
+                      <SelectItem value="RPL">RPL</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors.jurusan && <span className="text-destructive text-sm">{errors.jurusan}</span>}
+                </FieldContent>
+              </Field>
 
               <Field orientation="vertical">
                 <FieldTitle>Tanggal Lahir</FieldTitle>
@@ -166,6 +205,20 @@ export default function AddStudentDialog() {
                 </FieldContent>
               </Field>
 
+              <Field orientation="vertical">
+                <FieldTitle>Password</FieldTitle>
+                <FieldContent>
+                  <Input
+                    type="password"
+                    placeholder="Minimal 8 karakter"
+                    value={form.password}
+                    onChange={(e) => update("password", e.target.value)}
+                    aria-invalid={!!errors.password}
+                  />
+                  {errors.password && <span className="text-destructive text-sm">{errors.password}</span>}
+                </FieldContent>
+              </Field>
+
               <Field orientation="vertical" className="sm:col-span-2">
                 <FieldTitle>Nama Orang Tua</FieldTitle>
                 <FieldContent>
@@ -182,7 +235,9 @@ export default function AddStudentDialog() {
 
         <DialogFooter>
           <Button variant="secondary" onClick={() => setOpen(false)}>Batal</Button>
-          <Button variant="destructive" onClick={submit}>Tambahkan</Button>
+          <Button variant="destructive" onClick={submit} disabled={createStudent.isPending}>
+            {createStudent.isPending ? "Menyimpan..." : "Tambahkan"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -1,10 +1,28 @@
 "use client"
 
+/**
+ * TODO: Backend Integration
+ * 
+ * This dialog currently creates tasks with local state only.
+ * When backend is ready:
+ * 1. Replace onAdd callback with api.tasks.create.useMutation()
+ * 2. Include attachments array in mutation payload
+ * 3. Handle task distribution to placements on backend
+ * 4. Show loading state during mutation
+ * 5. Display success/error messages
+ * 
+ * Required backend endpoint:
+ * api.tasks.create({ title, description, dueDate, targetMajor, placementIds, attachments })
+ */
+
 import React from "react"
+import { api } from "@/trpc/react"
+import { toast } from "sonner"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Field, FieldContent, FieldGroup, FieldSet, FieldTitle } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { FileUploadField, type FileUploadValue } from "@/components/ui/file-upload-field"
 import { RUBRIC_CATEGORIES, RUBRICS_BY_MAJOR } from "@/lib/rubrics"
 
 export type TaskItem = {
@@ -13,6 +31,7 @@ export type TaskItem = {
   titleSub: string
   description: string
   date: string
+  attachments?: Array<{ url: string, filename?: string }>
 }
 
 export default function AddTaskDialog({ onAdd }: { onAdd: (t: TaskItem) => void }) {
@@ -22,18 +41,19 @@ export default function AddTaskDialog({ onAdd }: { onAdd: (t: TaskItem) => void 
   const [description, setDescription] = React.useState("")
   const [date, setDate] = React.useState("")
   const [error, setError] = React.useState<string | null>(null)
-  const [majors, setMajors] = React.useState<Array<"RPL"|"TKJ"|"Umum">>([])
+  const [majors, setMajors] = React.useState<Array<"RPL" | "TKJ" | "Umum">>([])
   const [rubrics, setRubrics] = React.useState<string[]>([])
+  const [attachments, setAttachments] = React.useState<FileUploadValue[]>([])
 
   const todayStr = React.useMemo(() => {
     const d = new Date();
     const yyyy = d.getFullYear();
-    const mm = String(d.getMonth()+1).padStart(2,"0");
-    const dd = String(d.getDate()).padStart(2,"0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
     return `${yyyy}-${mm}-${dd}`
   }, [])
 
-  function toggleMajor(m: "RPL"|"TKJ"|"Umum") {
+  function toggleMajor(m: "RPL" | "TKJ" | "Umum") {
     setMajors((prev) => {
       if (m === "Umum") {
         const next = prev.includes("Umum") ? prev.filter((x) => x !== "Umum") : ["Umum"]
@@ -56,12 +76,41 @@ export default function AddTaskDialog({ onAdd }: { onAdd: (t: TaskItem) => void 
   }, [majors])
 
   function toggleRubric(r: string) {
-    setRubrics((prev) => prev.includes(r) ? prev.filter(x=>x!==r) : [...prev, r])
+    setRubrics((prev) => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r])
   }
+
+  const utils = api.useUtils()
+  const createTask = api.tasks.create.useMutation({
+    onSuccess: () => {
+      toast.success("Tugas berhasil dibuat")
+      setOpen(false)
+      utils.tasks.list.invalidate()
+      onAdd({
+        id: "temp",
+        titleMain: "",
+        titleSub: "",
+        description: "",
+        date: "",
+      }) // Trigger parent refresh if needed, though invalidate handles it
+
+      // Reset form
+      setTitleMain("")
+      setTitleSub("")
+      setDescription("")
+      setDate("")
+      setMajors([])
+      setRubrics([])
+      setAttachments([])
+    },
+    onError: (err) => {
+      toast.error(err.message)
+      setError(err.message)
+    }
+  })
 
   function submit() {
     const today = new Date()
-    today.setHours(0,0,0,0)
+    today.setHours(0, 0, 0, 0)
     const d = date ? new Date(date) : null
     if (!titleMain.trim()) { setError("Topik wajib diisi"); return }
     if (titleMain.length > 100) { setError("Judul besar maksimal 100 karakter"); return }
@@ -72,14 +121,15 @@ export default function AddTaskDialog({ onAdd }: { onAdd: (t: TaskItem) => void 
     if (!d || isNaN(d.getTime())) { setError("Tanggal deadline wajib dipilih"); return }
     if (d < today) { setError("Tanggal deadline tidak boleh lebih awal dari hari ini"); return }
     setError(null)
-    onAdd({ id: crypto.randomUUID(), titleMain, titleSub, description, date })
-    setOpen(false)
-    setTitleMain("")
-    setTitleSub("")
-    setDescription("")
-    setDate("")
-    setMajors([])
-    setRubrics([])
+
+    // Call mutation
+    createTask.mutate({
+      title: titleMain,
+      description: description, // Note: titleSub is not in schema yet, maybe append to title or desc?
+      dueDate: d,
+      targetMajor: majors.includes("Umum") ? undefined : majors[0], // Schema only supports one targetMajor for now
+      attachments: attachments.map(a => ({ url: a.url, filename: a.filename })),
+    })
   }
 
   return (
@@ -87,7 +137,7 @@ export default function AddTaskDialog({ onAdd }: { onAdd: (t: TaskItem) => void 
       <DialogTrigger asChild>
         <Button variant="destructive" size="lg" className="rounded-full">+ Tambah Tugas</Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Tambah Tugas</DialogTitle>
           <DialogDescription>Atur topik, subtopik, deskripsi, jurusan, rubrik, dan tanggal deadline.</DialogDescription>
@@ -128,10 +178,27 @@ export default function AddTaskDialog({ onAdd }: { onAdd: (t: TaskItem) => void 
             </Field>
 
             <Field orientation="vertical">
+              <FieldTitle>Lampiran Tugas (Opsional)</FieldTitle>
+              <FieldContent>
+                <FileUploadField
+                  ownerType="task"
+                  ownerId={0}
+                  value={attachments}
+                  onChange={setAttachments}
+                  multiple={true}
+                  maxFiles={5}
+                  accept="image/*,.pdf"
+                  maxSizeBytes={4.5 * 1024 * 1024}
+                  description="Unggah file pendukung tugas (gambar atau PDF, maks 5 file @ 4.5MB)"
+                />
+              </FieldContent>
+            </Field>
+
+            <Field orientation="vertical">
               <FieldTitle>Pilih Jurusan</FieldTitle>
               <FieldContent>
                 <div className="max-h-[400px] overflow-auto grid grid-cols-2 gap-3">
-                  {["RPL","TKJ","Umum"].map((m) => (
+                  {["RPL", "TKJ", "Umum"].map((m) => (
                     <label
                       key={m}
                       className={`flex items-center justify-between gap-2 border rounded-(--radius-sm) px-3 py-2 cursor-pointer transition-transform active:scale-[0.98] ${majors.includes(m as any) ? (m === "Umum" ? "ring-1 ring-muted-foreground/40 bg-accent" : "ring-1 ring-primary bg-secondary") : "bg-card"}`}
@@ -178,7 +245,9 @@ export default function AddTaskDialog({ onAdd }: { onAdd: (t: TaskItem) => void 
 
         <DialogFooter>
           <Button variant="secondary" onClick={() => setOpen(false)}>Batal</Button>
-          <Button variant="destructive" onClick={submit} disabled={!titleMain || !description || !date || majors.length === 0 || (availableRubrics.length>0 && rubrics.length===0)}>Simpan</Button>
+          <Button variant="destructive" onClick={submit} disabled={!titleMain || !description || !date || majors.length === 0 || (availableRubrics.length > 0 && rubrics.length === 0) || createTask.isPending}>
+            {createTask.isPending ? "Menyimpan..." : "Simpan"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

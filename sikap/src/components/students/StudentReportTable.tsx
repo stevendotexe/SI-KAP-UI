@@ -6,6 +6,7 @@ import Link from "next/link"
 import { useParams } from "next/navigation"
 
 type Report = {
+  id: number
   week: number
   title: string
   description: string
@@ -57,7 +58,7 @@ export default function StudentReportTable({ reports, reviewed, onReviewedChange
               <div className="text-xs text-muted-foreground mt-1">{r.date}</div>
             </div>
             <div className="text-2xl font-semibold">{r.score}</div>
-            <Link href={`/mentor/siswa/${params?.id ?? "STD-001"}/laporan/${r.week}`}>
+            <Link href={`/mentor/siswa/${params?.id ?? "STD-001"}/laporan/${r.id}`}>
               <Button variant="destructive" size="sm" className="rounded-full px-4">Lihat Detail</Button>
             </Link>
           </div>

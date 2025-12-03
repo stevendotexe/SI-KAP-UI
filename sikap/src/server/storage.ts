@@ -97,7 +97,7 @@ export async function uploadFilesAction(
   const res = await fetch(uploadUrl, {
     method: "POST",
     headers: {
-      "x-api-key": env.FILE_STORAGE_API_KEY,
+      "x-api-key": env.FILE_STORAGE_API_KEY ?? "",
     },
     body: outForm,
   });
@@ -112,10 +112,14 @@ export async function uploadFilesAction(
     const it = items[i];
     if (!it) continue;
     const size = prepared[i]?.result?.size;
+
+    // Use the URL returned by the service, or fallback to constructing it
+    const fileUrl = it.url || buildPublicUrl(it.filename);
+
     await db.insert(attachment).values({
       ownerType,
       ownerId,
-      url: buildPublicUrl(it.filename),
+      url: fileUrl,
       filename: it.filename,
       mimeType: it.mimetype,
       sizeBytes: typeof size === "number" ? size : undefined,
@@ -142,7 +146,7 @@ export async function deleteFileAction(
   const resp = await fetch(delUrl, {
     method: "DELETE",
     headers: {
-      "x-api-key": env.FILE_STORAGE_API_KEY,
+      "x-api-key": env.FILE_STORAGE_API_KEY ?? "",
     },
   });
   if (!resp.ok) {
@@ -169,6 +173,6 @@ export async function deleteFileAction(
   return json;
 }
 
-export function buildPublicUrlAction(filename: string) {
+export async function buildPublicUrlAction(filename: string) {
   return buildPublicUrl(filename);
 }

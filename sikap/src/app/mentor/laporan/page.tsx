@@ -6,9 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { Spinner } from "@/components/ui/spinner"
-import { getReports, type ReportItem } from "@/lib/reports-data"
-
-// menggunakan tipe ReportItem dari lib agar konsisten
+import { api } from "@/trpc/react"
 
 export default function Page() {
   return (
@@ -22,31 +20,70 @@ export default function Page() {
   )
 }
 
+// Map UI status filter values to backend reviewStatus enum
+function mapStatusToBackend(status: string): "pending" | "approved" | "rejected" | undefined {
+  switch (status) {
+    case "Sudah Direview":
+      return "approved"
+    case "Belum Direview":
+      return "pending"
+    case "Ditolak":
+      return "rejected"
+    default:
+      return undefined
+  }
+}
+
+// Convert date filter to date range
+function getDateRange(dateFilter: string): { from?: Date; to?: Date } {
+  if (dateFilter === "Semua Tanggal") {
+    return {}
+  }
+  // Format: "2025-06" -> from: 2025-06-01, to: 2025-06-30
+  const [year, month] = dateFilter.split("-").map(Number)
+  if (!year || !month) return {}
+  
+  const from = new Date(year, month - 1, 1)
+  const to = new Date(year, month, 0) // Last day of the month
+  to.setHours(23, 59, 59, 999)
+  
+  return { from, to }
+}
+
+// Format date to Indonesian locale
+function formatDate(date: Date | string | null): string {
+  if (!date) return "-"
+  const d = typeof date === "string" ? new Date(date) : date
+  return d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
+}
+
 function ClientList() {
-  const [loading, setLoading] = React.useState(true)
   const [q, setQ] = React.useState("")
   const [status, setStatus] = React.useState("Semua Status")
   const [date, setDate] = React.useState("Semua Tanggal")
-  const [student, setStudent] = React.useState("Semua Siswa")
 
-  const data: ReportItem[] = getReports()
+  // Get date range from filter
+  const dateRange = React.useMemo(() => getDateRange(date), [date])
 
-  React.useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 400)
-    return () => clearTimeout(t)
-  }, [])
+  // Get mentor's profile to retrieve companyId
+  const { data: mentorProfile, isLoading: isMentorLoading } = api.mentors.me.useQuery()
+  const companyId = mentorProfile?.companyId
 
-  const list = data
-    .filter((r) => {
-      if (status === "Semua Status") return true
-      if (status === "Sudah Direview") return r.status === "sudah_direview"
-      if (status === "Belum Direview") return r.status === "belum_direview"
-      if (status === "Belum Dikerjakan") return r.status === "belum_dikerjakan"
-      return true
-    })
-    .filter((r) => (student === "Semua Siswa" ? true : r.student === student))
-    .filter((r) => (date === "Semua Tanggal" ? true : r.date.startsWith(date)))
-    .filter((r) => (q ? (r.title + r.student).toLowerCase().includes(q.toLowerCase()) : true))
+  // Query reports from backend - only when companyId is known
+  const { data, isLoading: isReportsLoading, isError, refetch } = api.reports.list.useQuery({
+    companyId: companyId!,
+    search: q || undefined,
+    status: mapStatusToBackend(status),
+    from: dateRange.from,
+    to: dateRange.to,
+    limit: 200,
+    offset: 0,
+  }, {
+    enabled: !!companyId,
+  })
+
+  const isLoading = isMentorLoading || isReportsLoading
+  const list = data?.items ?? []
 
   return (
     <div className="mt-6 space-y-4">
@@ -60,20 +97,11 @@ function ClientList() {
             <SelectItem value="Semua Tanggal">Semua Tanggal</SelectItem>
             <SelectItem value="2025-06">Juni 2025</SelectItem>
             <SelectItem value="2025-07">Juli 2025</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select value={student} onValueChange={setStudent}>
-          <SelectTrigger className="min-w-[240px] w-full sm:w-fit" aria-label="Filter Siswa">
-            <SelectValue placeholder="Semua Siswa" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Semua Siswa">Semua Siswa</SelectItem>
-            <SelectItem value="Alya Putri">Alya Putri</SelectItem>
-            <SelectItem value="Bagus Pratama">Bagus Pratama</SelectItem>
-            <SelectItem value="Citra Dewi">Citra Dewi</SelectItem>
-            <SelectItem value="Dwi Santoso">Dwi Santoso</SelectItem>
-            <SelectItem value="Eka Ramadhan">Eka Ramadhan</SelectItem>
+            <SelectItem value="2025-08">Agustus 2025</SelectItem>
+            <SelectItem value="2025-09">September 2025</SelectItem>
+            <SelectItem value="2025-10">Oktober 2025</SelectItem>
+            <SelectItem value="2025-11">November 2025</SelectItem>
+            <SelectItem value="2025-12">Desember 2025</SelectItem>
           </SelectContent>
         </Select>
 
@@ -85,28 +113,43 @@ function ClientList() {
             <SelectItem value="Semua Status">Semua Status</SelectItem>
             <SelectItem value="Sudah Direview">Sudah Direview</SelectItem>
             <SelectItem value="Belum Direview">Belum Direview</SelectItem>
-            <SelectItem value="Belum Dikerjakan">Belum Dikerjakan</SelectItem>
+            <SelectItem value="Ditolak">Ditolak</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
-      {loading ? (
+      {isLoading ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground"><Spinner /> Memuat laporan...</div>
+      ) : isError ? (
+        <div className="flex flex-col items-start gap-2">
+          <div className="text-sm text-destructive">Gagal memuat laporan.</div>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Coba Lagi</Button>
+        </div>
       ) : list.length === 0 ? (
         <div className="text-sm text-muted-foreground">Tidak ada laporan.</div>
       ) : (
         <div className="space-y-4">
-          {list.map((r, i) => (
-            <div key={i} className="bg-card border rounded-xl shadow-sm p-4 flex items-center gap-4">
+          {list.map((r) => (
+            <div key={r.id} className="bg-card border rounded-xl shadow-sm p-4 flex items-center gap-4">
               <div className="flex-1">
-                <div className="text-sm font-medium">{r.student}</div>
-              <div className="text-base font-semibold">{r.title}</div>
-              <div className="text-sm text-muted-foreground">{r.title}</div>
+                <div className="text-sm font-medium">{r.student.name}</div>
+                <div className="text-base font-semibold">{r.title ?? "Laporan Tanpa Judul"}</div>
+                <div className="text-sm text-muted-foreground">{formatDate(r.submittedAt)}</div>
               </div>
               <div className="flex items-center gap-2">
-                <span className={`px-2 py-1 rounded-(--radius-md) text-xs ${r.status === "sudah_direview" ? "bg-green-100 text-green-800" : r.status === "belum_direview" ? "bg-yellow-100 text-yellow-800" : "bg-gray-200 text-gray-800"}`}>{r.status === "sudah_direview" ? "Direview" : r.status === "belum_direview" ? "Belum Direview" : "Belum Dikerjakan"}</span>
-                <Link href={`/mentor/siswa/${r.id}/laporan/1`}>
-                  <Button variant="destructive" size="sm" className="rounded-full">{r.status === "belum_direview" ? "Review" : "Lihat Detail"}</Button>
+                <span className={`px-2 py-1 rounded-(--radius-md) text-xs ${
+                  r.reviewStatus === "approved" 
+                    ? "bg-green-100 text-green-800" 
+                    : r.reviewStatus === "pending" 
+                      ? "bg-yellow-100 text-yellow-800" 
+                      : "bg-red-100 text-red-800"
+                }`}>
+                  {r.reviewStatus === "approved" ? "Direview" : r.reviewStatus === "pending" ? "Belum Direview" : "Ditolak"}
+                </span>
+                <Link href={`/mentor/laporan/${r.id}`}>
+                  <Button variant="destructive" size="sm" className="rounded-full">
+                    {r.reviewStatus === "pending" ? "Review" : "Lihat Detail"}
+                  </Button>
                 </Link>
               </div>
             </div>

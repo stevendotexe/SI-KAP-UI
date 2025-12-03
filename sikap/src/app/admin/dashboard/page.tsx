@@ -3,6 +3,7 @@ import React from "react";
 import { createTRPCContext } from "@/server/api/trpc";
 import { createCaller } from "@/server/api/root";
 import type { RouterOutputs } from "@/trpc/react";
+import { headers } from "next/headers";
 
 import StatisticCard from "@/components/dashboard/StatisticCard";
 import AttendanceLine from "@/components/students/AttendanceLine";
@@ -11,70 +12,15 @@ type DashboardCounts = RouterOutputs["dashboards"]["getDashboardCounts"];
 type SeriesPoint = { period: string; count: number };
 
 export default async function AdminDashboardPage() {
-  let counts: DashboardCounts | null = null;
-  let avgScores: SeriesPoint[] = [];
-  let avgAttendances: SeriesPoint[] = [];
-  let studentGrowth: SeriesPoint[] = [];
+  const ctx = await createTRPCContext({ headers: await headers() });
+  const caller = createCaller(ctx);
 
-  try {
-    const ctx = await createTRPCContext({ headers: new Headers() });
-    const caller = createCaller(ctx);
-
-    const result = (await Promise.all([
-      caller.dashboards.getDashboardCounts({}),
-      caller.dashboards.getAverageStudentScores({ granularity: "month" }),
-      caller.dashboards.getAverageStudentAttendances({ granularity: "month" }),
-      caller.dashboards.getStudentCountPerPeriod({ granularity: "month" }),
-    ])) as [DashboardCounts, SeriesPoint[], SeriesPoint[], SeriesPoint[]];
-
-    counts = result[0];
-    avgScores = result[1] ?? [];
-    avgAttendances = result[2] ?? [];
-    studentGrowth = result[3] ?? [];
-  } catch {
-    // gunakan data fallback jika terjadi kendala memuat dari API
-  }
-
-  // Fallback data
-  counts ??= {
-    students: 156,
-    mentors: 24,
-    reports: 487,
-    graduates: 487,
-    lastUpdated: new Date().toISOString(),
-  } as unknown as DashboardCounts;
-
-  if (!avgScores || avgScores.length === 0) {
-    avgScores = [
-      { period: "Jan", count: 75 },
-      { period: "Feb", count: 78 },
-      { period: "Mar", count: 80 },
-      { period: "Apr", count: 79 },
-      { period: "May", count: 82 },
-      { period: "Jun", count: 81 },
-    ] as SeriesPoint[];
-  }
-
-  if (!avgAttendances || avgAttendances.length === 0) {
-    avgAttendances = [
-      { period: "Jan", count: 88 },
-      { period: "Feb", count: 90 },
-      { period: "Mar", count: 89 },
-      { period: "Apr", count: 91 },
-      { period: "May", count: 90 },
-      { period: "Jun", count: 91 },
-    ] as SeriesPoint[];
-  }
-
-  if (!studentGrowth || studentGrowth.length === 0) {
-    studentGrowth = [
-      { period: "2020", count: 120 },
-      { period: "2021", count: 130 },
-      { period: "2022", count: 140 },
-      { period: "2023", count: 150 },
-      { period: "2024", count: 156 },
-    ] as SeriesPoint[];
-  }
+  const [counts, avgScores, avgAttendances, studentGrowth] = (await Promise.all([
+    caller.dashboards.getDashboardCounts({}),
+    caller.dashboards.getAverageStudentScores({ granularity: "month" }),
+    caller.dashboards.getAverageStudentAttendances({ granularity: "month" }),
+    caller.dashboards.getStudentCountPerPeriod({ granularity: "month" }),
+  ])) as [DashboardCounts, SeriesPoint[], SeriesPoint[], SeriesPoint[]];
 
   const growthPercent = (() => {
     const first = studentGrowth[0]?.count ?? 0;

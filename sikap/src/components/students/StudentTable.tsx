@@ -33,15 +33,15 @@ export default function StudentTable({ rows }: { rows: StudentRow[] }) {
             </thead>
             <tbody>
               {rows.map((r, i) => (
-                <tr key={i} className={i % 2 === 0 ? "bg-transparent" : "bg-muted/20"}>
+                <tr key={i} className={`${i % 2 === 0 ? "bg-transparent" : "bg-muted/20"} hover:bg-muted/50 transition-colors`}>
                   <td className="py-2 px-3">{r.name}</td>
                   <td className="py-2 px-3">{r.code}</td>
                   <td className="py-2 px-3">{r.school}</td>
                   <td className="py-2 px-3">{r.batch}</td>
                   <td className="py-2 px-3">{r.status}</td>
                   <td className="py-2 px-3">
-                    <Link href={`/mentor/siswa/${r.code}`}> 
-                      <Button variant="destructive" size="sm" className="rounded-full px-4">Detail</Button>
+                    <Link href={`/mentor/siswa/${r.code}`}>
+                      <Button variant="destructive" size="sm" className="rounded-full px-4 cursor-pointer shadow-sm hover:bg-destructive/90">Detail</Button>
                     </Link>
                   </td>
                 </tr>

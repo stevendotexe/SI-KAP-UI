@@ -94,12 +94,21 @@ export const reportsRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
+      let mentorFilterId = input.mentorId;
+      if (ctx.session.user.role === "mentor") {
+        const mp = await ctx.db.query.mentorProfile.findFirst({
+          where: eq(mentorProfile.userId, ctx.session.user.id),
+        });
+        if (!mp) throw new TRPCError({ code: "FORBIDDEN" });
+        mentorFilterId = mp.id;
+      }
+
       const submittedExpr = sql`coalesce(${report.submittedAt}, ${report.createdAt})`;
       const where = and(
         eq(placement.companyId, input.companyId),
         input.from ? gte(submittedExpr, input.from) : undefined,
         input.to ? lte(submittedExpr, input.to) : undefined,
-        input.mentorId ? eq(placement.mentorId, input.mentorId) : undefined,
+        mentorFilterId ? eq(placement.mentorId, mentorFilterId) : undefined,
         input.status ? eq(report.reviewStatus, input.status) : undefined,
         input.search
           ? sql`(lower(${report.title}) like ${"%" + input.search.toLowerCase() + "%"} or lower(${studentUser.name}) like ${"%" + input.search.toLowerCase() + "%"})`
@@ -314,11 +323,13 @@ export const reportsRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const sp = await requireStudentPlacement(ctx);
       const range = coerceRange({ from: input.from, to: input.to });
+      const fromStr = range.from.toISOString();
+      const toStr = range.to.toISOString();
       const submittedExpr = sql`coalesce(${report.submittedAt}, ${report.createdAt})`;
       const where = and(
         eq(placement.studentId, sp.id),
-        gte(submittedExpr, range.from),
-        lte(submittedExpr, range.to),
+        sql`${submittedExpr} >= ${fromStr}::timestamptz`,
+        sql`${submittedExpr} <= ${toStr}::timestamptz`,
         input.status ? eq(report.reviewStatus, input.status) : undefined,
         input.type ? eq(report.type, input.type) : undefined,
         input.search

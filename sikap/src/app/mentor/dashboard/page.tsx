@@ -5,18 +5,18 @@ import { createTRPCContext } from "@/server/api/trpc";
 import { createCaller } from "@/server/api/root";
 import type { RouterOutputs } from "@/trpc/react";
 import { getSession } from "@/server/better-auth/server";
+import { headers } from "next/headers";
 
 import StatisticCard from "@/components/dashboard/StatisticCard";
 import AttendanceLine from "@/components/students/AttendanceLine";
 import PieChart from "@/components/dashboard/PieChart";
 import AttendanceTable from "@/components/dashboard/AttendanceTable";
 import StatusButtons from "@/components/dashboard/StatusButtons";
-import { STUDENTS } from "@/lib/reports-data";
 
 type DashboardCounts = RouterOutputs["dashboards"]["getDashboardCounts"];
 type SeriesPoint = { period: string; count: number };
 type PieItem = RouterOutputs["dashboards"]["getAttendancePieChart"][number];
-type AttendanceRow = RouterOutputs["dashboards"]["getAttendanceTable"][number];
+type AttendanceDetailItem = RouterOutputs["attendances"]["detail"]["items"][number];
 
 export default async function DashboardPage() {
   const session = await getSession();
@@ -26,10 +26,10 @@ export default async function DashboardPage() {
   let avgAttendances: SeriesPoint[] = [];
   let studentGrowth: SeriesPoint[] = [];
   let attendancePie: PieItem[] = [];
-  let attendanceTable: AttendanceRow[] = [];
+  let attendanceDetailItems: AttendanceDetailItem[] = [];
 
   try {
-    const ctx = await createTRPCContext({ headers: new Headers() });
+    const ctx = await createTRPCContext({ headers: await headers() });
     const caller = createCaller(ctx);
 
     const result = (await Promise.all([
@@ -38,85 +38,43 @@ export default async function DashboardPage() {
       caller.dashboards.getAverageStudentAttendances({ granularity: "month" }),
       caller.dashboards.getStudentCountPerPeriod({ granularity: "month" }),
       caller.dashboards.getAttendancePieChart({}),
-      caller.dashboards.getAttendanceTable({}),
+      caller.attendances.detail({ date: new Date() }),
     ])) as [
-      DashboardCounts,
-      SeriesPoint[],
-      SeriesPoint[],
-      SeriesPoint[],
-      PieItem[],
-      AttendanceRow[]
-    ];
+        DashboardCounts,
+        SeriesPoint[],
+        SeriesPoint[],
+        SeriesPoint[],
+        PieItem[],
+        { items: AttendanceDetailItem[] }
+      ];
 
     counts = result[0];
     avgScores = result[1] ?? [];
     avgAttendances = result[2] ?? [];
     studentGrowth = result[3] ?? [];
     attendancePie = result[4] ?? [];
-    attendanceTable = result[5] ?? [];
+    attendanceDetailItems = result[5]?.items ?? [];
   } catch {
     // gunakan data fallback jika terjadi kendala memuat dari API
   }
 
   // --- tambahkan fallback / dummy data jika API tidak mengembalikan apa-apa ---
+  // Fallback removed to show real data
   counts ??= {
-      students: 156,
-      mentors: 24,
-      reports: 487,
-      graduates: 62,
-      lastUpdated: new Date().toISOString(),
-    } as unknown as DashboardCounts;
+    students: 0,
+    mentors: 0,
+    reports: 0,
+    graduates: 0,
+    lastUpdated: new Date().toISOString(),
+  } as DashboardCounts;
 
-  if (!avgScores || avgScores.length === 0) {
-    avgScores = [
-      { period: "Jan", count: 75 },
-      { period: "Feb", count: 78 },
-      { period: "Mar", count: 80 },
-      { period: "Apr", count: 79 },
-      { period: "May", count: 82 },
-      { period: "Jun", count: 81 },
-    ] as SeriesPoint[];
-  }
+  // Fallback removed
 
-  if (!avgAttendances || avgAttendances.length === 0) {
-    avgAttendances = [
-      { period: "Jan", count: 88 },
-      { period: "Feb", count: 90 },
-      { period: "Mar", count: 89 },
-      { period: "Apr", count: 91 },
-      { period: "May", count: 90 },
-      { period: "Jun", count: 91 },
-    ] as SeriesPoint[];
-  }
+  // Fallback removed
 
-  if (!studentGrowth || studentGrowth.length === 0) {
-    studentGrowth = [
-      { period: "2020", count: 120 },
-      { period: "2021", count: 130 },
-      { period: "2022", count: 140 },
-      { period: "2023", count: 150 },
-      { period: "2024", count: 156 },
-    ] as SeriesPoint[];
-  }
+  // Fallback removed
 
-  if (!attendancePie || attendancePie.length === 0) {
-    attendancePie = [
-      { name: "present", value: 31 },
-      { name: "absent", value: 3 },
-      { name: "excused", value: 5 },
-      { name: "late", value: 2 },
-    ] as PieItem[];
-  }
-
-  if (!attendanceTable || attendanceTable.length === 0) {
-    // contoh dummy rows; cast ke tipe AttendanceRow agar tidak error tipe
-    attendanceTable = [
-      { studentName: "Alya Putri", date: "2024-11-01", status: "Present" },
-      { studentName: "Bagus Pratama", date: "2024-11-01", status: "Absent" },
-      { studentName: "Citra Dewi", date: "2024-11-01", status: "Excused" },
-      { studentName: "Dwi Santoso", date: "2024-11-01", status: "Present" },
-    ] as unknown as AttendanceRow[];
-  }
+  // Fallback removed
 
   const growthPercent = (() => {
     const first = studentGrowth[0]?.count ?? 0;
@@ -136,11 +94,13 @@ export default async function DashboardPage() {
     value: Number(p.value ?? 0),
   }));
 
-  const attendanceList = (() => {
-    const today = new Date().toISOString().slice(0, 10);
-    const cycle: Array<"Hadir" | "Tidak Hadir" | "Izin"> = ["Hadir", "Tidak Hadir", "Izin"];
-    return STUDENTS.slice(0, 20).map((s, i) => ({ no: i + 1, name: s.student, major: s.major, status: cycle[i % cycle.length]!, date: today }));
-  })();
+  const attendanceList = attendanceDetailItems.map((r, i) => ({
+    no: i + 1,
+    name: r.student.name,
+    major: undefined as string | undefined,
+    status: (r.status === 'present' ? 'Hadir' : r.status === 'excused' ? 'Izin' : 'Tidak Hadir') as "Hadir" | "Tidak Hadir" | "Izin",
+    date: r.date,
+  }));
   return (
     <main className="min-h-screen bg-muted text-foreground">
 

@@ -3,13 +3,14 @@ import { alias } from "drizzle-orm/pg-core";
 import { and, eq, gte, lte, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
-import { adminOrMentorProcedure, createTRPCRouter, requirePermissions } from "@/server/api/trpc";
+import { adminOrMentorProcedure, createTRPCRouter, protectedProcedure, requirePermissions } from "@/server/api/trpc";
 import {
   attachment,
   calendarEvent,
   eventType,
   mentorProfile,
   placement,
+  studentProfile,
   type AttachmentInsert,
   type CalendarEventInsert,
   user,
@@ -33,8 +34,21 @@ const docs = {
       "## Update Calendar Event\n\nMengubah event dan lampiran.\n\n### Parameters\n- `eventId` (number)\n- field sama seperti create (opsional)\n\n### Response\n`{ ok: true }`.",
   },
   delete: { description: "## Delete Calendar Event\n\nHapus event beserta lampirannya." },
+  listForStudent: {
+    description:
+      "## List Calendar Events (Student)\\n\\nDaftar event kalender untuk siswa berdasarkan placement mereka.\\n\\n### Parameters\\n- `month` (1-12, optional, default bulan ini)\\n- `year` (number, optional, default tahun ini)\\n- `type` (in_class | field_trip | meet_greet | meeting | deadline | milestone, optional)\\n\\n### Response\\nArray `items` berisi `{ id, title, startDate, endDate, type, colorHex }`.\\n\\n### Example (React)\\n```ts\\nconst { data } = api.calendarEvents.listForStudent.useQuery({ month: 8, year: 2025 });\\n```",
+  },
 };
 
+
+async function requireStudentPlacement(ctx: { db: any; session: any }) {
+  if (!ctx.session?.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+  const sp = await ctx.db.query.studentProfile.findFirst({
+    where: eq(studentProfile.userId, ctx.session.user.id),
+  });
+  if (!sp) throw new TRPCError({ code: "FORBIDDEN" });
+  return sp;
+}
 const creatorUser = alias(user, "creator_user");
 
 function monthRange(params: { month?: number; year?: number }) {
@@ -176,10 +190,10 @@ export const calendarEventsRouter = createTRPCRouter({
         placementId: ev.placementId,
         createdBy: ev.createdById
           ? {
-              id: ev.createdById,
-              name: ev.createdByName ?? null,
-              email: ev.createdByEmail ?? null,
-            }
+            id: ev.createdById,
+            name: ev.createdByName ?? null,
+            email: ev.createdByEmail ?? null,
+          }
           : null,
         attachments: files.map((f) => ({
           id: f.id,
@@ -323,5 +337,64 @@ export const calendarEventsRouter = createTRPCRouter({
       await ctx.db.delete(attachment).where(and(eq(attachment.ownerType, "calendar_event"), eq(attachment.ownerId, input.eventId)));
       await ctx.db.delete(calendarEvent).where(eq(calendarEvent.id, input.eventId));
       return { ok: true };
+    }),
+  listForStudent: protectedProcedure
+    .meta(docs.listForStudent)
+    .input(
+      z.object({
+        month: z.number().min(1).max(12).optional(),
+        year: z.number().optional(),
+        type: z.enum(eventType.enumValues).optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const sp = await requireStudentPlacement(ctx);
+
+      // Get student's placement
+      const placementRow = await ctx.db.query.placement.findFirst({
+        where: eq(placement.studentId, sp.id),
+      });
+      if (!placementRow) {
+        // Student has no placement, return empty events
+        return { items: [] };
+      }
+
+      const range = monthRange({ month: input.month, year: input.year });
+      const startStr = range.start.toISOString().slice(0, 10);
+      const endStr = range.end.toISOString().slice(0, 10);
+
+      const startDateExpr = sql`(${calendarEvent.scheduledAt})::date`;
+      const dueDateExpr = sql`coalesce(${calendarEvent.endDate}, ${calendarEvent.scheduledAt})::date`;
+      const overlapWhere = and(lte(startDateExpr, endStr), gte(dueDateExpr, startStr));
+
+      const rows = await ctx.db
+        .select({
+          id: calendarEvent.id,
+          title: calendarEvent.title,
+          type: calendarEvent.type,
+          startDate: calendarEvent.scheduledAt,
+          endDate: calendarEvent.endDate,
+          colorHex: calendarEvent.colorHex,
+        })
+        .from(calendarEvent)
+        .where(
+          and(
+            eq(calendarEvent.placementId, placementRow.id),
+            overlapWhere,
+            input.type ? eq(calendarEvent.type, input.type) : undefined,
+          ),
+        )
+        .orderBy(calendarEvent.scheduledAt);
+
+      return {
+        items: rows.map((r) => ({
+          id: r.id,
+          title: r.title,
+          type: r.type,
+          startDate: r.startDate,
+          endDate: r.endDate ?? r.startDate,
+          colorHex: r.colorHex ?? null,
+        })),
+      };
     }),
 });

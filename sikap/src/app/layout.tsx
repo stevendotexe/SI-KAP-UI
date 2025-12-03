@@ -18,6 +18,8 @@ const nunitoSans = Nunito_Sans({
   weight: ["300", "400", "500", "600", "700", "800", "900"],
 });
 
+import { Toaster } from "sonner";
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -25,6 +27,7 @@ export default function RootLayout({
     <html lang="en" className={`${nunitoSans.variable}`}>
       <body className="font-sans">
         <TRPCReactProvider>{children}</TRPCReactProvider>
+        <Toaster />
       </body>
     </html>
   );

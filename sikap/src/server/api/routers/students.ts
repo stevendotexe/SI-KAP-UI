@@ -47,7 +47,7 @@ export const studentsRouter = createTRPCRouter({
     .use(requirePermissions({ studentProfile: ["read"], placement: ["read"] }))
     .input(
       z.object({
-        companyId: z.number(),
+        companyId: z.number().optional(),
         year: z.number().optional(),
         school: z.string().optional(),
         status: z.enum(["active", "completed", "canceled"]).optional(),
@@ -57,6 +57,18 @@ export const studentsRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
+      // Note: companyId parameter is kept for backwards compatibility but not used for filtering anymore
+      // For mentors, we show all students in the system regardless of placement company
+
+      let mentorId: number | null = null;
+      if (ctx.session.user.role === "mentor") {
+        const mp = await ctx.db.query.mentorProfile.findFirst({
+          where: eq(mentorProfile.userId, ctx.session.user.id),
+        });
+        if (!mp) throw new TRPCError({ code: "FORBIDDEN" });
+        mentorId = mp.id;
+      }
+
       const rows = await ctx.db
         .select({
           id: studentProfile.id,
@@ -64,15 +76,16 @@ export const studentsRouter = createTRPCRouter({
           name: user.name,
           school: studentProfile.school,
           cohort: studentProfile.cohort,
-          year: sql<number>`date_part('year', ${placement.startDate}::timestamp)`,
+          year: sql<number | null>`date_part('year', ${placement.startDate}::timestamp)`,
           status: placement.status,
+          nis: studentProfile.nis,
         })
-        .from(placement)
-        .innerJoin(studentProfile, eq(placement.studentId, studentProfile.id))
+        .from(studentProfile)
         .innerJoin(user, eq(studentProfile.userId, user.id))
+        .leftJoin(placement, eq(placement.studentId, studentProfile.id))
         .where(
           and(
-            eq(placement.companyId, input.companyId),
+            mentorId ? eq(placement.mentorId, mentorId) : undefined,
             input.status ? eq(placement.status, input.status) : undefined,
             input.school ? eq(studentProfile.school, input.school) : undefined,
             input.year !== undefined
@@ -88,12 +101,12 @@ export const studentsRouter = createTRPCRouter({
 
       const countRows = await ctx.db
         .select({ total: sql<number>`count(*)` })
-        .from(placement)
-        .innerJoin(studentProfile, eq(placement.studentId, studentProfile.id))
+        .from(studentProfile)
         .innerJoin(user, eq(studentProfile.userId, user.id))
+        .leftJoin(placement, eq(placement.studentId, studentProfile.id))
         .where(
           and(
-            eq(placement.companyId, input.companyId),
+            mentorId ? eq(placement.mentorId, mentorId) : undefined,
             input.status ? eq(placement.status, input.status) : undefined,
             input.school ? eq(studentProfile.school, input.school) : undefined,
             input.year !== undefined
@@ -114,7 +127,8 @@ export const studentsRouter = createTRPCRouter({
           school: r.school ?? null,
           cohort: r.cohort ?? null,
           year: r.year ?? null,
-          status: String(r.status),
+          status: r.status ? String(r.status) : "active", // Default to "active" if no placement
+          nis: r.nis ?? null,
         })),
         pagination: { total: Number(total), limit: input.limit, offset: input.offset },
         lastUpdated: new Date().toISOString(),
@@ -183,6 +197,51 @@ export const studentsRouter = createTRPCRouter({
         .where(eq(placement.studentId, sp.id))
         .orderBy(report.submittedAt);
 
+      // Score History (Weekly Average)
+      const scoreHistoryRows = await ctx.db
+        .select({
+          period: sql<string>`to_char(date_trunc('week', ${assessment.createdAt}::timestamp), 'IYYY-"W"IW')`,
+          avgScore: sql<number>`avg(${assessment.totalScore})`,
+        })
+        .from(assessment)
+        .innerJoin(placement, eq(assessment.placementId, placement.id))
+        .where(eq(placement.studentId, sp.id))
+        .groupBy(sql`to_char(date_trunc('week', ${assessment.createdAt}::timestamp), 'IYYY-"W"IW')`)
+        .orderBy(sql`to_char(date_trunc('week', ${assessment.createdAt}::timestamp), 'IYYY-"W"IW')`);
+
+      // Attendance History (Weekly Percentage)
+      const attendanceHistoryRows = await ctx.db
+        .select({
+          period: sql<string>`to_char(date_trunc('week', ${attendanceLog.date}::timestamp), 'IYYY-"W"IW')`,
+          status: attendanceLog.status,
+          count: sql<number>`count(*)`,
+        })
+        .from(attendanceLog)
+        .innerJoin(placement, eq(attendanceLog.placementId, placement.id))
+        .where(eq(placement.studentId, sp.id))
+        .groupBy(
+          sql`to_char(date_trunc('week', ${attendanceLog.date}::timestamp), 'IYYY-"W"IW')`,
+          attendanceLog.status,
+        )
+        .orderBy(sql`to_char(date_trunc('week', ${attendanceLog.date}::timestamp), 'IYYY-"W"IW')`);
+
+      const attendanceHistoryMap: Record<string, { present: number; total: number }> = {};
+      for (const r of attendanceHistoryRows) {
+        const p = r.period;
+        if (!attendanceHistoryMap[p]) attendanceHistoryMap[p] = { present: 0, total: 0 };
+        const val = Number(r.count);
+        attendanceHistoryMap[p]!.total += val;
+        if (r.status === "present" || r.status === "late") {
+          attendanceHistoryMap[p]!.present += val;
+        }
+      }
+      const attendanceHistory = Object.entries(attendanceHistoryMap)
+        .map(([period, data]) => ({
+          period,
+          count: data.total === 0 ? 0 : Math.round((data.present / data.total) * 100),
+        }))
+        .sort((a, b) => a.period.localeCompare(b.period));
+
       const assessments = await ctx.db
         .select({ id: assessment.id, totalScore: assessment.totalScore, createdAt: assessment.createdAt })
         .from(assessment)
@@ -208,11 +267,20 @@ export const studentsRouter = createTRPCRouter({
           phone: sp.phone ?? null,
           active: sp.active,
           mentorName,
+          nis: sp.nis ?? null,
+          address: sp.address ?? null,
+          startDate: activePlacement?.startDate ? new Date(activePlacement.startDate).toISOString().slice(0, 10) : null,
+          endDate: activePlacement?.endDate ? new Date(activePlacement.endDate).toISOString().slice(0, 10) : null,
         },
         stats: { averageScore: Number(avgScoreRow?.avg ?? 0) },
         attendance: { percent: attendancePercent, present, late, absent, excused },
         reports,
         assessments,
+        scoreHistory: scoreHistoryRows.map((r) => ({
+          period: r.period,
+          count: Number(r.avgScore ?? 0),
+        })),
+        attendanceHistory,
         lastUpdated: new Date().toISOString(),
       };
     }),
@@ -272,6 +340,9 @@ export const studentsRouter = createTRPCRouter({
         major: z.string().optional(),
         cohort: z.string().optional(),
         phone: z.string().optional(),
+        nis: z.string().optional(),
+        birthDate: z.date().optional(),
+        address: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -287,8 +358,29 @@ export const studentsRouter = createTRPCRouter({
         major: input.major ?? null,
         cohort: input.cohort ?? null,
         phone: input.phone ?? null,
+        nis: input.nis ?? null,
+        birthDate: input.birthDate ? input.birthDate.toISOString().slice(0, 10) : null,
+        address: input.address ?? null,
       });
       const sp = await ctx.db.query.studentProfile.findFirst({ where: eq(studentProfile.userId, u.id) });
+
+      // If creator is a mentor, automatically create a placement
+      if (ctx.session.user.role === "mentor" && sp) {
+        const mp = await ctx.db.query.mentorProfile.findFirst({
+          where: eq(mentorProfile.userId, ctx.session.user.id),
+        });
+
+        if (mp && mp.companyId) {
+          await ctx.db.insert(placement).values({
+            studentId: sp.id,
+            mentorId: mp.id,
+            companyId: mp.companyId,
+            status: "active" as any,
+            startDate: new Date().toISOString().slice(0, 10),
+          });
+        }
+      }
+
       return sp ?? null;
     }),
 

@@ -10,11 +10,11 @@ import { Spinner } from "@/components/ui/spinner"
 
 type Props = {
   id: string
-  week: number
+  reportId: number
   reviewed: boolean
 }
 
-export default function ReportDetailClient({ id, week, reviewed }: Props) {
+export default function ReportDetailClient({ id, reportId, reviewed }: Props) {
   const [score, setScore] = React.useState<string>("")
   const [desc, setDesc] = React.useState("")
   const [submitting, setSubmitting] = React.useState(false)
@@ -23,7 +23,7 @@ export default function ReportDetailClient({ id, week, reviewed }: Props) {
   const img = "data:image/svg+xml;utf8," + encodeURIComponent(
     `<svg xmlns='http://www.w3.org/2000/svg' width='800' height='400'>
       <rect x='0' y='0' width='800' height='400' rx='16' fill='white' />
-      <text x='24' y='32' font-size='20' fill='black'>Dokumentasi Laporan Minggu ${week}</text>
+      <text x='24' y='32' font-size='20' fill='black'>Dokumentasi Laporan #${reportId}</text>
       <circle cx='120' cy='280' r='14' fill='rgb(16,185,129)' />
       <circle cx='240' cy='180' r='14' fill='rgb(99,102,241)' />
       <circle cx='360' cy='220' r='14' fill='rgb(245,158,11)' />
@@ -68,7 +68,7 @@ export default function ReportDetailClient({ id, week, reviewed }: Props) {
             <Button variant="destructive" size="sm" className="rounded-full w-fit">Tampilkan Gambar</Button>
           </DialogTrigger>
           <DialogContent className="rounded-none max-w-3xl">
-            <img src={img} alt={`Gambar Laporan Minggu ${week}`} className="max-w-full h-auto" />
+            <img src={img} alt={`Gambar Laporan #${reportId}`} className="max-w-full h-auto" />
           </DialogContent>
         </Dialog>
       </div>

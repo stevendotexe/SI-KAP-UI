@@ -14,6 +14,34 @@ import {
   type FinalReportScoreInsert,
 } from "@/server/db/schema";
 
+/**
+ * TODO: Add endpoint to fetch competency templates by major
+ * 
+ * Required for frontend to display score input forms for new final reports.
+ * 
+ * Suggested procedure:
+ * ```
+ * getCompetencyTemplates: adminOrMentorProcedure
+ *   .input(z.object({ major: z.string() })) // e.g., "TKJ" or "RPL"
+ *   .query(async ({ ctx, input }) => {
+ *     const templates = await ctx.db.query.competencyTemplate.findMany({
+ *       where: eq(competencyTemplate.major, input.major),
+ *       orderBy: [competencyTemplate.category, competencyTemplate.position]
+ *     });
+ *     return {
+ *       personality: templates.filter(t => t.category === 'personality'),
+ *       technical: templates.filter(t => t.category === 'technical')
+ *     };
+ *   })
+ * ```
+ * 
+ * Also ensure competency templates are seeded in the database (currently missing in seed.ts).
+ * Example seed data:
+ * - Personality (both majors): Disiplin, Inisiatif, Tanggung Jawab, Kerja Sama, Kerajinan
+ * - Technical TKJ: Penerapan KSLH, Menginstalasi sistem operasi, Perbaikan peripheral, etc.
+ * - Technical RPL: Penerapan KSLH, Pemrograman Dasar, Basis Data, Pemrograman Web, etc.
+ */
+
 const docs = {
   list: {
     description:
@@ -178,6 +206,7 @@ export const finalReportsRouter = createTRPCRouter({
 
       return {
         id: fr.id,
+        placementId: fr.placementId,
         student: {
           id: fr.studentId,
           name: fr.studentName ?? "",

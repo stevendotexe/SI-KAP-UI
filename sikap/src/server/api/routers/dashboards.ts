@@ -79,6 +79,16 @@ export const dashboardsRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const range = coerceRange(input);
       const per = periodExpr(input.granularity, assessment.createdAt);
+
+      let mentorFilterId: number | null = null;
+      if (ctx.session.user.role === "mentor") {
+        const mp = await ctx.db.query.mentorProfile.findFirst({
+          where: eq(mentorProfile.userId, ctx.session.user.id),
+        });
+        if (!mp) throw new TRPCError({ code: "FORBIDDEN" });
+        mentorFilterId = mp.id;
+      }
+
       const rows = await ctx.db
         .select({
           period: per,
@@ -93,6 +103,7 @@ export const dashboardsRouter = createTRPCRouter({
             input.programId === undefined
               ? undefined
               : eq(placement.programId, input.programId),
+            mentorFilterId ? eq(placement.mentorId, mentorFilterId) : undefined,
           ),
         )
         .groupBy(per)
@@ -119,6 +130,16 @@ export const dashboardsRouter = createTRPCRouter({
       const fromDateStr = range.from.toISOString().slice(0, 10);
       const toDateStr = range.to.toISOString().slice(0, 10);
       const per = periodExpr(input.granularity, attendanceLog.date);
+
+      let mentorFilterId: number | null = null;
+      if (ctx.session.user.role === "mentor") {
+        const mp = await ctx.db.query.mentorProfile.findFirst({
+          where: eq(mentorProfile.userId, ctx.session.user.id),
+        });
+        if (!mp) throw new TRPCError({ code: "FORBIDDEN" });
+        mentorFilterId = mp.id;
+      }
+
       const rows = await ctx.db
         .select({
           period: per,
@@ -134,6 +155,7 @@ export const dashboardsRouter = createTRPCRouter({
             input.programId === undefined
               ? undefined
               : eq(placement.programId, input.programId),
+            mentorFilterId ? eq(placement.mentorId, mentorFilterId) : undefined,
           ),
         )
         .groupBy(per, attendanceLog.status)
@@ -179,6 +201,16 @@ export const dashboardsRouter = createTRPCRouter({
       const fromDateStr = range.from.toISOString().slice(0, 10);
       const toDateStr = range.to.toISOString().slice(0, 10);
       const per = periodExpr(input.granularity, placement.startDate);
+
+      let mentorFilterId: number | null = null;
+      if (ctx.session.user.role === "mentor") {
+        const mp = await ctx.db.query.mentorProfile.findFirst({
+          where: eq(mentorProfile.userId, ctx.session.user.id),
+        });
+        if (!mp) throw new TRPCError({ code: "FORBIDDEN" });
+        mentorFilterId = mp.id;
+      }
+
       const rows = await ctx.db
         .select({
           period: per,
@@ -196,6 +228,7 @@ export const dashboardsRouter = createTRPCRouter({
             input.programId === undefined
               ? undefined
               : eq(placement.programId, input.programId),
+            mentorFilterId ? eq(placement.mentorId, mentorFilterId) : undefined,
           ),
         )
         .groupBy(per)
@@ -212,27 +245,59 @@ export const dashboardsRouter = createTRPCRouter({
     .input(z.object({ from: z.date().optional(), to: z.date().optional() }))
     .query(async ({ ctx, input }) => {
       const range = coerceRange(input);
+
+      let mentorFilterId: number | null = null;
+      if (ctx.session.user.role === "mentor") {
+        const mp = await ctx.db.query.mentorProfile.findFirst({
+          where: eq(mentorProfile.userId, ctx.session.user.id),
+        });
+        if (!mp) throw new TRPCError({ code: "FORBIDDEN" });
+        mentorFilterId = mp.id;
+      }
+
+      // Students: count active students (filtered by mentor if applicable)
       const [studentsRow] = await ctx.db
-        .select({ count: sql<number>`count(*)` })
+        .select({ count: sql<number>`count(distinct ${studentProfile.id})` })
         .from(studentProfile)
-        .where(eq(studentProfile.active, true));
+        .innerJoin(placement, eq(studentProfile.id, placement.studentId))
+        .where(
+          and(
+            eq(studentProfile.active, true),
+            eq(placement.status, "active"),
+            mentorFilterId ? eq(placement.mentorId, mentorFilterId) : undefined,
+          ),
+        );
+
+      // Mentors: global count (or just 1 if mentor? keeping global for now as it's less critical)
       const [mentorsRow] = await ctx.db
         .select({ count: sql<number>`count(*)` })
         .from(mentorProfile)
         .where(eq(mentorProfile.active, true));
+
+      // Reports: count reports (filtered by mentor's students)
       const [reportsRow] = await ctx.db
         .select({ count: sql<number>`count(*)` })
         .from(report)
+        .innerJoin(placement, eq(report.placementId, placement.id))
         .where(
           and(
             gte(report.createdAt, range.from),
             lte(report.createdAt, range.to),
+            mentorFilterId ? eq(placement.mentorId, mentorFilterId) : undefined,
           ),
         );
+
+      // Graduates: count completed placements (filtered by mentor)
       const [graduatesRow] = await ctx.db
         .select({ count: sql<number>`count(*)` })
         .from(placement)
-        .where(eq(placement.status, "completed"));
+        .where(
+          and(
+            eq(placement.status, "completed"),
+            mentorFilterId ? eq(placement.mentorId, mentorFilterId) : undefined,
+          ),
+        );
+
       return {
         students: Number(studentsRow?.count ?? 0),
         mentors: Number(mentorsRow?.count ?? 0),

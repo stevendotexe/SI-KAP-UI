@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { ChevronDown } from "lucide-react"
+import { api } from "@/trpc/react"
+import { Spinner } from "@/components/ui/spinner"
 
 type DayCell = { date: Date; inMonth: boolean; day: number }
 type EventSpec = {
@@ -42,18 +44,45 @@ function buildWeeks(year: number, month: number) {
   return weeks
 }
 
+// Helper to convert API color hex to Tailwind class  
+function getColorClass(colorHex: string | null, index: number): string {
+  if (colorHex) {
+    // For now, just use chart colors. In the future, could map hex to Tailwind colors
+    return `bg-chart-${(index % 5) + 1}`
+  }
+  return `bg-chart-${(index % 5) + 1}`
+}
+
 export default function CalendarPage() {
-  const [year] = useState(2025)
-  const [month, setMonth] = useState(7) // 0-based, 7 = Agustus
+  const now = new Date()
+  const [year] = useState(now.getFullYear())
+  const [month, setMonth] = useState(now.getMonth()) // 0-based
   const [open, setOpen] = useState(false)
 
   const weeks = useMemo(() => buildWeeks(year, month), [year, month])
 
-  // Example events (matching the reference feel)
-  const events: EventSpec[] = [
-    { label: "Tenggat waktu laporan 3", startDay: 1, endDay: 4, colorClass: "bg-chart-4" },
-    { label: "Tenggat waktu laporan 4", startDay: 19, endDay: 21, colorClass: "bg-chart-5" },
-  ]
+  // Fetch calendar events from API
+  const { data, isLoading, isError, refetch } = api.calendarEvents.listForStudent.useQuery({
+    month: month + 1, // API expects 1-12
+    year,
+  })
+
+  // Transform API events to EventSpec format
+  const events: EventSpec[] = useMemo(() => {
+    if (!data?.items) return []
+
+    return data.items.map((event, index) => {
+      const startDate = new Date(event.startDate)
+      const endDate = event.endDate ? new Date(event.endDate) : startDate
+
+      return {
+        label: event.title,
+        startDay: startDate.getDate(),
+        endDay: endDate.getDate(),
+        colorClass: getColorClass(event.colorHex, index),
+      }
+    })
+  }, [data])
 
   // Compute event segments per week for overlay
   function getWeekSegments(week: DayCell[]) {
@@ -119,9 +148,8 @@ export default function CalendarPage() {
                           setMonth(i)
                           setOpen(false)
                         }}
-                        className={`w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground ${
-                          i === month ? "bg-accent/50" : ""
-                        }`}
+                        className={`w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground ${i === month ? "bg-accent/50" : ""
+                          }`}
                         role="option"
                         aria-selected={i === month}
                       >
@@ -135,59 +163,83 @@ export default function CalendarPage() {
           </div>
         </div>
 
-        {/* Calendar card */}
-        <section className="mt-4 rounded-2xl border bg-card p-4 sm:p-6">
-          {/* Weekday header */}
-          <div className="grid grid-cols-7 rounded-xl overflow-hidden">
-            {WEEKDAYS_ID.map((d) => (
-              <div
-                key={d}
-                className="bg-destructive text-primary-foreground px-3 py-2 text-center font-medium border-r last:border-r-0"
-              >
-                {d}
-              </div>
-            ))}
+        {/* Loading state */}
+        {isLoading && (
+          <div className="mt-6 flex items-center justify-center p-12">
+            <Spinner className="h-8 w-8" />
           </div>
+        )}
 
-          {/* Weeks */}
-          <div className="mt-0">
-            {weeks.map((week, wi) => {
-              const segments = getWeekSegments(week)
-              return (
-                <div key={wi} className="relative">
-                  {/* day cells */}
-                  <div className="grid grid-cols-7">
-                    {week.map((c, ci) => (
+        {/* Error state */}
+        {isError && (
+          <div className="mt-6 rounded-2xl border border-destructive bg-destructive/10 p-6">
+            <p className="text-sm text-destructive">
+              Gagal memuat kalender. Silakan coba lagi.{" "}
+              <button
+                onClick={() => void refetch()}
+                className="underline font-medium"
+              >
+                Refresh
+              </button>
+            </p>
+          </div>
+        )}
+
+        {/* Calendar card */}
+        {!isLoading && !isError && (
+          <section className="mt-4 rounded-2xl border bg-card p-4 sm:p-6">
+            {/* Weekday header */}
+            <div className="grid grid-cols-7 rounded-xl overflow-hidden">
+              {WEEKDAYS_ID.map((d) => (
+                <div
+                  key={d}
+                  className="bg-destructive text-primary-foreground px-3 py-2 text-center font-medium border-r last:border-r-0"
+                >
+                  {d}
+                </div>
+              ))}
+            </div>
+
+            {/* Weeks */}
+            <div className="mt-0">
+              {weeks.map((week, wi) => {
+                const segments = getWeekSegments(week)
+                return (
+                  <div key={wi} className="relative">
+                    {/* day cells */}
+                    <div className="grid grid-cols-7">
+                      {week.map((c, ci) => (
+                        <div
+                          key={ci}
+                          className={`h-28 border ${c.inMonth ? "bg-card" : "bg-muted/40"}`}
+                        >
+                          <div className="px-2 pt-2 text-xs text-muted-foreground">{c.day}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* event overlays */}
+                    {segments.map((s, si) => (
                       <div
-                        key={ci}
-                        className={`h-28 border ${c.inMonth ? "bg-card" : "bg-muted/40"}`}
+                        key={si}
+                        className={`absolute z-10 pointer-events-none h-7 ${s.colorClass} rounded-full flex items-center justify-center text-xs font-medium text-primary-foreground`}
+                        style={{
+                          top: 34,
+                          left: `${s.leftPct}%`,
+                          width: `${s.widthPct}%`,
+                          paddingLeft: 12,
+                          paddingRight: 12,
+                        }}
                       >
-                        <div className="px-2 pt-2 text-xs text-muted-foreground">{c.day}</div>
+                        {s.label}
                       </div>
                     ))}
                   </div>
-
-                  {/* event overlays */}
-                  {segments.map((s, si) => (
-                    <div
-                      key={si}
-                      className={`absolute z-10 pointer-events-none h-7 ${s.colorClass} rounded-full flex items-center justify-center text-xs font-medium text-primary-foreground`}
-                      style={{
-                        top: 34,
-                        left: `${s.leftPct}%`,
-                        width: `${s.widthPct}%`,
-                        paddingLeft: 12,
-                        paddingRight: 12,
-                      }}
-                    >
-                      {s.label}
-                    </div>
-                  ))}
-                </div>
-              )
-            })}
-          </div>
-        </section>
+                )
+              })}
+            </div>
+          </section>
+        )}
       </div>
     </div>
   )

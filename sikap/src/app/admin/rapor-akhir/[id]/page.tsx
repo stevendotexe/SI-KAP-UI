@@ -12,7 +12,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Plus, Trash2, Pencil } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import AttendanceLine from "@/components/students/AttendanceLine";
+import { useMemo } from "react";
 
 type ScoreData = {
     // Kompetensi Kepribadian
@@ -54,7 +56,8 @@ export default function EditRaporAkhirPage() {
     const router = useRouter();
 
     const [studentName] = useState("Rafif Zharif");
-    const [kejuruan, setKejuruan] = useState<"TKJ" | "RPL">("TKJ");
+    const studentMajor: "TKJ" | "RPL" = "TKJ"; // In real app, get from student data
+    const [kejuruan] = useState<"TKJ" | "RPL">(studentMajor);
     const [scores, setScores] = useState<ScoreData>({
         disiplin: 85,
         inisiatif: 90,
@@ -64,11 +67,42 @@ export default function EditRaporAkhirPage() {
     });
 
     const [kejuruanItems, setKejuruanItems] = useState<KejuruanItem[]>(tkjDefaultItems);
-    const [editingItemId, setEditingItemId] = useState<string | null>(null);
-    const [editingItemName, setEditingItemName] = useState("");
 
     const [totalNilai, setTotalNilai] = useState(0);
     const [rataRata, setRataRata] = useState(0);
+
+    // Mock student data - in real app, fetch based on params.id
+    const studentData = {
+        name: studentName,
+        id: "STD-001",
+        school: "SMK 13 Tasikmalaya",
+        major: kejuruan,
+        status: "Aktif",
+        batch: "2024",
+    };
+
+    // Generate graph data
+    const attendanceSeries = useMemo(() => {
+        const base = kejuruan === "RPL" ? 85 : 82;
+        return [0, 1, 2, 3, 4, 5].map((i) => ({ period: `M${i + 1}`, count: Math.max(60, Math.min(98, Math.round(base + (i - 3) * 2 + (i % 2 ? 3 : -2)))) }));
+    }, [kejuruan]);
+
+    const scoreSeries = useMemo(() => {
+        const base = kejuruan === "RPL" ? 78 : 75;
+        return [0, 1, 2, 3, 4, 5].map((i) => ({ period: `M${i + 1}`, count: Math.max(60, Math.min(98, Math.round(base + (i - 3) * 2 + (i % 2 ? 2 : -1)))) }));
+    }, [kejuruan]);
+
+    const attGrowth = useMemo(() => {
+        const first = attendanceSeries[0]?.count ?? 0;
+        const last = attendanceSeries[attendanceSeries.length - 1]?.count ?? 0;
+        return first ? Math.round(((last - first) / first) * 100) : 0;
+    }, [attendanceSeries]);
+
+    const scoreGrowth = useMemo(() => {
+        const first = scoreSeries[0]?.count ?? 0;
+        const last = scoreSeries[scoreSeries.length - 1]?.count ?? 0;
+        return first ? Math.round(((last - first) / first) * 100) : 0;
+    }, [scoreSeries]);
 
     useEffect(() => {
         // Load appropriate items when kejuruan changes
@@ -101,39 +135,9 @@ export default function EditRaporAkhirPage() {
         );
     };
 
-    const handleAddKejuruanItem = () => {
-        const newId = (Math.max(...kejuruanItems.map((i) => parseInt(i.id))) + 1).toString();
-        setKejuruanItems([
-            ...kejuruanItems,
-            { id: newId, name: "Kompetensi Baru", score: 0 },
-        ]);
-    };
 
-    const handleDeleteKejuruanItem = (id: string) => {
-        setKejuruanItems(kejuruanItems.filter((item) => item.id !== id));
-    };
 
-    const handleStartEditItemName = (item: KejuruanItem) => {
-        setEditingItemId(item.id);
-        setEditingItemName(item.name);
-    };
 
-    const handleSaveItemName = () => {
-        if (editingItemId) {
-            setKejuruanItems(
-                kejuruanItems.map((item) =>
-                    item.id === editingItemId ? { ...item, name: editingItemName } : item
-                )
-            );
-            setEditingItemId(null);
-            setEditingItemName("");
-        }
-    };
-
-    const handleCancelEditItemName = () => {
-        setEditingItemId(null);
-        setEditingItemName("");
-    };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -164,21 +168,48 @@ export default function EditRaporAkhirPage() {
 
                 {/* Form */}
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Kejuruan Selector */}
-                    <div className="bg-card border rounded-xl shadow-sm p-6">
-                        <Label htmlFor="kejuruan" className="text-sm font-medium mb-2 block">
-                            Kejuruan
-                        </Label>
-                        <Select value={kejuruan} onValueChange={(value: "TKJ" | "RPL") => setKejuruan(value)}>
-                            <SelectTrigger className="rounded-lg w-full md:w-1/2">
-                                <SelectValue placeholder="Pilih kejuruan" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="TKJ">Teknik Komputer dan Jaringan (TKJ)</SelectItem>
-                                <SelectItem value="RPL">Rekayasa Perangkat Lunak (RPL)</SelectItem>
-                            </SelectContent>
-                        </Select>
+                    {/* Student Info Cards */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                        <div className="lg:col-span-4 bg-card border rounded-xl shadow-sm p-4">
+                            <div className="text-sm font-medium mb-2">Informasi Siswa</div>
+                            <div className="space-y-1 text-sm">
+                                <div><span className="text-muted-foreground">Nama:</span> {studentData.name}</div>
+                                <div><span className="text-muted-foreground">ID:</span> {studentData.id}</div>
+                                <div><span className="text-muted-foreground">Sekolah:</span> {studentData.school}</div>
+                                <div><span className="text-muted-foreground">Jurusan:</span> {studentData.major}</div>
+                                <div><span className="text-muted-foreground">Status:</span> {studentData.status}</div>
+                                <div><span className="text-muted-foreground">Angkatan:</span> {studentData.batch}</div>
+                            </div>
+                        </div>
+
+                        <div className="lg:col-span-4 bg-card border rounded-xl shadow-sm p-4">
+                            <div className="flex items-start justify-between">
+                                <div>
+                                    <div className="text-sm text-muted-foreground">Rata Kehadiran</div>
+                                </div>
+                                <div className="text-2xl font-semibold">{attendanceSeries.length ? `${attendanceSeries[attendanceSeries.length - 1]!.count}%` : "-"}</div>
+                            </div>
+                            <div className="mt-2">
+                                <AttendanceLine data={attendanceSeries} />
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-2">Pertumbuhan: {attGrowth}%</div>
+                        </div>
+
+                        <div className="lg:col-span-4 bg-card border rounded-xl shadow-sm p-4">
+                            <div className="flex items-start justify-between">
+                                <div>
+                                    <div className="text-sm text-muted-foreground">Rata Skor</div>
+                                </div>
+                                <div className="text-2xl font-semibold">{scoreSeries.length ? `${scoreSeries[scoreSeries.length - 1]!.count}` : "-"}</div>
+                            </div>
+                            <div className="mt-2">
+                                <AttendanceLine data={scoreSeries} />
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-2">Pertumbuhan: {scoreGrowth}%</div>
+                        </div>
                     </div>
+
+                    {/* Kejuruan Selector - REMOVED, now determined from student data */}
 
                     {/* Kompetensi Kepribadian */}
                     <div className="bg-card border rounded-xl shadow-sm p-6">
@@ -270,75 +301,14 @@ export default function EditRaporAkhirPage() {
 
                     {/* Kompetensi Kejuruan */}
                     <div className="bg-card border rounded-xl shadow-sm p-6">
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-lg font-semibold">
-                                Kompetensi Kejuruan
-                            </h3>
-                            <Button
-                                type="button"
-                                onClick={handleAddKejuruanItem}
-                                size="sm"
-                                className="bg-destructive hover:bg-red-700 text-white rounded-full cursor-pointer"
-                            >
-                                <Plus className="w-4 h-4 mr-1" />
-                                Tambah Item
-                            </Button>
-                        </div>
+                        <h3 className="text-lg font-semibold mb-6">
+                            Kompetensi Kejuruan
+                        </h3>
                         <div className="space-y-4">
                             {kejuruanItems.map((item) => (
                                 <div key={item.id} className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                                     <div>
-                                        {editingItemId === item.id ? (
-                                            <div className="space-y-2">
-                                                <Input
-                                                    value={editingItemName}
-                                                    onChange={(e) => setEditingItemName(e.target.value)}
-                                                    className="rounded-lg"
-                                                    placeholder="Nama kompetensi"
-                                                />
-                                                <div className="flex gap-2">
-                                                    <Button
-                                                        type="button"
-                                                        size="sm"
-                                                        onClick={handleSaveItemName}
-                                                        className="bg-green-600 hover:bg-green-700 text-white rounded-lg cursor-pointer"
-                                                    >
-                                                        Simpan
-                                                    </Button>
-                                                    <Button
-                                                        type="button"
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={handleCancelEditItemName}
-                                                        className="rounded-lg cursor-pointer"
-                                                    >
-                                                        Batal
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-center gap-2">
-                                                <Label className="text-sm font-medium flex-1">{item.name}</Label>
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    onClick={() => handleStartEditItemName(item)}
-                                                    className="hover:bg-muted cursor-pointer"
-                                                >
-                                                    <Pencil className="w-4 h-4" />
-                                                </Button>
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    onClick={() => handleDeleteKejuruanItem(item.id)}
-                                                    className="hover:bg-destructive/10 text-destructive cursor-pointer"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </Button>
-                                            </div>
-                                        )}
+                                        <Label className="text-sm font-medium">{item.name}</Label>
                                     </div>
                                     <div>
                                         <Input

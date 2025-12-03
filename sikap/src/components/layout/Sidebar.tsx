@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { authClient } from "@/server/better-auth/client";
 
 export type NavItem = {
   label: string;
@@ -172,13 +173,21 @@ export default function Sidebar({ role, userName = "Person Name", userRole }: Si
               <span>Pengaturan</span>
             </Link>
             <hr className="my-1 border-gray-100" />
-            <Link
-              href="/api/auth/signout"
-              className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+            <button
+              onClick={async () => {
+                await authClient.signOut({
+                  fetchOptions: {
+                    onSuccess: () => {
+                      window.location.href = "/sign-in";
+                    },
+                  },
+                });
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
             >
               <LogOut size={16} />
               <span>Keluar</span>
-            </Link>
+            </button>
           </div>
         )}
       </div>

@@ -12,50 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Search, Plus } from "lucide-react";
-
-// Dummy data
-const students = [
-  {
-    id: 1,
-    name: "Rafif Zharif",
-    code: "STD-001",
-    school: "SMK 13 Tasikmalaya",
-    cohort: "2025",
-    status: "Aktif",
-  },
-  {
-    id: 2,
-    name: "Rafif Zharif",
-    code: "STD-001",
-    school: "SMK 13 Tasikmalaya",
-    cohort: "2025",
-    status: "Aktif",
-  },
-  {
-    id: 3,
-    name: "Rafif Zharif",
-    code: "STD-001",
-    school: "SMK 13 Tasikmalaya",
-    cohort: "2025",
-    status: "Aktif",
-  },
-  {
-    id: 4,
-    name: "Rafif Zharif",
-    code: "STD-001",
-    school: "SMK 13 Tasikmalaya",
-    cohort: "2025",
-    status: "Aktif",
-  },
-  {
-    id: 5,
-    name: "Rafif Zharif",
-    code: "STD-001",
-    school: "SMK 13 Tasikmalaya",
-    cohort: "2025",
-    status: "Aktif",
-  },
-];
+import { api } from "@/trpc/react";
 
 export default function AdminSiswaPage() {
   const [search, setSearch] = useState("");
@@ -63,15 +20,17 @@ export default function AdminSiswaPage() {
   const [filterSchool, setFilterSchool] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
 
-  const filtered = students.filter((s) => {
-    const matchSearch =
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.code.toLowerCase().includes(search.toLowerCase());
-    const matchCohort = filterCohort === "all" || s.cohort === filterCohort;
-    const matchSchool = filterSchool === "all" || s.school === filterSchool;
-    const matchStatus = filterStatus === "all" || s.status === filterStatus;
-    return matchSearch && matchCohort && matchSchool && matchStatus;
+  const { data, isLoading } = api.students.list.useQuery({
+    search: search || undefined,
+    year: filterCohort !== "all" ? parseInt(filterCohort) : undefined,
+    school: filterSchool !== "all" ? filterSchool : undefined,
+    status:
+      filterStatus !== "all"
+        ? (filterStatus.toLowerCase() as "active" | "completed" | "canceled")
+        : undefined,
   });
+
+  const students = data?.items ?? [];
 
   return (
     <main className="min-h-screen bg-muted text-foreground">
@@ -173,28 +132,44 @@ export default function AdminSiswaPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((student, index) => (
-                  <tr
-                    key={student.id}
-                    className={`border-t ${index % 2 === 0 ? "bg-background" : "bg-muted/30"}`}
-                  >
-                    <td className="px-4 py-3 text-sm">{student.name}</td>
-                    <td className="px-4 py-3 text-sm">{student.code}</td>
-                    <td className="px-4 py-3 text-sm">{student.school}</td>
-                    <td className="px-4 py-3 text-sm">{student.cohort}</td>
-                    <td className="px-4 py-3 text-sm">{student.status}</td>
-                    <td className="px-4 py-3">
-                      <Link href={`/admin/siswa/${student.id}`}>
-                        <Button
-                          size="sm"
-                          className="bg-destructive hover:bg-red-700 text-white rounded-full px-6 cursor-pointer transition-colors"
-                        >
-                          Detail
-                        </Button>
-                      </Link>
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                      Memuat data...
                     </td>
                   </tr>
-                ))}
+                ) : students.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                      Tidak ada data siswa ditemukan
+                    </td>
+                  </tr>
+                ) : (
+                  students.map((student, index) => (
+                    <tr
+                      key={student.id}
+                      className={`border-t ${index % 2 === 0 ? "bg-background" : "bg-muted/30"}`}
+                    >
+                      <td className="px-4 py-3 text-sm">{student.name}</td>
+                      <td className="px-4 py-3 text-sm">{student.nis ?? "-"}</td>
+                      <td className="px-4 py-3 text-sm">{student.school ?? "-"}</td>
+                      <td className="px-4 py-3 text-sm">{student.cohort ?? "-"}</td>
+                      <td className="px-4 py-3 text-sm capitalize">
+                        {student.status}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Link href={`/admin/siswa/${student.studentId}`}>
+                          <Button
+                            size="sm"
+                            className="bg-destructive hover:bg-red-700 text-white rounded-full px-6 cursor-pointer transition-colors"
+                          >
+                            Detail
+                          </Button>
+                        </Link>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

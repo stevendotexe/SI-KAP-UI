@@ -3,6 +3,41 @@
 import { Button } from "@/components/ui/button"
 import { FileDown } from "lucide-react"
 
+/**
+ * TODO: Backend Integration Required
+ * 
+ * This page currently displays static final report data. To integrate with backend:
+ * 
+ * Required Backend Endpoint:
+ * - `api.finalReports.myReport.useQuery()` (student-specific procedure)
+ *   - Should return final report for logged-in student's active placement
+ *   - Returns: {
+ *       student: { name, nis, birthPlace, birthDate, gender, semester, school, major, address, phone },
+ *       scores: {
+ *         personality: Array<{ name, score }>,
+ *         technical: Array<{ name, score }>
+ *       },
+ *       totalScore: number,
+ *       averageScore: number
+ *     }
+ * 
+ * Current Limitation:
+ * - `finalReports.detail` in `sikap/src/server/api/routers/finalReports.ts` uses
+ *   `adminOrMentorProcedure`, blocking student access
+ * - No student-facing final report procedures exist
+ * 
+ * Integration Steps (when endpoint available):
+ * 1. Import: `import { api } from "@/trpc/react"` and `import { Spinner } from "@/components/ui/spinner"`
+ * 2. Query: `const { data, isLoading, error } = api.finalReports.myReport.useQuery()`
+ * 3. Replace hardcoded student identity fields (lines 56-96) with `data?.student` fields
+ * 4. Replace hardcoded scores (lines 136-175) with mapped `data?.scores.personality` and `data?.scores.technical`
+ * 5. Replace total/average (lines 183-189) with `data?.totalScore` and `data?.averageScore`
+ * 6. Add loading state before card: `{isLoading && <Spinner />}`
+ * 7. Add error state: `{error && <div>Error loading final report</div>}`
+ * 8. Format dates: `new Date(data.student.birthDate).toLocaleDateString('id-ID')`
+ * 9. Conditionally render card only when `data` exists
+ */
+
 export default function RaporAkhirPage() {
   const handleDownload = async () => {
     const element = document.getElementById("pdf-content")
@@ -45,6 +80,7 @@ export default function RaporAkhirPage() {
               {/* Judul di tengah */}
               <div className="text-center font-semibold">Rapor Akhir Praktik Kerja Lapangan</div>
 
+              {/* MOCK DATA: Replace with api.finalReports.myReport.useQuery() when backend endpoint is available */}
               {/* A. Identitas Siswa */}
               <div className="mt-6">
                 <div className="font-semibold">A. Identitas Siswa</div>
@@ -98,6 +134,7 @@ export default function RaporAkhirPage() {
                 </div>
               </div>
 
+              {/* MOCK SCORES: Replace with data?.scores.personality and data?.scores.technical when backend endpoint is available */}
               {/* B. Penilaian */}
               <div className="mt-6">
                 <div className="font-semibold">B. Penilaian</div>
