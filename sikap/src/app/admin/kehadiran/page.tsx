@@ -4,96 +4,36 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, Download, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
-
-// Dummy data
-const attendanceData = [
-  {
-    id: 1,
-    name: "Ahmad Fauzi",
-    school: "SMK Negeri 1",
-    status: "Hadir",
-    checkIn: "07:45",
-    checkOut: "16:00",
-    counters: { hadir: 45, tidakHadir: 2, izin: 1, terlambat: 3 }
-  },
-  {
-    id: 2,
-    name: "Siti Aisyah",
-    school: "SMK Negeri 2",
-    status: "Hadir",
-    checkIn: "07:30",
-    checkOut: "16:15",
-    counters: { hadir: 48, tidakHadir: 1, izin: 0, terlambat: 2 }
-  },
-  {
-    id: 3,
-    name: "Rudi Hermawan",
-    school: "SMK Negeri 1",
-    status: "Izin",
-    checkIn: "-",
-    checkOut: "-",
-    counters: { hadir: 42, tidakHadir: 3, izin: 4, terlambat: 2 }
-  },
-  {
-    id: 4,
-    name: "Maya Putri",
-    school: "SMK Negeri 3",
-    status: "Hadir",
-    checkIn: "08:00",
-    checkOut: "16:00",
-    counters: { hadir: 50, tidakHadir: 0, izin: 1, terlambat: 0 }
-  },
-  {
-    id: 5,
-    name: "Dian Prasetyo",
-    school: "SMK Negeri 2",
-    status: "Tidak Hadir",
-    checkIn: "-",
-    checkOut: "-",
-    counters: { hadir: 38, tidakHadir: 8, izin: 2, terlambat: 3 }
-  },
-  {
-    id: 6,
-    name: "Eko Prasetyo",
-    school: "SMK Negeri 1",
-    status: "Hadir",
-    checkIn: "07:55",
-    checkOut: "16:10",
-    counters: { hadir: 47, tidakHadir: 1, izin: 1, terlambat: 2 }
-  },
-  {
-    id: 7,
-    name: "Fitri Handayani",
-    school: "SMK Negeri 3",
-    status: "Terlambat",
-    checkIn: "08:30",
-    checkOut: "16:00",
-    counters: { hadir: 40, tidakHadir: 2, izin: 3, terlambat: 6 }
-  },
-];
+import { api } from "@/trpc/react";
+import { Spinner } from "@/components/ui/spinner";
 
 const statusConfig: Record<string, string> = {
-  Hadir: "bg-emerald-100 text-emerald-700",
-  "Tidak Hadir": "bg-red-100 text-red-700",
-  Izin: "bg-blue-100 text-blue-700",
-  Terlambat: "bg-amber-100 text-amber-700",
+  present: "bg-emerald-100 text-emerald-700",
+  absent: "bg-red-100 text-red-700",
+  excused: "bg-blue-100 text-blue-700",
+  late: "bg-amber-100 text-amber-700",
+};
+
+const statusLabel: Record<string, string> = {
+  present: "Hadir",
+  absent: "Tidak Hadir",
+  excused: "Izin",
+  late: "Terlambat",
 };
 
 export default function AdminKehadiranPage() {
   const [search, setSearch] = useState("");
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
 
-  const filtered = attendanceData.filter((a) =>
-    a.name.toLowerCase().includes(search.toLowerCase()) ||
-    a.school.toLowerCase().includes(search.toLowerCase())
-  );
+  // TODO: Add company selector UI - hardcoded to company 1 for now
+  const companyId = 1;
 
-  const summary = {
-    hadir: attendanceData.filter((a) => a.status === "Hadir").length,
-    tidakHadir: attendanceData.filter((a) => a.status === "Tidak Hadir").length,
-    izin: attendanceData.filter((a) => a.status === "Izin").length,
-    terlambat: attendanceData.filter((a) => a.status === "Terlambat").length,
-  };
+  const { data, isLoading, isError } = api.attendances.detail.useQuery({
+    companyId,
+    date: new Date(selectedDate),
+    search: search || undefined,
+    limit: 200,
+  });
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -103,6 +43,22 @@ export default function AdminKehadiranPage() {
       month: "long",
       year: "numeric",
     }).format(date);
+  };
+
+  const formatTime = (isoString: string | null) => {
+    if (!isoString) return "-";
+    const date = new Date(isoString);
+    return date.toLocaleTimeString("id-ID", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const summary = {
+    hadir: data?.items.filter((a) => a.status === "present").length ?? 0,
+    tidakHadir: data?.items.filter((a) => a.status === "absent").length ?? 0,
+    izin: data?.items.filter((a) => a.status === "excused").length ?? 0,
+    terlambat: data?.items.filter((a) => a.status === "late").length ?? 0,
   };
 
   return (
@@ -184,52 +140,76 @@ export default function AdminKehadiranPage() {
         {/* Table */}
         <div className="rounded-2xl border bg-card shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-muted/50">
-                <tr>
-                  <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">No</th>
-                  <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">Nama Siswa</th>
-                  <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">Sekolah</th>
-                  <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">Status Hari Ini</th>
-                  <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">Jam Masuk</th>
-                  <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">Jam Keluar</th>
-                  <th className="text-center text-sm font-medium text-emerald-700 px-4 py-3 bg-emerald-50">H</th>
-                  <th className="text-center text-sm font-medium text-red-700 px-4 py-3 bg-red-50">TH</th>
-                  <th className="text-center text-sm font-medium text-blue-700 px-4 py-3 bg-blue-50">I</th>
-                  <th className="text-center text-sm font-medium text-amber-700 px-4 py-3 bg-amber-50">T</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((attendance, index) => (
-                  <tr key={attendance.id} className="border-t hover:bg-muted/30 transition-colors">
-                    <td className="px-4 py-3 text-sm text-muted-foreground">{index + 1}</td>
-                    <td className="px-4 py-3 font-medium">{attendance.name}</td>
-                    <td className="px-4 py-3 text-sm">{attendance.school}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusConfig[attendance.status] ?? "bg-gray-100 text-gray-700"
-                          }`}
-                      >
-                        {attendance.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm font-mono">{attendance.checkIn}</td>
-                    <td className="px-4 py-3 text-sm font-mono">{attendance.checkOut}</td>
-                    <td className="px-4 py-3 text-center text-sm font-semibold text-emerald-700">{attendance.counters.hadir}</td>
-                    <td className="px-4 py-3 text-center text-sm font-semibold text-red-700">{attendance.counters.tidakHadir}</td>
-                    <td className="px-4 py-3 text-center text-sm font-semibold text-blue-700">{attendance.counters.izin}</td>
-                    <td className="px-4 py-3 text-center text-sm font-semibold text-amber-700">{attendance.counters.terlambat}</td>
+            {isLoading ? (
+              <div className="flex justify-center py-12">
+                <Spinner size="lg" />
+              </div>
+            ) : isError ? (
+              <div className="text-center py-12 text-destructive">
+                Gagal memuat data kehadiran. Silakan coba lagi.
+              </div>
+            ) : !data?.items.length ? (
+              <div className="text-center py-12 text-muted-foreground">
+                Tidak ada data kehadiran untuk tanggal ini.
+              </div>
+            ) : (
+              <table className="w-full">
+                <thead className="bg-muted/50">
+                  <tr>
+                    <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">No</th>
+                    <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">Nama Siswa</th>
+                    <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">Sekolah</th>
+                    <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">Status Hari Ini</th>
+                    <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">Jam Masuk</th>
+                    <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">Jam Keluar</th>
+                    <th className="text-center text-sm font-medium text-emerald-700 px-4 py-3 bg-emerald-50">H</th>
+                    <th className="text-center text-sm font-medium text-red-700 px-4 py-3 bg-red-50">TH</th>
+                    <th className="text-center text-sm font-medium text-blue-700 px-4 py-3 bg-blue-50">I</th>
+                    <th className="text-center text-sm font-medium text-amber-700 px-4 py-3 bg-amber-50">T</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {data.items.map((attendance, index) => (
+                    <tr key={attendance.id} className="border-t hover:bg-muted/30 transition-colors">
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{index + 1}</td>
+                      <td className="px-4 py-3 font-medium">{attendance.student.name}</td>
+                      <td className="px-4 py-3 text-sm">{attendance.student.school || "-"}</td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusConfig[attendance.status] ?? "bg-gray-100 text-gray-700"
+                            }`}
+                        >
+                          {statusLabel[attendance.status] ?? attendance.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm font-mono">{formatTime(attendance.checkInAt)}</td>
+                      <td className="px-4 py-3 text-sm font-mono">{formatTime(attendance.checkOutAt)}</td>
+                      <td className="px-4 py-3 text-center text-sm font-semibold text-emerald-700">
+                        {attendance.counters.hadir}
+                      </td>
+                      <td className="px-4 py-3 text-center text-sm font-semibold text-red-700">
+                        {attendance.counters.tidakHadir}
+                      </td>
+                      <td className="px-4 py-3 text-center text-sm font-semibold text-blue-700">
+                        {attendance.counters.izin}
+                      </td>
+                      <td className="px-4 py-3 text-center text-sm font-semibold text-amber-700">
+                        {attendance.counters.terlambat}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
 
         {/* Footer */}
-        <div className="text-sm text-muted-foreground text-center">
-          Total: {attendanceData.length} siswa
-        </div>
+        {!isLoading && !isError && (
+          <div className="text-sm text-muted-foreground text-center">
+            Total: {data?.items.length ?? 0} siswa
+          </div>
+        )}
       </div>
     </main>
   );

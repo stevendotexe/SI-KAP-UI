@@ -206,9 +206,13 @@ export const attendancesRouter = createTRPCRouter({
           id: attendanceLog.id,
           date: attendanceLog.date,
           status: attendanceLog.status,
+          checkInAt: attendanceLog.checkInAt,
+          checkOutAt: attendanceLog.checkOutAt,
+          placementId: placement.id,
           studentId: studentProfile.id,
           studentUserId: studentProfile.userId,
           studentName: studentUser.name,
+          studentSchool: studentProfile.school,
           mentorId: mentorProfile.id,
           mentorName: mentorUser.name,
         })
@@ -234,18 +238,51 @@ export const attendancesRouter = createTRPCRouter({
         .where(where);
       const total = totalRows[0]?.total ?? 0;
 
+      // Get per-student attendance counters for each placement
+      const placementIds = [...new Set(rows.map((r) => r.placementId))];
+      const countersMap = new Map<number, { hadir: number; tidakHadir: number; izin: number; terlambat: number }>();
+
+      if (placementIds.length > 0) {
+        const countersRows = await ctx.db
+          .select({
+            placementId: attendanceLog.placementId,
+            status: attendanceLog.status,
+            count: sql<number>`count(*)`,
+          })
+          .from(attendanceLog)
+          .where(sql`${attendanceLog.placementId} = ANY(${placementIds})`)
+          .groupBy(attendanceLog.placementId, attendanceLog.status);
+
+        for (const row of countersRows) {
+          if (!countersMap.has(row.placementId)) {
+            countersMap.set(row.placementId, { hadir: 0, tidakHadir: 0, izin: 0, terlambat: 0 });
+          }
+          const counters = countersMap.get(row.placementId)!;
+          const count = Number(row.count ?? 0);
+
+          if (row.status === "present") counters.hadir += count;
+          else if (row.status === "late") counters.terlambat += count;
+          else if (row.status === "absent") counters.tidakHadir += count;
+          else if (row.status === "excused") counters.izin += count;
+        }
+      }
+
       return {
         items: rows.map((r) => ({
           id: r.id,
           date: r.date,
           status: r.status,
+          checkInAt: r.checkInAt ? r.checkInAt.toISOString() : null,
+          checkOutAt: r.checkOutAt ? r.checkOutAt.toISOString() : null,
           student: {
             id: r.studentId,
             userId: r.studentUserId,
             code: r.studentUserId,
             name: r.studentName ?? "",
+            school: r.studentSchool ?? "",
           },
           mentor: r.mentorId ? { id: r.mentorId, name: r.mentorName ?? null } : null,
+          counters: countersMap.get(r.placementId) ?? { hadir: 0, tidakHadir: 0, izin: 0, terlambat: 0 },
         })),
         pagination: { total: Number(total ?? 0), limit: input.limit, offset: input.offset },
         lastUpdated: new Date().toISOString(),

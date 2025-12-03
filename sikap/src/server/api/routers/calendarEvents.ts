@@ -7,6 +7,7 @@ import { adminOrMentorProcedure, createTRPCRouter, protectedProcedure, requirePe
 import {
   attachment,
   calendarEvent,
+  company,
   eventType,
   mentorProfile,
   placement,
@@ -38,6 +39,10 @@ const docs = {
     description:
       "## List Calendar Events (Student)\\n\\nDaftar event kalender untuk siswa berdasarkan placement mereka.\\n\\n### Parameters\\n- `month` (1-12, optional, default bulan ini)\\n- `year` (number, optional, default tahun ini)\\n- `type` (in_class | field_trip | meet_greet | meeting | deadline | milestone, optional)\\n\\n### Response\\nArray `items` berisi `{ id, title, startDate, endDate, type, colorHex }`.\\n\\n### Example (React)\\n```ts\\nconst { data } = api.calendarEvents.listForStudent.useQuery({ month: 8, year: 2025 });\\n```",
   },
+  listForAdmin: {
+    description:
+      "## List Calendar Events (Admin)\\n\\nDaftar semua event kalender untuk admin (semua companies).\\n\\n### Parameters\\n- `month` (1-12, optional, default bulan ini)\\n- `year` (number, optional, default tahun ini)\\n- `type` (in_class | field_trip | meet_greet | meeting | deadline | milestone, optional)\\n- `search` (string, optional; judul atau penyelenggara)\\n\\n### Response\\nArray berisi `{ id, title, startDate, endDate, type, organizerName, colorHex, placementId, companyName }`.\\n\\n### Example (React)\\n```ts\\nconst { data } = api.calendarEvents.listForAdmin.useQuery({ month: 8, year: 2025 });\\n```",
+  },
 };
 
 
@@ -66,7 +71,7 @@ export const calendarEventsRouter = createTRPCRouter({
     .use(requirePermissions({ calendarEvent: ["read"], placement: ["read"] }))
     .input(
       z.object({
-        companyId: z.number(),
+        companyId: z.number().optional(),
         month: z.number().min(1).max(12).optional(),
         year: z.number().optional(),
         type: z.enum(eventType.enumValues).optional(),
@@ -79,18 +84,29 @@ export const calendarEventsRouter = createTRPCRouter({
       const endStr = range.end.toISOString().slice(0, 10);
 
       let mentorFilterId: number | null = null;
+      let effectiveCompanyId = input.companyId;
+
       if (ctx.session.user.role === "mentor") {
         const mp = await ctx.db.query.mentorProfile.findFirst({
           where: eq(mentorProfile.userId, ctx.session.user.id),
         });
         if (!mp) throw new TRPCError({ code: "FORBIDDEN" });
         mentorFilterId = mp.id;
+
+        // If companyId not provided, use mentor's companyId
+        if (!effectiveCompanyId) {
+          effectiveCompanyId = mp.companyId ?? undefined;
+        } else if (mp.companyId && effectiveCompanyId !== mp.companyId) {
+          // If companyId provided, validate it matches mentor's company
+          throw new TRPCError({ code: "FORBIDDEN", message: "Cannot access events from other companies" });
+        }
       }
 
       const startDateExpr = sql`(${calendarEvent.scheduledAt})::date`;
       const dueDateExpr = sql`coalesce(${calendarEvent.endDate}, ${calendarEvent.scheduledAt})::date`;
       const overlapWhere = and(lte(startDateExpr, endStr), gte(dueDateExpr, startStr));
 
+      // Use LEFT JOIN to include company-wide events (placementId = null)
       const rows = await ctx.db
         .select({
           id: calendarEvent.id,
@@ -104,15 +120,22 @@ export const calendarEventsRouter = createTRPCRouter({
           placementId: placement.id,
         })
         .from(calendarEvent)
-        .innerJoin(placement, eq(calendarEvent.placementId, placement.id))
+        .leftJoin(placement, eq(calendarEvent.placementId, placement.id))
         .where(
           and(
-            eq(placement.companyId, input.companyId),
-            mentorFilterId ? eq(placement.mentorId, mentorFilterId) : undefined,
+            // For admin: if companyId provided, show events for that company OR company-wide events (placementId is null)
+            // For admin without companyId: show all events
+            // For mentor: filter by their company OR company-wide events
+            effectiveCompanyId
+              ? sql`(${calendarEvent.placementId} IS NULL OR ${placement.companyId} = ${effectiveCompanyId})`
+              : undefined,
+            mentorFilterId
+              ? sql`(${calendarEvent.placementId} IS NULL OR ${placement.mentorId} = ${mentorFilterId})`
+              : undefined,
             overlapWhere,
             input.type ? eq(calendarEvent.type, input.type) : undefined,
             input.search
-              ? sql`(lower(${calendarEvent.title}) like ${"%" + input.search.toLowerCase() + "%"} or lower(${calendarEvent.organizerName}) like ${"%" + input.search.toLowerCase() + "%"})`
+              ? sql`(lower(${calendarEvent.title}) like ${"%" + input.search.toLowerCase() + "%"} or lower(coalesce(${calendarEvent.organizerName}, '')) like ${"%" + input.search.toLowerCase() + "%"})`
               : undefined,
           ),
         )
@@ -126,7 +149,7 @@ export const calendarEventsRouter = createTRPCRouter({
         dueDate: r.dueDate ?? r.startDate,
         organizerName: r.organizerName ?? null,
         colorHex: r.colorHex ?? null,
-        placementId: r.placementId,
+        placementId: r.placementId ?? null,
       }));
     }),
 
@@ -371,9 +394,13 @@ export const calendarEventsRouter = createTRPCRouter({
         .select({
           id: calendarEvent.id,
           title: calendarEvent.title,
+          description: calendarEvent.description,
           type: calendarEvent.type,
           startDate: calendarEvent.scheduledAt,
           endDate: calendarEvent.endDate,
+          location: calendarEvent.location,
+          organizerName: calendarEvent.organizerName,
+          organizerLogoUrl: calendarEvent.organizerLogoUrl,
           colorHex: calendarEvent.colorHex,
         })
         .from(calendarEvent)
@@ -390,11 +417,81 @@ export const calendarEventsRouter = createTRPCRouter({
         items: rows.map((r) => ({
           id: r.id,
           title: r.title,
+          description: r.description ?? null,
           type: r.type,
           startDate: r.startDate,
           endDate: r.endDate ?? r.startDate,
+          location: r.location ?? null,
+          organizerName: r.organizerName ?? null,
+          organizerLogoUrl: r.organizerLogoUrl ?? null,
           colorHex: r.colorHex ?? null,
         })),
       };
+    }),
+
+  listForAdmin: adminOrMentorProcedure
+    .meta(docs.listForAdmin)
+    .input(
+      z.object({
+        month: z.number().min(1).max(12).optional(),
+        year: z.number().optional(),
+        type: z.enum(eventType.enumValues).optional(),
+        search: z.string().optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      // Only admins can access this endpoint
+      if (ctx.session.user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+      }
+
+      const range = monthRange({ month: input.month, year: input.year });
+      const startStr = range.start.toISOString().slice(0, 10);
+      const endStr = range.end.toISOString().slice(0, 10);
+
+      const startDateExpr = sql`(${calendarEvent.scheduledAt})::date`;
+      const dueDateExpr = sql`coalesce(${calendarEvent.endDate}, ${calendarEvent.scheduledAt})::date`;
+      const overlapWhere = and(lte(startDateExpr, endStr), gte(dueDateExpr, startStr));
+
+      // Use LEFT JOIN to include company-wide events (placementId = null)
+      const rows = await ctx.db
+        .select({
+          id: calendarEvent.id,
+          title: calendarEvent.title,
+          type: calendarEvent.type,
+          startDate: calendarEvent.scheduledAt,
+          endDate: calendarEvent.endDate,
+          organizerName: calendarEvent.organizerName,
+          colorHex: calendarEvent.colorHex,
+          placementId: placement.id,
+          companyId: placement.companyId,
+          companyName: company.name,
+        })
+        .from(calendarEvent)
+        .leftJoin(placement, eq(calendarEvent.placementId, placement.id))
+        .leftJoin(company, eq(placement.companyId, company.id))
+        .where(
+          and(
+            overlapWhere,
+            input.type ? eq(calendarEvent.type, input.type) : undefined,
+            input.search
+              ? sql`(lower(${calendarEvent.title}) like ${"%" + input.search.toLowerCase() + "%"} or lower(coalesce(${calendarEvent.organizerName}, '')) like ${"%" + input.search.toLowerCase() + "%"})`
+              : undefined,
+          ),
+        )
+        .orderBy(calendarEvent.scheduledAt);
+
+      return rows.map((r) => ({
+        id: r.id,
+        title: r.title,
+        type: r.type,
+        startDate: r.startDate,
+        endDate: r.endDate ?? r.startDate,
+        organizerName: r.organizerName ?? null,
+        colorHex: r.colorHex ?? null,
+        placementId: r.placementId ?? null,
+        companyId: r.companyId ?? null,
+        companyName: r.companyName ?? null,
+      }));
     }),
 });

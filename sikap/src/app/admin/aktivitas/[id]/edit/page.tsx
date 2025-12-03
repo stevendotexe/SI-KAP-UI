@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Spinner } from "@/components/ui/spinner";
 import {
     Select,
     SelectContent,
@@ -13,54 +14,117 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Upload, X } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { api } from "@/trpc/react";
+import { FileUploadField, type FileUploadValue } from "@/components/ui/file-upload-field";
 
 export default function EditAktivitasPage() {
     const params = useParams();
     const router = useRouter();
+    const eventId = Number(params.id);
 
-    // Simulate loading existing data
     const [formData, setFormData] = useState({
-        name: "Workshop Web Development",
-        type: "In-Class",
-        date: "2025-08-15",
-        time: "09:00",
-        organizer: "PT Teknologi Indonesia",
-        color: "#3b82f6",
-        description: "Workshop intensif mengenai web development modern",
+        title: "",
+        type: "" as "in_class" | "field_trip" | "meet_greet" | "",
+        date: "",
+        time: "",
+        organizerName: "",
+        colorHex: "#3b82f6",
+        description: "",
     });
-    const [logoPreview, setLogoPreview] = useState<string | null>(
-        "https://via.placeholder.com/150"
+    const [attachments, setAttachments] = useState<FileUploadValue[]>([]);
+
+    const { data: event, isLoading, isError, refetch } = api.calendarEvents.detail.useQuery(
+        { eventId },
+        { enabled: !isNaN(eventId) }
     );
-    const [documentFiles, setDocumentFiles] = useState<File[]>([]);
 
-    const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setLogoPreview(reader.result as string);
-            };
-            reader.readAsDataURL(file);
+    const updateMutation = api.calendarEvents.update.useMutation({
+        onSuccess: () => {
+            router.push("/admin/aktivitas");
+        },
+    });
+
+    // Pre-fill form when event data is loaded
+    useEffect(() => {
+        if (event) {
+            const startDate = new Date(event.startDate);
+            setFormData({
+                title: event.title,
+                type: event.type as "in_class" | "field_trip" | "meet_greet",
+                date: startDate.toISOString().split('T')[0],
+                time: startDate.toTimeString().slice(0, 5),
+                organizerName: event.organizerName ?? "",
+                colorHex: event.colorHex ?? "#3b82f6",
+                description: event.description ?? "",
+            });
+
+            // Convert existing attachments to FileUploadValue format
+            if (event.attachments && event.attachments.length > 0) {
+                setAttachments(
+                    event.attachments.map(att => ({
+                        url: att.url,
+                        filename: att.filename ?? undefined,
+                    }))
+                );
+            }
         }
-    };
-
-    const handleDocumentUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = Array.from(e.target.files || []);
-        setDocumentFiles((prev) => [...prev, ...files]);
-    };
-
-    const removeDocument = (index: number) => {
-        setDocumentFiles((prev) => prev.filter((_, i) => i !== index));
-    };
+    }, [event]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        console.log("Updated data:", formData);
-        console.log("Logo:", logoPreview);
-        console.log("Documents:", documentFiles);
-        router.push("/admin/aktivitas");
+
+        // Combine date and time into a single Date object
+        const dateTime = new Date(`${formData.date}T${formData.time}:00`);
+
+        updateMutation.mutate({
+            eventId,
+            title: formData.title,
+            type: formData.type as "in_class" | "field_trip" | "meet_greet",
+            date: dateTime,
+            description: formData.description || undefined,
+            organizerName: formData.organizerName || undefined,
+            colorHex: formData.colorHex || undefined,
+            placementId: undefined,
+            attachments: attachments.length > 0
+                ? attachments.map(a => ({ url: a.url, filename: a.filename }))
+                : undefined,
+        });
     };
+
+    const isSubmitting = updateMutation.isPending;
+
+    if (isLoading) {
+        return (
+            <main className="min-h-screen bg-muted text-foreground">
+                <div className="max-w-[900px] mx-auto px-6 py-8">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Spinner /> Memuat data aktivitas...
+                    </div>
+                </div>
+            </main>
+        );
+    }
+
+    if (isError || !event) {
+        return (
+            <main className="min-h-screen bg-muted text-foreground">
+                <div className="max-w-[900px] mx-auto px-6 py-8">
+                    <div className="flex flex-col items-start gap-2">
+                        <div className="text-sm text-destructive">Gagal memuat data aktivitas.</div>
+                        <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={() => refetch()}>
+                                Coba Lagi
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => router.back()}>
+                                Kembali
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        );
+    }
 
     return (
         <main className="min-h-screen bg-muted text-foreground">
@@ -87,15 +151,15 @@ export default function EditAktivitasPage() {
                     <form onSubmit={handleSubmit} className="space-y-6">
                         {/* Nama Kegiatan */}
                         <div>
-                            <Label htmlFor="name" className="text-sm font-medium mb-2 block">
+                            <Label htmlFor="title" className="text-sm font-medium mb-2 block">
                                 Nama Kegiatan
                             </Label>
                             <Input
-                                id="name"
+                                id="title"
                                 placeholder="Contoh: Workshop Web Development"
-                                value={formData.name}
+                                value={formData.title}
                                 onChange={(e) =>
-                                    setFormData({ ...formData, name: e.target.value })
+                                    setFormData({ ...formData, title: e.target.value })
                                 }
                                 className="rounded-lg"
                                 required
@@ -110,16 +174,17 @@ export default function EditAktivitasPage() {
                             <Select
                                 value={formData.type}
                                 onValueChange={(value) =>
-                                    setFormData({ ...formData, type: value })
+                                    setFormData({ ...formData, type: value as typeof formData.type })
                                 }
+                                required
                             >
                                 <SelectTrigger className="rounded-lg">
                                     <SelectValue placeholder="Pilih tipe kegiatan" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="In-Class">In-Class</SelectItem>
-                                    <SelectItem value="Field Trip">Field Trip</SelectItem>
-                                    <SelectItem value="Meet & Greet">Meet & Greet</SelectItem>
+                                    <SelectItem value="in_class">In-Class</SelectItem>
+                                    <SelectItem value="field_trip">Field Trip</SelectItem>
+                                    <SelectItem value="meet_greet">Meet & Greet</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -163,20 +228,19 @@ export default function EditAktivitasPage() {
                         {/* Penyelenggara */}
                         <div>
                             <Label
-                                htmlFor="organizer"
+                                htmlFor="organizerName"
                                 className="text-sm font-medium mb-2 block"
                             >
                                 Penyelenggara
                             </Label>
                             <Input
-                                id="organizer"
+                                id="organizerName"
                                 placeholder="Contoh: PT Teknologi Indonesia"
-                                value={formData.organizer}
+                                value={formData.organizerName}
                                 onChange={(e) =>
-                                    setFormData({ ...formData, organizer: e.target.value })
+                                    setFormData({ ...formData, organizerName: e.target.value })
                                 }
                                 className="rounded-lg"
-                                required
                             />
                         </div>
 
@@ -189,17 +253,17 @@ export default function EditAktivitasPage() {
                                 <Input
                                     id="color"
                                     type="color"
-                                    value={formData.color}
+                                    value={formData.colorHex}
                                     onChange={(e) =>
-                                        setFormData({ ...formData, color: e.target.value })
+                                        setFormData({ ...formData, colorHex: e.target.value })
                                     }
                                     className="w-20 h-10 rounded-lg cursor-pointer"
                                 />
                                 <Input
                                     type="text"
-                                    value={formData.color}
+                                    value={formData.colorHex}
                                     onChange={(e) =>
-                                        setFormData({ ...formData, color: e.target.value })
+                                        setFormData({ ...formData, colorHex: e.target.value })
                                     }
                                     className="flex-1 rounded-lg"
                                     placeholder="#3b82f6"
@@ -208,49 +272,6 @@ export default function EditAktivitasPage() {
                             <p className="text-xs text-muted-foreground mt-1">
                                 Warna akan digunakan pada kalender
                             </p>
-                        </div>
-
-                        {/* Logo Penyelenggara */}
-                        <div>
-                            <Label htmlFor="logo" className="text-sm font-medium mb-2 block">
-                                Logo Penyelenggara
-                            </Label>
-                            <div className="space-y-3">
-                                {logoPreview && (
-                                    <div className="relative inline-block">
-                                        <img
-                                            src={logoPreview}
-                                            alt="Logo preview"
-                                            className="w-32 h-32 object-cover rounded-lg border"
-                                        />
-                                        <Button
-                                            type="button"
-                                            size="sm"
-                                            variant="destructive"
-                                            className="absolute -top-2 -right-2 rounded-full w-6 h-6 p-0"
-                                            onClick={() => setLogoPreview(null)}
-                                        >
-                                            <X className="w-4 h-4" />
-                                        </Button>
-                                    </div>
-                                )}
-                                <div>
-                                    <label
-                                        htmlFor="logo"
-                                        className="inline-flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer hover:bg-muted transition-colors"
-                                    >
-                                        <Upload className="w-4 h-4" />
-                                        <span className="text-sm">Upload Logo Baru</span>
-                                    </label>
-                                    <input
-                                        id="logo"
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={handleLogoUpload}
-                                        className="hidden"
-                                    />
-                                </div>
-                            </div>
                         </div>
 
                         {/* Deskripsi */}
@@ -269,72 +290,24 @@ export default function EditAktivitasPage() {
                                     setFormData({ ...formData, description: e.target.value })
                                 }
                                 className="rounded-lg min-h-[120px]"
-                                required
                             />
                         </div>
 
-                        {/* Dokumentasi */}
+                        {/* Lampiran / File Pendukung */}
                         <div>
-                            <Label
-                                htmlFor="documents"
-                                className="text-sm font-medium mb-2 block"
-                            >
-                                Dokumentasi / File Pendukung
+                            <Label className="text-sm font-medium mb-2 block">
+                                Lampiran / File Pendukung
                             </Label>
-                            <div className="space-y-3">
-                                {documentFiles.length > 0 && (
-                                    <div className="space-y-2">
-                                        {documentFiles.map((file, index) => (
-                                            <div
-                                                key={index}
-                                                className="flex items-center justify-between p-3 bg-muted rounded-lg"
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
-                                                        <span className="text-xs font-medium text-blue-700">
-                                                            {file.name.split(".").pop()?.toUpperCase()}
-                                                        </span>
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-sm font-medium">{file.name}</p>
-                                                        <p className="text-xs text-muted-foreground">
-                                                            {(file.size / 1024).toFixed(2)} KB
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    className="text-destructive hover:bg-destructive/10"
-                                                    onClick={() => removeDocument(index)}
-                                                >
-                                                    <X className="w-4 h-4" />
-                                                </Button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                                <div>
-                                    <label
-                                        htmlFor="documents"
-                                        className="inline-flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer hover:bg-muted transition-colors"
-                                    >
-                                        <Upload className="w-4 h-4" />
-                                        <span className="text-sm">Upload File Tambahan</span>
-                                    </label>
-                                    <input
-                                        id="documents"
-                                        type="file"
-                                        multiple
-                                        onChange={handleDocumentUpload}
-                                        className="hidden"
-                                    />
-                                    <p className="text-xs text-muted-foreground mt-2">
-                                        Format: PDF, DOC, XLS, JPG, PNG (Max. 10MB per file)
-                                    </p>
-                                </div>
-                            </div>
+                            <FileUploadField
+                                ownerType="calendar_event"
+                                ownerId={eventId}
+                                value={attachments}
+                                onChange={setAttachments}
+                                label=""
+                                description="Upload file pendukung (opsional). Format: PDF, DOC, XLS, JPG, PNG (Max. 10MB per file)"
+                                multiple
+                                maxFiles={10}
+                            />
                         </div>
 
                         {/* Submit Buttons */}
@@ -342,14 +315,23 @@ export default function EditAktivitasPage() {
                             <Button
                                 type="submit"
                                 className="bg-destructive hover:bg-red-700 text-white rounded-full px-8 cursor-pointer transition-colors"
+                                disabled={isSubmitting}
                             >
-                                Simpan Perubahan
+                                {isSubmitting ? (
+                                    <>
+                                        <Spinner className="mr-2" />
+                                        Menyimpan...
+                                    </>
+                                ) : (
+                                    "Simpan Perubahan"
+                                )}
                             </Button>
                             <Button
                                 type="button"
                                 variant="outline"
                                 onClick={() => router.back()}
                                 className="rounded-full px-8 cursor-pointer"
+                                disabled={isSubmitting}
                             >
                                 Batal
                             </Button>

@@ -5,33 +5,76 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
 import { ArrowLeft } from "lucide-react";
+import { api } from "@/trpc/react";
 
 export default function TambahMentorPage() {
     const router = useRouter();
     const [formData, setFormData] = useState({
         nama: "",
-        nip: "",
-        tempatLahir: "",
-        tanggalLahir: "",
-        jenisKelamin: "",
-        kompetensiKeahlian: "",
-        alamat: "",
+        email: "",
+        password: "",
         noTelp: "",
+    });
+    const [errors, setErrors] = useState<Record<string, string>>({});
+
+    // Fetch the first company to use as companyId
+    const { data: companiesData } = api.companies.list.useQuery({
+        limit: 1,
+        offset: 0,
+    });
+    const companyId = companiesData?.items[0]?.id;
+
+    const createMentor = api.mentors.create.useMutation({
+        onSuccess: () => {
+            router.push("/admin/mentor");
+        },
+        onError: (error) => {
+            setErrors({
+                submit: error.message || "Gagal menambahkan mentor. Silakan coba lagi.",
+            });
+        },
     });
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        // Handle form submission
-        console.log(formData);
-        router.back();
+
+        // Clear previous errors
+        setErrors({});
+
+        // Basic validation
+        const newErrors: Record<string, string> = {};
+        if (!formData.nama.trim()) {
+            newErrors.nama = "Nama harus diisi";
+        }
+        if (!formData.email.trim()) {
+            newErrors.email = "Email harus diisi";
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+            newErrors.email = "Email tidak valid";
+        }
+        if (!formData.password) {
+            newErrors.password = "Password harus diisi";
+        } else if (formData.password.length < 8) {
+            newErrors.password = "Password minimal 8 karakter";
+        }
+
+        if (Object.keys(newErrors).length > 0) {
+            setErrors(newErrors);
+            return;
+        }
+
+        if (!companyId) {
+            setErrors({ submit: "Gagal mendapatkan data perusahaan" });
+            return;
+        }
+
+        createMentor.mutate({
+            email: formData.email,
+            password: formData.password,
+            name: formData.nama,
+            phone: formData.noTelp || undefined,
+            companyId: companyId,
+        });
     };
 
     return (
@@ -56,14 +99,21 @@ export default function TambahMentorPage() {
 
                 {/* Form */}
                 <div className="bg-card border rounded-xl shadow-sm p-8">
-                    <h3 className="text-lg font-semibold mb-6">Identitas Pribadi Siswa</h3>
+                    <h3 className="text-lg font-semibold mb-6">Identitas Pribadi Mentor</h3>
 
                     <form onSubmit={handleSubmit} className="space-y-6">
+                        {/* Error message */}
+                        {errors.submit && (
+                            <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-lg text-sm">
+                                {errors.submit}
+                            </div>
+                        )}
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {/* Nama */}
                             <div>
                                 <Label htmlFor="nama" className="text-sm font-medium mb-2 block">
-                                    Nama
+                                    Nama <span className="text-destructive">*</span>
                                 </Label>
                                 <Input
                                     id="nama"
@@ -72,141 +122,79 @@ export default function TambahMentorPage() {
                                     onChange={(e) =>
                                         setFormData({ ...formData, nama: e.target.value })
                                     }
-                                    className="rounded-lg"
+                                    className={`rounded-lg ${errors.nama ? "border-destructive" : ""}`}
                                 />
+                                {errors.nama && (
+                                    <p className="text-xs text-destructive mt-1">{errors.nama}</p>
+                                )}
                             </div>
 
-                            {/* NIP */}
+                            {/* Email */}
                             <div>
-                                <Label htmlFor="nip" className="text-sm font-medium mb-2 block">
-                                    NIP
+                                <Label htmlFor="email" className="text-sm font-medium mb-2 block">
+                                    Email <span className="text-destructive">*</span>
                                 </Label>
                                 <Input
-                                    id="nip"
-                                    placeholder="234658594"
-                                    value={formData.nip}
+                                    id="email"
+                                    type="email"
+                                    placeholder="ahsan@example.com"
+                                    value={formData.email}
                                     onChange={(e) =>
-                                        setFormData({ ...formData, nip: e.target.value })
+                                        setFormData({ ...formData, email: e.target.value })
                                     }
-                                    className="rounded-lg"
+                                    className={`rounded-lg ${errors.email ? "border-destructive" : ""}`}
                                 />
+                                {errors.email && (
+                                    <p className="text-xs text-destructive mt-1">{errors.email}</p>
+                                )}
                             </div>
 
-                            {/* Tempat Lahir */}
+                            {/* Password */}
                             <div>
-                                <Label htmlFor="tempatLahir" className="text-sm font-medium mb-2 block">
-                                    Tempat Lahir
+                                <Label htmlFor="password" className="text-sm font-medium mb-2 block">
+                                    Password <span className="text-destructive">*</span>
                                 </Label>
                                 <Input
-                                    id="tempatLahir"
-                                    placeholder="Bandung"
-                                    value={formData.tempatLahir}
+                                    id="password"
+                                    type="password"
+                                    placeholder="Minimal 8 karakter"
+                                    value={formData.password}
                                     onChange={(e) =>
-                                        setFormData({ ...formData, tempatLahir: e.target.value })
+                                        setFormData({ ...formData, password: e.target.value })
                                     }
-                                    className="rounded-lg"
+                                    className={`rounded-lg ${errors.password ? "border-destructive" : ""}`}
                                 />
+                                {errors.password && (
+                                    <p className="text-xs text-destructive mt-1">{errors.password}</p>
+                                )}
                             </div>
 
-                            {/* Tanggal Lahir */}
+                            {/* No Telp */}
                             <div>
-                                <Label htmlFor="tanggalLahir" className="text-sm font-medium mb-2 block">
-                                    Tanggal Lahir
+                                <Label htmlFor="noTelp" className="text-sm font-medium mb-2 block">
+                                    No Telp
                                 </Label>
                                 <Input
-                                    id="tanggalLahir"
-                                    type="date"
-                                    value={formData.tanggalLahir}
+                                    id="noTelp"
+                                    type="tel"
+                                    placeholder="081234567890"
+                                    value={formData.noTelp}
                                     onChange={(e) =>
-                                        setFormData({ ...formData, tanggalLahir: e.target.value })
+                                        setFormData({ ...formData, noTelp: e.target.value })
                                     }
                                     className="rounded-lg"
                                 />
                             </div>
-
-                            {/* Jenis Kelamin */}
-                            <div>
-                                <Label htmlFor="jenisKelamin" className="text-sm font-medium mb-2 block">
-                                    Jenis Kelamin
-                                </Label>
-                                <Select
-                                    value={formData.jenisKelamin}
-                                    onValueChange={(value) =>
-                                        setFormData({ ...formData, jenisKelamin: value })
-                                    }
-                                >
-                                    <SelectTrigger className="rounded-lg">
-                                        <SelectValue placeholder="Laki-laki" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="laki-laki">Laki-laki</SelectItem>
-                                        <SelectItem value="perempuan">Perempuan</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            {/* Kompetensi Keahlian */}
-                            <div>
-                                <Label htmlFor="kompetensiKeahlian" className="text-sm font-medium mb-2 block">
-                                    Kompetensi Keahlian
-                                </Label>
-                                <Select
-                                    value={formData.kompetensiKeahlian}
-                                    onValueChange={(value) =>
-                                        setFormData({ ...formData, kompetensiKeahlian: value })
-                                    }
-                                >
-                                    <SelectTrigger className="rounded-lg">
-                                        <SelectValue placeholder="Teknik Komputer & jaringan" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="tkj">Teknik Komputer & jaringan</SelectItem>
-                                        <SelectItem value="rpl">Rekayasa Perangkat Lunak</SelectItem>
-                                        <SelectItem value="mm">Multimedia</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-
-                        {/* Alamat - Full Width */}
-                        <div>
-                            <Label htmlFor="alamat" className="text-sm font-medium mb-2 block">
-                                Alamat
-                            </Label>
-                            <Input
-                                id="alamat"
-                                placeholder=""
-                                value={formData.alamat}
-                                onChange={(e) =>
-                                    setFormData({ ...formData, alamat: e.target.value })
-                                }
-                                className="rounded-lg"
-                            />
-                        </div>
-
-                        {/* No telp - Full Width */}
-                        <div>
-                            <Label htmlFor="noTelp" className="text-sm font-medium mb-2 block">
-                                No telp
-                            </Label>
-                            <Input
-                                id="noTelp"
-                                placeholder=""
-                                value={formData.noTelp}
-                                onChange={(e) =>
-                                    setFormData({ ...formData, noTelp: e.target.value })
-                                }
-                                className="rounded-lg"
-                            />
                         </div>
 
                         {/* Submit Button */}
                         <div>
                             <Button
                                 type="submit"
-                                className="bg-destructive hover:bg-red-700 text-white rounded-full px-8 cursor-pointer transition-colors"
+                                disabled={createMentor.isPending}
+                                className="bg-destructive hover:bg-red-700 text-white rounded-full px-8 cursor-pointer transition-colors disabled:opacity-50"
                             >
-                                Tambahkan
+                                {createMentor.isPending ? "Menambahkan..." : "Tambahkan"}
                             </Button>
                         </div>
                     </form>

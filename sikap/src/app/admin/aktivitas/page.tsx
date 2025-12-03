@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
 import {
     Select,
     SelectContent,
@@ -11,79 +12,60 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import { Search, Plus, Pencil, Trash2 } from "lucide-react";
-
-// Dummy data
-const activities = [
-    {
-        id: 1,
-        name: "Workshop Web Development",
-        type: "In-Class",
-        date: "2025-08-15",
-        time: "09:00",
-        organizer: "PT Teknologi Indonesia",
-        color: "#3b82f6",
-        description: "Workshop intensif mengenai web development modern",
-    },
-    {
-        id: 2,
-        name: "Kunjungan Industri ke Google",
-        type: "Field Trip",
-        date: "2025-08-20",
-        time: "08:00",
-        organizer: "SMK 13 Tasikmalaya",
-        color: "#10b981",
-        description: "Kunjungan ke kantor Google Indonesia",
-    },
-    {
-        id: 3,
-        name: "Perkenalan dengan Alumni",
-        type: "Meet & Greet",
-        date: "2025-08-25",
-        time: "14:00",
-        organizer: "Komisi Magang",
-        color: "#f59e0b",
-        description: "Sesi networking dengan alumni yang sudah bekerja",
-    },
-    {
-        id: 4,
-        name: "Training Soft Skills",
-        type: "In-Class",
-        date: "2025-09-01",
-        time: "10:00",
-        organizer: "HR Department",
-        color: "#8b5cf6",
-        description: "Pelatihan komunikasi dan kerjasama tim",
-    },
-    {
-        id: 5,
-        name: "Expo Teknologi 2025",
-        type: "Field Trip",
-        date: "2025-09-10",
-        time: "09:00",
-        organizer: "Asosiasi IT Indonesia",
-        color: "#ec4899",
-        description: "Pameran teknologi terbaru di JCC",
-    },
-];
+import { api } from "@/trpc/react";
 
 const typeColors = {
-    "In-Class": "bg-blue-100 text-blue-700",
-    "Field Trip": "bg-green-100 text-green-700",
-    "Meet & Greet": "bg-amber-100 text-amber-700",
+    "in_class": "bg-blue-100 text-blue-700",
+    "field_trip": "bg-green-100 text-green-700",
+    "meet_greet": "bg-amber-100 text-amber-700",
+};
+
+const typeLabels = {
+    "in_class": "In-Class",
+    "field_trip": "Field Trip",
+    "meet_greet": "Meet & Greet",
 };
 
 export default function AktivitasPage() {
     const [search, setSearch] = useState("");
-    const [filterType, setFilterType] = useState("all");
+    const [filterType, setFilterType] = useState<"all" | "in_class" | "field_trip" | "meet_greet">("all");
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [eventToDelete, setEventToDelete] = useState<{ id: number; title: string } | null>(null);
 
-    const filtered = activities.filter((a) => {
-        const matchSearch =
-            a.name.toLowerCase().includes(search.toLowerCase()) ||
-            a.organizer.toLowerCase().includes(search.toLowerCase());
-        const matchType = filterType === "all" || a.type === filterType;
-        return matchSearch && matchType;
+    const utils = api.useUtils();
+
+    // Query all activities (companyId is optional for admin users)
+    const { data: events, isLoading, isError, refetch } = api.calendarEvents.list.useQuery({
+        // companyId is optional - admin users will see all activities
+        search: search || undefined,
+        type: filterType === "all" ? undefined : filterType,
     });
+
+    const deleteMutation = api.calendarEvents.delete.useMutation({
+        onSuccess: () => {
+            utils.calendarEvents.list.invalidate();
+            setDeleteDialogOpen(false);
+            setEventToDelete(null);
+        },
+    });
+
+    const handleDeleteClick = (event: { id: number; title: string }) => {
+        setEventToDelete(event);
+        setDeleteDialogOpen(true);
+    };
+
+    const confirmDelete = () => {
+        if (eventToDelete) {
+            deleteMutation.mutate({ eventId: eventToDelete.id });
+        }
+    };
 
     return (
         <main className="min-h-screen bg-muted text-foreground">
@@ -119,109 +101,167 @@ export default function AktivitasPage() {
 
                 {/* Filter */}
                 <div className="mb-6">
-                    <Select value={filterType} onValueChange={setFilterType}>
+                    <Select value={filterType} onValueChange={(v) => setFilterType(v as typeof filterType)}>
                         <SelectTrigger className="w-[180px] rounded-full bg-background">
                             <SelectValue placeholder="Semua Tipe" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">Semua Tipe</SelectItem>
-                            <SelectItem value="In-Class">In-Class</SelectItem>
-                            <SelectItem value="Field Trip">Field Trip</SelectItem>
-                            <SelectItem value="Meet & Greet">Meet & Greet</SelectItem>
+                            <SelectItem value="in_class">In-Class</SelectItem>
+                            <SelectItem value="field_trip">Field Trip</SelectItem>
+                            <SelectItem value="meet_greet">Meet & Greet</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
 
-                {/* Table */}
-                <div className="rounded-xl overflow-hidden border bg-card shadow-sm">
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="bg-destructive text-white">
-                                <tr>
-                                    <th className="text-left text-sm font-medium px-4 py-3">
-                                        Nama Kegiatan
-                                    </th>
-                                    <th className="text-left text-sm font-medium px-4 py-3">
-                                        Tipe
-                                    </th>
-                                    <th className="text-left text-sm font-medium px-4 py-3">
-                                        Tanggal & Waktu
-                                    </th>
-                                    <th className="text-left text-sm font-medium px-4 py-3">
-                                        Penyelenggara
-                                    </th>
-                                    <th className="text-left text-sm font-medium px-4 py-3">
-                                        Warna
-                                    </th>
-                                    <th className="text-left text-sm font-medium px-4 py-3">
-                                        Aksi
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filtered.map((activity, index) => (
-                                    <tr
-                                        key={activity.id}
-                                        className={`border-t ${index % 2 === 0 ? "bg-background" : "bg-muted/30"}`}
-                                    >
-                                        <td className="px-4 py-3 text-sm font-medium">
-                                            {activity.name}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <span
-                                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${typeColors[activity.type as keyof typeof typeColors]
-                                                    }`}
-                                            >
-                                                {activity.type}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 text-sm">
-                                            {new Date(activity.date).toLocaleDateString("id-ID", {
-                                                day: "numeric",
-                                                month: "short",
-                                                year: "numeric",
-                                            })}{" "}
-                                            - {activity.time}
-                                        </td>
-                                        <td className="px-4 py-3 text-sm">{activity.organizer}</td>
-                                        <td className="px-4 py-3">
-                                            <div className="flex items-center gap-2">
-                                                <div
-                                                    className="w-6 h-6 rounded-full border"
-                                                    style={{ backgroundColor: activity.color }}
-                                                ></div>
-                                                <span className="text-xs text-muted-foreground">
-                                                    {activity.color}
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <div className="flex items-center gap-2">
-                                                <Link href={`/admin/aktivitas/${activity.id}/edit`}>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        className="hover:bg-muted cursor-pointer"
-                                                    >
-                                                        <Pencil className="w-4 h-4" />
-                                                    </Button>
-                                                </Link>
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    className="hover:bg-destructive/10 text-destructive cursor-pointer"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </Button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                {/* Loading State */}
+                {isLoading && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Spinner /> Memuat aktivitas...
                     </div>
-                </div>
+                )}
+
+                {/* Error State */}
+                {isError && (
+                    <div className="flex flex-col items-start gap-2">
+                        <div className="text-sm text-destructive">Gagal memuat aktivitas.</div>
+                        <Button variant="outline" size="sm" onClick={() => refetch()}>
+                            Coba Lagi
+                        </Button>
+                    </div>
+                )}
+
+                {/* Table */}
+                {!isLoading && !isError && (
+                    <div className="rounded-xl overflow-hidden border bg-card shadow-sm">
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead className="bg-destructive text-white">
+                                    <tr>
+                                        <th className="text-left text-sm font-medium px-4 py-3">
+                                            Nama Kegiatan
+                                        </th>
+                                        <th className="text-left text-sm font-medium px-4 py-3">
+                                            Tipe
+                                        </th>
+                                        <th className="text-left text-sm font-medium px-4 py-3">
+                                            Tanggal & Waktu
+                                        </th>
+                                        <th className="text-left text-sm font-medium px-4 py-3">
+                                            Penyelenggara
+                                        </th>
+                                        <th className="text-left text-sm font-medium px-4 py-3">
+                                            Warna
+                                        </th>
+                                        <th className="text-left text-sm font-medium px-4 py-3">
+                                            Aksi
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {events && events.length > 0 ? (
+                                        events.map((activity, index) => {
+                                            const type = activity.type as keyof typeof typeColors;
+                                            return (
+                                                <tr
+                                                    key={activity.id}
+                                                    className={`border-t ${index % 2 === 0 ? "bg-background" : "bg-muted/30"}`}
+                                                >
+                                                    <td className="px-4 py-3 text-sm font-medium">
+                                                        {activity.title}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <span
+                                                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${typeColors[type] ?? "bg-gray-100 text-gray-700"}`}
+                                                        >
+                                                            {typeLabels[type] ?? activity.type}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-sm">
+                                                        {new Date(activity.startDate).toLocaleDateString("id-ID", {
+                                                            day: "numeric",
+                                                            month: "short",
+                                                            year: "numeric",
+                                                        })}{" "}
+                                                        - {new Date(activity.startDate).toLocaleTimeString("id-ID", {
+                                                            hour: "2-digit",
+                                                            minute: "2-digit",
+                                                        })}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-sm">{activity.organizerName ?? "-"}</td>
+                                                    <td className="px-4 py-3">
+                                                        <div className="flex items-center gap-2">
+                                                            <div
+                                                                className="w-6 h-6 rounded-full border"
+                                                                style={{ backgroundColor: activity.colorHex ?? "#3b82f6" }}
+                                                            ></div>
+                                                            <span className="text-xs text-muted-foreground">
+                                                                {activity.colorHex ?? "#3b82f6"}
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <div className="flex items-center gap-2">
+                                                            <Link href={`/admin/aktivitas/${activity.id}/edit`}>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    className="hover:bg-muted cursor-pointer"
+                                                                >
+                                                                    <Pencil className="w-4 h-4" />
+                                                                </Button>
+                                                            </Link>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                className="hover:bg-destructive/10 text-destructive cursor-pointer"
+                                                                onClick={() => handleDeleteClick({ id: activity.id, title: activity.title })}
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </Button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    ) : (
+                                        <tr>
+                                            <td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                                                Tidak ada aktivitas ditemukan
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
             </div>
+
+            {/* Delete Confirmation Dialog */}
+            <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>Hapus Aktivitas</DialogTitle>
+                    </DialogHeader>
+                    <p className="text-sm text-muted-foreground">
+                        Apakah Anda yakin ingin menghapus aktivitas &quot;{eventToDelete?.title}&quot;? Tindakan ini tidak dapat dibatalkan.
+                    </p>
+                    <div className="flex justify-end gap-2 pt-2">
+                        <Button type="button" variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+                            Batal
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            onClick={confirmDelete}
+                            disabled={deleteMutation.isPending}
+                        >
+                            {deleteMutation.isPending ? <><Spinner className="mr-2" /> Menghapus...</> : "Hapus"}
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </main>
     );
 }

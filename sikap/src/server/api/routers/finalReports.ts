@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, eq, ilike, sql } from "drizzle-orm";
+import { and, eq, ilike, sql, or } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 import { adminOrMentorProcedure, createTRPCRouter, requirePermissions } from "@/server/api/trpc";
@@ -93,7 +93,12 @@ export const finalReportsRouter = createTRPCRouter({
         input.cohort ? eq(studentProfile.cohort, input.cohort) : undefined,
         input.status ? eq(placement.status, input.status) : undefined,
         mentorId ? eq(placement.mentorId, mentorId) : undefined,
-        input.search ? ilike(user.name, `%${input.search}%`) : undefined,
+        input.search
+          ? or(
+              ilike(user.name, `%${input.search}%`),
+              ilike(studentProfile.nis, `%${input.search}%`),
+            )
+          : undefined,
       );
 
       const rows = await ctx.db
@@ -101,24 +106,24 @@ export const finalReportsRouter = createTRPCRouter({
           id: finalReport.id,
           placementId: placement.id,
           studentName: user.name,
-          studentCode: user.id,
+          studentCode: studentProfile.nis,
           school: studentProfile.school,
           cohort: studentProfile.cohort,
           status: placement.status,
           total: sql<number>`coalesce(sum(${finalReportScore.score}),0)`,
           count: sql<number>`count(${finalReportScore.id})`,
         })
-        .from(finalReport)
-        .innerJoin(placement, eq(finalReport.placementId, placement.id))
+        .from(placement)
         .innerJoin(studentProfile, eq(placement.studentId, studentProfile.id))
         .innerJoin(user, eq(studentProfile.userId, user.id))
+        .innerJoin(finalReport, eq(finalReport.placementId, placement.id))
         .leftJoin(finalReportScore, eq(finalReportScore.finalReportId, finalReport.id))
         .where(where)
         .groupBy(
           finalReport.id,
           placement.id,
           user.name,
-          user.id,
+          studentProfile.nis,
           studentProfile.school,
           studentProfile.cohort,
           placement.status,
@@ -128,10 +133,10 @@ export const finalReportsRouter = createTRPCRouter({
 
       const countRows = await ctx.db
         .select({ total: sql<number>`count(distinct ${finalReport.id})` })
-        .from(finalReport)
-        .innerJoin(placement, eq(finalReport.placementId, placement.id))
+        .from(placement)
         .innerJoin(studentProfile, eq(placement.studentId, studentProfile.id))
         .innerJoin(user, eq(studentProfile.userId, user.id))
+        .innerJoin(finalReport, eq(finalReport.placementId, placement.id))
         .where(where);
 
       return {
@@ -165,7 +170,7 @@ export const finalReportsRouter = createTRPCRouter({
           placementId: placement.id,
           studentId: studentProfile.id,
           studentName: user.name,
-          studentCode: user.id,
+          studentCode: studentProfile.nis,
           school: studentProfile.school,
           cohort: studentProfile.cohort,
           status: placement.status,

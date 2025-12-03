@@ -60,8 +60,8 @@ type FileState = {
 export interface FileUploadFieldProps {
   /** Owner type for the attachment (task, report, final_report, assessment) */
   ownerType: OwnerType;
-  /** Owner ID for the attachment */
-  ownerId: number;
+  /** Owner ID for the attachment (null for new entities not yet created) */
+  ownerId: number | null;
   /** Array of uploaded file objects with url and optional filename (controlled) */
   value?: FileUploadValue[];
   /** Callback when uploaded files change */
@@ -277,9 +277,10 @@ export function FileUploadField({
 
       try {
         // Create FormData and upload
+        // Use 0 as placeholder ownerId if null (for new entities not yet created)
         const formData = new FormData();
         formData.append("ownerType", ownerType);
-        formData.append("ownerId", String(ownerId));
+        formData.append("ownerId", String(ownerId ?? 0));
         for (const file of filesToUpload) {
           formData.append("file", file);
         }
@@ -396,9 +397,10 @@ export function FileUploadField({
       );
 
       try {
+        // Use 0 as placeholder ownerId if null (for new entities not yet created)
         await deleteFileAction(fileState.filename, {
           ownerType,
-          ownerId,
+          ownerId: ownerId ?? 0,
         });
 
         // Remove from state

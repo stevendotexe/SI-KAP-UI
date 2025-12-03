@@ -12,62 +12,27 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Search, Plus } from "lucide-react";
-
-// Dummy data
-const mentors = [
-  {
-    id: 1,
-    name: "Ahsan Nur Ilham",
-    code: "MEN-001",
-    email: "ahsan@gmail.com",
-    jumlahSiswa: 7,
-    status: "Aktif",
-  },
-  {
-    id: 2,
-    name: "Ahsan Nur Ilham",
-    code: "MEN-001",
-    email: "ahsan@gmail.com",
-    jumlahSiswa: 5,
-    status: "Aktif",
-  },
-  {
-    id: 3,
-    name: "Ahsan Nur Ilham",
-    code: "MEN-001",
-    email: "ahsan@gmail.com",
-    jumlahSiswa: 3,
-    status: "Aktif",
-  },
-  {
-    id: 4,
-    name: "Ahsan Nur Ilham",
-    code: "MEN-001",
-    email: "ahsan@gmail.com",
-    jumlahSiswa: 8,
-    status: "Aktif",
-  },
-  {
-    id: 5,
-    name: "Ahsan Nur Ilham",
-    code: "MEN-001",
-    email: "ahsan@gmail.com",
-    jumlahSiswa: 5,
-    status: "Aktif",
-  },
-];
+import { api } from "@/trpc/react";
 
 export default function AdminMentorPage() {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
 
-  const filtered = mentors.filter((m) => {
-    const matchSearch =
-      m.name.toLowerCase().includes(search.toLowerCase()) ||
-      m.code.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = filterStatus === "all" || m.status === filterStatus;
-    return matchSearch && matchStatus;
+  // Query mentors from backend (companyId is optional for admin users)
+  const {
+    data: mentorsData,
+    isLoading,
+    isError,
+    refetch,
+  } = api.mentors.list.useQuery({
+    // companyId is optional - admin users will see all mentors
+    search: search || undefined,
+    active: filterStatus === "all" ? undefined : filterStatus === "Aktif",
+    limit: 200,
+    offset: 0,
   });
+
+  const mentors = mentorsData?.items ?? [];
 
   return (
     <main className="min-h-screen bg-muted text-foreground">
@@ -142,28 +107,69 @@ export default function AdminMentorPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((mentor, index) => (
-                  <tr
-                    key={mentor.id}
-                    className={`border-t ${index % 2 === 0 ? "bg-background" : "bg-muted/30"}`}
-                  >
-                    <td className="px-4 py-3 text-sm">{mentor.name}</td>
-                    <td className="px-4 py-3 text-sm">{mentor.code}</td>
-                    <td className="px-4 py-3 text-sm">{mentor.email}</td>
-                    <td className="px-4 py-3 text-sm">{mentor.jumlahSiswa}</td>
-                    <td className="px-4 py-3 text-sm">{mentor.status}</td>
-                    <td className="px-4 py-3">
-                      <Link href={`/admin/mentor/${mentor.id}`}>
-                        <Button
-                          size="sm"
-                          className="bg-destructive hover:bg-red-700 text-white rounded-full px-6 cursor-pointer transition-colors"
-                        >
-                          Detail
-                        </Button>
-                      </Link>
+                {isLoading ? (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      className="px-4 py-8 text-center text-muted-foreground"
+                    >
+                      Memuat data...
                     </td>
                   </tr>
-                ))}
+                ) : isError ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center">
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="text-sm text-destructive">
+                          Gagal memuat data mentor.
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => refetch()}
+                        >
+                          Coba Lagi
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : mentors.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      className="px-4 py-8 text-center text-muted-foreground"
+                    >
+                      Tidak ada data mentor ditemukan
+                    </td>
+                  </tr>
+                ) : (
+                  mentors.map((mentor, index) => (
+                    <tr
+                      key={mentor.id}
+                      className={`border-t ${index % 2 === 0 ? "bg-background" : "bg-muted/30"}`}
+                    >
+                      <td className="px-4 py-3 text-sm">{mentor.name}</td>
+                      <td className="px-4 py-3 text-sm">{mentor.mentorId}</td>
+                      <td className="px-4 py-3 text-sm">{mentor.email}</td>
+                      <td className="px-4 py-3 text-sm">
+                        {mentor.studentCount}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {mentor.active ? "Aktif" : "Nonaktif"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Link href={`/admin/mentor/${mentor.mentorId}`}>
+                          <Button
+                            size="sm"
+                            className="bg-destructive hover:bg-red-700 text-white rounded-full px-6 cursor-pointer transition-colors"
+                          >
+                            Detail
+                          </Button>
+                        </Link>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

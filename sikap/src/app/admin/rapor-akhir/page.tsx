@@ -12,68 +12,47 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Search, Pencil } from "lucide-react";
-
-// Dummy data
-const students = [
-    {
-        id: 1,
-        name: "Rafif Zharif",
-        code: "STD-001",
-        school: "SMK 13 Tasikmalaya",
-        cohort: "2024",
-        status: "Completed",
-        hasReport: true,
-        totalScore: 850,
-        average: 85,
-    },
-    {
-        id: 2,
-        name: "Ahmad Fauzi",
-        code: "STD-002",
-        school: "SMK 1 Tasikmalaya",
-        cohort: "2024",
-        status: "Completed",
-        hasReport: true,
-        totalScore: 920,
-        average: 92,
-    },
-    {
-        id: 3,
-        name: "Siti Aisyah",
-        code: "STD-003",
-        school: "SMK 13 Tasikmalaya",
-        cohort: "2024",
-        status: "Completed",
-        hasReport: false,
-        totalScore: 0,
-        average: 0,
-    },
-    {
-        id: 4,
-        name: "Budi Santoso",
-        code: "STD-004",
-        school: "SMK 2 Tasikmalaya",
-        cohort: "2024",
-        status: "Active",
-        hasReport: false,
-        totalScore: 0,
-        average: 0,
-    },
-];
+import { api } from "@/trpc/react";
+import { Spinner } from "@/components/ui/spinner";
 
 export default function RaporAkhirPage() {
     const [search, setSearch] = useState("");
-    const [filterCohort, setFilterCohort] = useState("all");
-    const [filterStatus, setFilterStatus] = useState("all");
+    const [filterCohort, setFilterCohort] = useState<string | undefined>(undefined);
+    const [filterStatus, setFilterStatus] = useState<"active" | "completed" | "canceled" | undefined>(undefined);
 
-    const filtered = students.filter((s) => {
-        const matchSearch =
-            s.name.toLowerCase().includes(search.toLowerCase()) ||
-            s.code.toLowerCase().includes(search.toLowerCase());
-        const matchCohort = filterCohort === "all" || s.cohort === filterCohort;
-        const matchStatus = filterStatus === "all" || s.status === filterStatus;
-        return matchSearch && matchCohort && matchStatus;
+    const { data, isLoading, error } = api.finalReports.list.useQuery({
+        cohort: filterCohort,
+        status: filterStatus,
+        search: search || undefined,
+        limit: 100,
+        offset: 0,
     });
+
+    const getStatusLabel = (status: string) => {
+        switch (status) {
+            case "completed":
+                return "Selesai";
+            case "active":
+                return "Aktif";
+            case "canceled":
+                return "Dibatalkan";
+            default:
+                return status;
+        }
+    };
+
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case "completed":
+                return "bg-green-100 text-green-700";
+            case "active":
+                return "bg-blue-100 text-blue-700";
+            case "canceled":
+                return "bg-gray-100 text-gray-700";
+            default:
+                return "bg-gray-100 text-gray-700";
+        }
+    };
 
     return (
         <main className="min-h-screen bg-muted text-foreground">
@@ -101,7 +80,10 @@ export default function RaporAkhirPage() {
 
                 {/* Filters */}
                 <div className="flex gap-3 mb-6">
-                    <Select value={filterCohort} onValueChange={setFilterCohort}>
+                    <Select
+                        value={filterCohort || "all"}
+                        onValueChange={(val) => setFilterCohort(val === "all" ? undefined : val)}
+                    >
                         <SelectTrigger className="w-[180px] rounded-full bg-background">
                             <SelectValue placeholder="Semua Angkatan" />
                         </SelectTrigger>
@@ -112,95 +94,121 @@ export default function RaporAkhirPage() {
                         </SelectContent>
                     </Select>
 
-                    <Select value={filterStatus} onValueChange={setFilterStatus}>
+                    <Select
+                        value={filterStatus || "all"}
+                        onValueChange={(val) => setFilterStatus(val === "all" ? undefined : val as any)}
+                    >
                         <SelectTrigger className="w-[180px] rounded-full bg-background">
                             <SelectValue placeholder="Semua Status" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">Semua Status</SelectItem>
-                            <SelectItem value="Completed">Selesai</SelectItem>
-                            <SelectItem value="Active">Aktif</SelectItem>
+                            <SelectItem value="completed">Selesai</SelectItem>
+                            <SelectItem value="active">Aktif</SelectItem>
+                            <SelectItem value="canceled">Dibatalkan</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
 
-                {/* Table */}
-                <div className="rounded-xl overflow-hidden border bg-card shadow-sm">
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="bg-destructive text-white">
-                                <tr>
-                                    <th className="text-left text-sm font-medium px-4 py-3">
-                                        Nama
-                                    </th>
-                                    <th className="text-left text-sm font-medium px-4 py-3">
-                                        Kode
-                                    </th>
-                                    <th className="text-left text-sm font-medium px-4 py-3">
-                                        Asal Sekolah
-                                    </th>
-                                    <th className="text-left text-sm font-medium px-4 py-3">
-                                        Angkatan
-                                    </th>
-                                    <th className="text-left text-sm font-medium px-4 py-3">
-                                        Status
-                                    </th>
-                                    <th className="text-left text-sm font-medium px-4 py-3">
-                                        Total Nilai
-                                    </th>
-                                    <th className="text-left text-sm font-medium px-4 py-3">
-                                        Rata-rata
-                                    </th>
-                                    <th className="text-left text-sm font-medium px-4 py-3">
-                                        Aksi
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filtered.map((student, index) => (
-                                    <tr
-                                        key={student.id}
-                                        className={`border-t ${index % 2 === 0 ? "bg-background" : "bg-muted/30"}`}
-                                    >
-                                        <td className="px-4 py-3 text-sm font-medium">
-                                            {student.name}
-                                        </td>
-                                        <td className="px-4 py-3 text-sm">{student.code}</td>
-                                        <td className="px-4 py-3 text-sm">{student.school}</td>
-                                        <td className="px-4 py-3 text-sm">{student.cohort}</td>
-                                        <td className="px-4 py-3">
-                                            <span
-                                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${student.status === "Completed"
-                                                        ? "bg-green-100 text-green-700"
-                                                        : "bg-blue-100 text-blue-700"
-                                                    }`}
-                                            >
-                                                {student.status === "Completed" ? "Selesai" : "Aktif"}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 text-sm font-medium">
-                                            {student.totalScore}
-                                        </td>
-                                        <td className="px-4 py-3 text-sm font-medium">
-                                            {student.average}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <Link href={`/admin/rapor-akhir/${student.id}`}>
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    className="hover:bg-muted cursor-pointer"
-                                                >
-                                                    <Pencil className="w-4 h-4" />
-                                                </Button>
-                                            </Link>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                {/* Loading State */}
+                {isLoading && (
+                    <div className="flex items-center justify-center py-12">
+                        <Spinner className="h-8 w-8" />
                     </div>
-                </div>
+                )}
+
+                {/* Error State */}
+                {error && (
+                    <div className="bg-card p-8 rounded-xl border shadow-sm text-center">
+                        <h2 className="text-xl font-semibold text-red-600 mb-2">Terjadi Kesalahan</h2>
+                        <p className="text-muted-foreground">{error.message}</p>
+                    </div>
+                )}
+
+                {/* Table */}
+                {!isLoading && !error && data && (
+                    <div className="rounded-xl overflow-hidden border bg-card shadow-sm">
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead className="bg-destructive text-white">
+                                    <tr>
+                                        <th className="text-left text-sm font-medium px-4 py-3">
+                                            Nama
+                                        </th>
+                                        <th className="text-left text-sm font-medium px-4 py-3">
+                                            Kode
+                                        </th>
+                                        <th className="text-left text-sm font-medium px-4 py-3">
+                                            Asal Sekolah
+                                        </th>
+                                        <th className="text-left text-sm font-medium px-4 py-3">
+                                            Angkatan
+                                        </th>
+                                        <th className="text-left text-sm font-medium px-4 py-3">
+                                            Status
+                                        </th>
+                                        <th className="text-left text-sm font-medium px-4 py-3">
+                                            Total Nilai
+                                        </th>
+                                        <th className="text-left text-sm font-medium px-4 py-3">
+                                            Rata-rata
+                                        </th>
+                                        <th className="text-left text-sm font-medium px-4 py-3">
+                                            Aksi
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {data.items.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
+                                                Tidak ada data rapor akhir
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        data.items.map((report, index) => (
+                                            <tr
+                                                key={report.id}
+                                                className={`border-t ${index % 2 === 0 ? "bg-background" : "bg-muted/30"}`}
+                                            >
+                                                <td className="px-4 py-3 text-sm font-medium">
+                                                    {report.studentName}
+                                                </td>
+                                                <td className="px-4 py-3 text-sm">{report.studentCode}</td>
+                                                <td className="px-4 py-3 text-sm">{report.school || "-"}</td>
+                                                <td className="px-4 py-3 text-sm">{report.cohort || "-"}</td>
+                                                <td className="px-4 py-3">
+                                                    <span
+                                                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(report.status)}`}
+                                                    >
+                                                        {getStatusLabel(report.status)}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 text-sm font-medium">
+                                                    {report.totalScore}
+                                                </td>
+                                                <td className="px-4 py-3 text-sm font-medium">
+                                                    {report.averageScore}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <Link href={`/admin/rapor-akhir/${report.id}`}>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            className="hover:bg-muted cursor-pointer"
+                                                        >
+                                                            <Pencil className="w-4 h-4" />
+                                                        </Button>
+                                                    </Link>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
             </div>
         </main>
     );

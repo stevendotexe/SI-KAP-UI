@@ -1,96 +1,82 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
 import { ArrowLeft } from "lucide-react";
 import AttendanceLine from "@/components/students/AttendanceLine";
-import { useMemo } from "react";
+import { api } from "@/trpc/react";
+import { Spinner } from "@/components/ui/spinner";
 
-type ScoreData = {
-    // Kompetensi Kepribadian
-    disiplin: number;
-    inisiatif: number;
-    tanggungJawab: number;
-    kerjaSama: number;
-    kerajinan: number;
-};
-
-type KejuruanItem = {
-    id: string;
+type ScoreItem = {
+    id: number;
     name: string;
     score: number;
 };
 
-const tkjDefaultItems: KejuruanItem[] = [
-    { id: "1", name: "Penerapan KSLH", score: 85 },
-    { id: "2", name: "Menginstalasi sistem operasi", score: 90 },
-    { id: "3", name: "Perbaikan peripheral", score: 88 },
-    { id: "4", name: "Perbaikan software jaringan", score: 86 },
-    { id: "5", name: "Merakit Komputer", score: 92 },
-    { id: "6", name: "Perawatan komputer", score: 89 },
-    { id: "7", name: "Menginstal software jaringan", score: 91 },
-];
-
-const rplDefaultItems: KejuruanItem[] = [
-    { id: "1", name: "Penerapan KSLH", score: 85 },
-    { id: "2", name: "Pemrograman Dasar", score: 88 },
-    { id: "3", name: "Basis Data", score: 90 },
-    { id: "4", name: "Pemrograman Web", score: 87 },
-    { id: "5", name: "Pemrograman Mobile", score: 89 },
-    { id: "6", name: "UI/UX Design", score: 86 },
-    { id: "7", name: "Testing & Deployment", score: 91 },
-];
-
 export default function EditRaporAkhirPage() {
     const params = useParams();
     const router = useRouter();
+    const finalReportId = Number(params.id);
 
-    const [studentName] = useState("Rafif Zharif");
-    const studentMajor: "TKJ" | "RPL" = "TKJ"; // In real app, get from student data
-    const [kejuruan] = useState<"TKJ" | "RPL">(studentMajor);
-    const [scores, setScores] = useState<ScoreData>({
-        disiplin: 85,
-        inisiatif: 90,
-        tanggungJawab: 88,
-        kerjaSama: 92,
-        kerajinan: 87,
+    const { data: reportData, isLoading, error } = api.finalReports.detail.useQuery(
+        { finalReportId },
+        { enabled: !isNaN(finalReportId) }
+    );
+
+    const upsertMutation = api.finalReports.upsertScores.useMutation({
+        onSuccess: () => {
+            alert("Nilai berhasil disimpan!");
+            router.push("/admin/rapor-akhir");
+        },
+        onError: (err) => {
+            alert(`Gagal menyimpan nilai: ${err.message}`);
+        }
     });
 
-    const [kejuruanItems, setKejuruanItems] = useState<KejuruanItem[]>(tkjDefaultItems);
+    // State for scores
+    const [personalityScores, setPersonalityScores] = useState<ScoreItem[]>([]);
+    const [technicalScores, setTechnicalScores] = useState<ScoreItem[]>([]);
 
     const [totalNilai, setTotalNilai] = useState(0);
     const [rataRata, setRataRata] = useState(0);
 
-    // Mock student data - in real app, fetch based on params.id
-    const studentData = {
-        name: studentName,
-        id: "STD-001",
-        school: "SMK 13 Tasikmalaya",
-        major: kejuruan,
-        status: "Aktif",
-        batch: "2024",
-    };
+    // Initialize scores when data loads
+    useEffect(() => {
+        if (reportData?.scores) {
+            setPersonalityScores(reportData.scores.personality);
+            setTechnicalScores(reportData.scores.technical);
+        }
+        // TODO: Backend needs endpoint to fetch competency templates by major (e.g., api.finalReports.getCompetencyTemplates({ major: 'TKJ' })) to support new reports without existing scores.
+    }, [reportData]);
 
-    // Generate graph data
+    // Calculate totals
+    useEffect(() => {
+        const personalityTotal = personalityScores.reduce((sum, item) => sum + item.score, 0);
+        const technicalTotal = technicalScores.reduce((sum, item) => sum + item.score, 0);
+        const total = personalityTotal + technicalTotal;
+        const itemCount = personalityScores.length + technicalScores.length;
+        const average = itemCount > 0 ? total / itemCount : 0;
+
+        setTotalNilai(total);
+        setRataRata(Math.round(average * 10) / 10);
+    }, [personalityScores, technicalScores]);
+
+    // Mock graph data (kept from original)
     const attendanceSeries = useMemo(() => {
-        const base = kejuruan === "RPL" ? 85 : 82;
+        // Use major from reportData if available, default to TKJ
+        const major = reportData?.student.major || "TKJ";
+        const base = major === "RPL" ? 85 : 82;
         return [0, 1, 2, 3, 4, 5].map((i) => ({ period: `M${i + 1}`, count: Math.max(60, Math.min(98, Math.round(base + (i - 3) * 2 + (i % 2 ? 3 : -2)))) }));
-    }, [kejuruan]);
+    }, [reportData]);
 
     const scoreSeries = useMemo(() => {
-        const base = kejuruan === "RPL" ? 78 : 75;
+        const major = reportData?.student.major || "TKJ";
+        const base = major === "RPL" ? 78 : 75;
         return [0, 1, 2, 3, 4, 5].map((i) => ({ period: `M${i + 1}`, count: Math.max(60, Math.min(98, Math.round(base + (i - 3) * 2 + (i % 2 ? 2 : -1)))) }));
-    }, [kejuruan]);
+    }, [reportData]);
 
     const attGrowth = useMemo(() => {
         const first = attendanceSeries[0]?.count ?? 0;
@@ -104,47 +90,57 @@ export default function EditRaporAkhirPage() {
         return first ? Math.round(((last - first) / first) * 100) : 0;
     }, [scoreSeries]);
 
-    useEffect(() => {
-        // Load appropriate items when kejuruan changes
-        setKejuruanItems(kejuruan === "TKJ" ? tkjDefaultItems : rplDefaultItems);
-    }, [kejuruan]);
 
-    useEffect(() => {
-        const kepribadianTotal = Object.values(scores).reduce((sum, val) => sum + val, 0);
-        const kejuruanTotal = kejuruanItems.reduce((sum, item) => sum + item.score, 0);
-        const total = kepribadianTotal + kejuruanTotal;
-        const itemCount = Object.keys(scores).length + kejuruanItems.length;
-        const average = itemCount > 0 ? total / itemCount : 0;
-        setTotalNilai(total);
-        setRataRata(Math.round(average * 10) / 10);
-    }, [scores, kejuruanItems]);
-
-    const handleScoreChange = (field: keyof ScoreData, value: string) => {
+    const handlePersonalityChange = (id: number, value: string) => {
         const numValue = parseInt(value) || 0;
         const clampedValue = Math.min(100, Math.max(0, numValue));
-        setScores({ ...scores, [field]: clampedValue });
-    };
-
-    const handleKejuruanScoreChange = (id: string, value: string) => {
-        const numValue = parseInt(value) || 0;
-        const clampedValue = Math.min(100, Math.max(0, numValue));
-        setKejuruanItems(
-            kejuruanItems.map((item) =>
-                item.id === id ? { ...item, score: clampedValue } : item
-            )
+        setPersonalityScores(prev =>
+            prev.map(item => item.id === id ? { ...item, score: clampedValue } : item)
         );
     };
 
-
-
-
+    const handleTechnicalChange = (id: number, value: string) => {
+        const numValue = parseInt(value) || 0;
+        const clampedValue = Math.min(100, Math.max(0, numValue));
+        setTechnicalScores(prev =>
+            prev.map(item => item.id === id ? { ...item, score: clampedValue } : item)
+        );
+    };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        console.log("Saved scores:", scores);
-        console.log("Saved kejuruan items:", kejuruanItems);
-        router.push("/admin/rapor-akhir");
+        if (!reportData) return;
+
+        const allScores = [...personalityScores, ...technicalScores].map(s => ({
+            competencyTemplateId: s.id,
+            score: s.score
+        }));
+
+        upsertMutation.mutate({
+            placementId: reportData.placementId,
+            scores: allScores
+        });
     };
+
+    if (isLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-muted">
+                <Spinner className="h-8 w-8" />
+            </div>
+        );
+    }
+
+    if (error || isNaN(finalReportId)) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-muted">
+                <div className="bg-card p-8 rounded-xl border shadow-sm max-w-md w-full text-center">
+                    <h2 className="text-xl font-semibold text-red-600 mb-2">Terjadi Kesalahan</h2>
+                    <p className="text-muted-foreground mb-6">{error?.message || "ID Rapor tidak valid"}</p>
+                    <Button onClick={() => router.back()}>Kembali</Button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <main className="min-h-screen bg-muted text-foreground">
@@ -161,7 +157,7 @@ export default function EditRaporAkhirPage() {
                     <div>
                         <h1 className="text-2xl font-semibold">Edit Rapor Akhir</h1>
                         <p className="text-sm text-muted-foreground mt-1">
-                            {studentName}
+                            {reportData?.student.name}
                         </p>
                     </div>
                 </div>
@@ -173,12 +169,12 @@ export default function EditRaporAkhirPage() {
                         <div className="lg:col-span-4 bg-card border rounded-xl shadow-sm p-4">
                             <div className="text-sm font-medium mb-2">Informasi Siswa</div>
                             <div className="space-y-1 text-sm">
-                                <div><span className="text-muted-foreground">Nama:</span> {studentData.name}</div>
-                                <div><span className="text-muted-foreground">ID:</span> {studentData.id}</div>
-                                <div><span className="text-muted-foreground">Sekolah:</span> {studentData.school}</div>
-                                <div><span className="text-muted-foreground">Jurusan:</span> {studentData.major}</div>
-                                <div><span className="text-muted-foreground">Status:</span> {studentData.status}</div>
-                                <div><span className="text-muted-foreground">Angkatan:</span> {studentData.batch}</div>
+                                <div><span className="text-muted-foreground">Nama:</span> {reportData?.student.name}</div>
+                                <div><span className="text-muted-foreground">ID:</span> {reportData?.student.code}</div>
+                                <div><span className="text-muted-foreground">Sekolah:</span> {reportData?.student.school}</div>
+                                <div><span className="text-muted-foreground">Jurusan:</span> {reportData?.student.major}</div>
+                                <div><span className="text-muted-foreground">Status:</span> {reportData?.placementStatus}</div>
+                                <div><span className="text-muted-foreground">Angkatan:</span> {reportData?.student.cohort}</div>
                             </div>
                         </div>
 
@@ -209,94 +205,34 @@ export default function EditRaporAkhirPage() {
                         </div>
                     </div>
 
-                    {/* Kejuruan Selector - REMOVED, now determined from student data */}
-
                     {/* Kompetensi Kepribadian */}
                     <div className="bg-card border rounded-xl shadow-sm p-6">
                         <h3 className="text-lg font-semibold mb-6">
                             Kompetensi Kepribadian
                         </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <Label htmlFor="disiplin" className="text-sm font-medium mb-2 block">
-                                    Disiplin
-                                </Label>
-                                <Input
-                                    id="disiplin"
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    value={scores.disiplin}
-                                    onChange={(e) => handleScoreChange("disiplin", e.target.value)}
-                                    className="rounded-lg"
-                                    placeholder="1-100"
-                                />
+                        {personalityScores.length === 0 ? (
+                            <p className="text-muted-foreground italic">Belum ada data kompetensi kepribadian.</p>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {personalityScores.map((item) => (
+                                    <div key={item.id}>
+                                        <Label htmlFor={`p-${item.id}`} className="text-sm font-medium mb-2 block">
+                                            {item.name}
+                                        </Label>
+                                        <Input
+                                            id={`p-${item.id}`}
+                                            type="number"
+                                            min="0"
+                                            max="100"
+                                            value={item.score}
+                                            onChange={(e) => handlePersonalityChange(item.id, e.target.value)}
+                                            className="rounded-lg"
+                                            placeholder="1-100"
+                                        />
+                                    </div>
+                                ))}
                             </div>
-
-                            <div>
-                                <Label htmlFor="kerjaSama" className="text-sm font-medium mb-2 block">
-                                    Kerja sama
-                                </Label>
-                                <Input
-                                    id="kerjaSama"
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    value={scores.kerjaSama}
-                                    onChange={(e) => handleScoreChange("kerjaSama", e.target.value)}
-                                    className="rounded-lg"
-                                    placeholder="1-100"
-                                />
-                            </div>
-
-                            <div>
-                                <Label htmlFor="inisiatif" className="text-sm font-medium mb-2 block">
-                                    Inisiatif
-                                </Label>
-                                <Input
-                                    id="inisiatif"
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    value={scores.inisiatif}
-                                    onChange={(e) => handleScoreChange("inisiatif", e.target.value)}
-                                    className="rounded-lg"
-                                    placeholder="1-100"
-                                />
-                            </div>
-
-                            <div>
-                                <Label htmlFor="kerajinan" className="text-sm font-medium mb-2 block">
-                                    Kerajinan
-                                </Label>
-                                <Input
-                                    id="kerajinan"
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    value={scores.kerajinan}
-                                    onChange={(e) => handleScoreChange("kerajinan", e.target.value)}
-                                    className="rounded-lg"
-                                    placeholder="1-100"
-                                />
-                            </div>
-
-                            <div className="md:col-span-2">
-                                <Label htmlFor="tanggungJawab" className="text-sm font-medium mb-2 block">
-                                    Tanggung jawab
-                                </Label>
-                                <Input
-                                    id="tanggungJawab"
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    value={scores.tanggungJawab}
-                                    onChange={(e) => handleScoreChange("tanggungJawab", e.target.value)}
-                                    className="rounded-lg"
-                                    placeholder="1-100"
-                                />
-                            </div>
-                        </div>
+                        )}
                     </div>
 
                     {/* Kompetensi Kejuruan */}
@@ -304,26 +240,30 @@ export default function EditRaporAkhirPage() {
                         <h3 className="text-lg font-semibold mb-6">
                             Kompetensi Kejuruan
                         </h3>
-                        <div className="space-y-4">
-                            {kejuruanItems.map((item) => (
-                                <div key={item.id} className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-                                    <div>
-                                        <Label className="text-sm font-medium">{item.name}</Label>
+                        {technicalScores.length === 0 ? (
+                            <p className="text-muted-foreground italic">Belum ada data kompetensi kejuruan.</p>
+                        ) : (
+                            <div className="space-y-4">
+                                {technicalScores.map((item) => (
+                                    <div key={item.id} className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                                        <div>
+                                            <Label className="text-sm font-medium">{item.name}</Label>
+                                        </div>
+                                        <div>
+                                            <Input
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                value={item.score}
+                                                onChange={(e) => handleTechnicalChange(item.id, e.target.value)}
+                                                className="rounded-lg"
+                                                placeholder="1-100"
+                                            />
+                                        </div>
                                     </div>
-                                    <div>
-                                        <Input
-                                            type="number"
-                                            min="0"
-                                            max="100"
-                                            value={item.score}
-                                            onChange={(e) => handleKejuruanScoreChange(item.id, e.target.value)}
-                                            className="rounded-lg"
-                                            placeholder="1-100"
-                                        />
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     {/* Summary */}
@@ -348,9 +288,10 @@ export default function EditRaporAkhirPage() {
                     <div className="flex gap-3">
                         <Button
                             type="submit"
+                            disabled={upsertMutation.isPending}
                             className="bg-destructive hover:bg-red-700 text-white rounded-full px-8 cursor-pointer transition-colors"
                         >
-                            Simpan Nilai
+                            {upsertMutation.isPending ? "Menyimpan..." : "Simpan Nilai"}
                         </Button>
                         <Button
                             type="button"
