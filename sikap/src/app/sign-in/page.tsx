@@ -36,7 +36,7 @@ export default function SignInPage() {
         },
         {
           onSuccess: () => {
-            router.push("/mentor/dashboard");
+            router.push("/");
           },
           onError: (ctx) => {
             setError(ctx.error.message);

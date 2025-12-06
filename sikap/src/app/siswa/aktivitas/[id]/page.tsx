@@ -99,10 +99,10 @@ export default function SiswaAktivitasDetailPage() {
                                 {currentEvent.title}
                             </h2>
                             <span
-                                className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${typeColors[currentEvent.type as keyof typeof typeColors] || "bg-gray-100 text-gray-700 border-gray-200"
+                                className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${typeColors[currentEvent.type] || "bg-gray-100 text-gray-700 border-gray-200"
                                     }`}
                             >
-                                {typeLabels[currentEvent.type as keyof typeof typeLabels] || currentEvent.type}
+                                {typeLabels[currentEvent.type] || currentEvent.type}
                             </span>
                         </div>
 

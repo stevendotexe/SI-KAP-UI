@@ -44,12 +44,11 @@ export const competencyCategory = pgEnum("competency_category", [
   "personality",
   "technical",
 ]);
-export const ownerType = pgEnum("owner_type", [
+export const ownerTypeEnum = pgEnum("owner_type", [
   "task",
   "report",
   "final_report",
   "assessment",
-  "attendance_log",
   "calendar_event",
 ]);
 export const notificationType = pgEnum("notification_type", [
@@ -659,7 +658,7 @@ export const attachment = createTable(
   "attachment",
   (d) => ({
     id: d.integer().primaryKey().generatedByDefaultAsIdentity(),
-    ownerType: ownerType("owner_type").notNull(),
+    ownerType: ownerTypeEnum("owner_type").notNull(),
     ownerId: d.integer().notNull(),
     url: d.text().notNull(),
     filename: d.text(),

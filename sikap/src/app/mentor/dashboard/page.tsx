@@ -27,35 +27,41 @@ export default async function DashboardPage() {
   let studentGrowth: SeriesPoint[] = [];
   let attendancePie: PieItem[] = [];
   let attendanceDetailItems: AttendanceDetailItem[] = [];
+  let loadFailed = false;
 
   try {
     const ctx = await createTRPCContext({ headers: await headers() });
     const caller = createCaller(ctx);
 
-    const result = (await Promise.all([
+    const results = await Promise.allSettled([
       caller.dashboards.getDashboardCounts({}),
       caller.dashboards.getAverageStudentScores({ granularity: "month" }),
       caller.dashboards.getAverageStudentAttendances({ granularity: "month" }),
       caller.dashboards.getStudentCountPerPeriod({ granularity: "month" }),
       caller.dashboards.getAttendancePieChart({}),
       caller.attendances.detail({ date: new Date() }),
-    ])) as [
-        DashboardCounts,
-        SeriesPoint[],
-        SeriesPoint[],
-        SeriesPoint[],
-        PieItem[],
-        { items: AttendanceDetailItem[] }
-      ];
+    ]);
 
-    counts = result[0];
-    avgScores = result[1] ?? [];
-    avgAttendances = result[2] ?? [];
-    studentGrowth = result[3] ?? [];
-    attendancePie = result[4] ?? [];
-    attendanceDetailItems = result[5]?.items ?? [];
+    const allRejected = results.every((r) => r.status === "rejected");
+    loadFailed = allRejected;
+
+    const get = <T,>(i: number) => (results[i]?.status === "fulfilled" ? (results[i] as PromiseFulfilledResult<T>).value : undefined);
+
+    const r0 = get<DashboardCounts>(0);
+    const r1 = get<SeriesPoint[]>(1);
+    const r2 = get<SeriesPoint[]>(2);
+    const r3 = get<SeriesPoint[]>(3);
+    const r4 = get<PieItem[]>(4);
+    const r5 = get<{ items: AttendanceDetailItem[] }>(5);
+
+    counts = r0 ?? counts;
+    avgScores = r1 ?? [];
+    avgAttendances = r2 ?? [];
+    studentGrowth = r3 ?? [];
+    attendancePie = r4 ?? [];
+    attendanceDetailItems = r5?.items ?? [];
   } catch {
-    // gunakan data fallback jika terjadi kendala memuat dari API
+    loadFailed = true;
   }
 
   // --- tambahkan fallback / dummy data jika API tidak mengembalikan apa-apa ---
@@ -98,7 +104,7 @@ export default async function DashboardPage() {
     no: i + 1,
     name: r.student.name,
     major: undefined as string | undefined,
-    status: (r.status === 'present' ? 'Hadir' : r.status === 'excused' ? 'Izin' : 'Tidak Hadir') as "Hadir" | "Tidak Hadir" | "Izin",
+    status: (r.status === 'present' ? 'Hadir' : r.status === 'excused' ? 'Izin' : 'Tidak Hadir'),
     date: r.date,
   }));
   return (
@@ -121,6 +127,9 @@ export default async function DashboardPage() {
             </div>
           </div>
         </header>
+        {loadFailed && (
+          <div className="mb-4 text-sm text-destructive">Gagal memuat data dashboard. Menampilkan data kosong.</div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Baris 1: dua kartu metrik */}

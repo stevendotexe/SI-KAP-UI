@@ -1,4 +1,4 @@
-"use client";
+"use client"
 
 import { Button } from "@/components/ui/button"
 import { FileDown } from "lucide-react"
@@ -42,8 +42,8 @@ import { useMemo } from "react"
 
 export default function RaporAkhirPage() {
   const handleDownload = async () => {
-    const element = document.getElementById("pdf-content");
-    if (!element) return alert("Element PNG tidak ditemukan!");
+    const element = document.getElementById("pdf-content")
+    if (!element) return alert("Element PNG tidak ditemukan!")
     try {
       const { toPng } = await import("html-to-image")
       const dataUrl = await toPng(element, { pixelRatio: 2, backgroundColor: "#ffffff", cacheBust: true })
@@ -52,10 +52,10 @@ export default function RaporAkhirPage() {
       link.href = dataUrl
       link.click()
     } catch (e) {
-      console.error(e);
-      alert("Gagal membuat PNG");
+      console.error(e)
+      alert("Gagal membuat PNG")
     }
-  };
+  }
 
   const spRouter = (api as any)?.studentProfile
   const reportsRouter = (api as any)?.reports
@@ -102,11 +102,7 @@ export default function RaporAkhirPage() {
                 {loadingProfile || loadingFinal ? "Memuat..." : "Laporan akhir kerja Anda"}
               </p>
             </div>
-            <Button
-              variant="destructive"
-              className="h-9 px-4"
-              onClick={handleDownload}
-            >
+            <Button variant="destructive" className="h-9 px-4" onClick={handleDownload}>
               <FileDown className="size-4" />
               <span className="ml-2">Cetak PNG</span>
             </Button>
@@ -114,21 +110,16 @@ export default function RaporAkhirPage() {
 
           {/* Card */}
           <section className="mt-4">
-            <div
-              id="pdf-content"
-              className="bg-card rounded-2xl border p-6 shadow-sm"
-            >
+            <div id="pdf-content" className="rounded-2xl border bg-card p-6 shadow-sm">
               {/* Judul di tengah */}
-              <div className="text-center font-semibold">
-                Rapor Akhir Praktik Kerja Lapangan
-              </div>
+              <div className="text-center font-semibold">Rapor Akhir Praktik Kerja Lapangan</div>
 
               {/* MOCK DATA: Replace with api.finalReports.myReport.useQuery() when backend endpoint is available */}
               {/* A. Identitas Siswa */}
               <div className="mt-6">
                 <div className="font-semibold">A. Identitas Siswa</div>
 
-                <div className="mt-4 grid grid-cols-1 gap-x-20 gap-y-3 text-sm md:grid-cols-2">
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-x-20 gap-y-3 text-sm">
                   {/* Kiri */}
                   <div className="space-y-3">
                     <div>
@@ -170,7 +161,7 @@ export default function RaporAkhirPage() {
                   </div>
 
                   {/* Alamat full width */}
-                  <div className="mt-2 md:col-span-2">
+                  <div className="md:col-span-2 mt-2">
                     <div className="font-medium">Alamat</div>
                     <div>{(typeof profile?.address === "string" && profile.address.length) ? profile.address : "Jl Pendidikan No. 20"}</div>
                   </div>
@@ -182,7 +173,7 @@ export default function RaporAkhirPage() {
               <div className="mt-6">
                 <div className="font-semibold">B. Penilaian</div>
 
-                <div className="no-scroll mt-3 rounded-xl border">
+                <div className="mt-3 rounded-xl border no-scroll">
                   <style>{`
                     #pdf-content .no-scroll {
                       overflow: visible;
@@ -199,26 +190,20 @@ export default function RaporAkhirPage() {
                   <table className="min-w-full text-xs">
                     <thead className="bg-secondary">
                       <tr>
-                        <th className="border-border w-20 border px-3 py-2 text-left">
-                          No
-                        </th>
-                        <th className="border-border border px-3 py-2 text-left">
+                        <th className="border border-border px-3 py-2 w-20 text-left">No</th>
+                        <th className="border border-border px-3 py-2 text-left">
                           Kompetensi yang dilatihkan
                         </th>
-                        <th className="border-border w-28 border px-3 py-2 text-left">
-                          Nilai
-                        </th>
+                        <th className="border border-border px-3 py-2 w-28 text-left">Nilai</th>
                       </tr>
                     </thead>
                     <tbody>
                       {/* Bagian 1 */}
                       <tr>
-                        <td className="border-border border px-3 py-2 align-top">
-                          1
-                        </td>
-                        <td className="border-border border px-3 py-2">
+                        <td className="border border-border px-3 py-2 align-top">1</td>
+                        <td className="border border-border px-3 py-2">
                           <div className="font-medium">Kepribadian</div>
-                          <ol className="mt-1 ml-4 list-decimal space-y-0.5">
+                          <ol className="list-decimal ml-4 mt-1 space-y-0.5">
                             <li>Disiplin</li>
                             <li>Kerja sama</li>
                             <li>Inisiatif</li>
@@ -237,12 +222,10 @@ export default function RaporAkhirPage() {
 
                       {/* Bagian 2 */}
                       <tr>
-                        <td className="border-border border px-3 py-2 align-top">
-                          2
-                        </td>
-                        <td className="border-border border px-3 py-2">
+                        <td className="border border-border px-3 py-2 align-top">2</td>
+                        <td className="border border-border px-3 py-2">
                           <div className="font-medium">Kompetensi kejuruan</div>
-                          <ol className="mt-1 ml-4 list-decimal space-y-0.5">
+                          <ol className="list-decimal ml-4 mt-1 space-y-0.5">
                             <li>Penerapan K3LH</li>
                             <li>Merakit Komputer</li>
                             <li>Menginstalasi sistem operasi</li>
@@ -265,10 +248,7 @@ export default function RaporAkhirPage() {
 
                       {/* Total & Rata-Rata */}
                       <tr>
-                        <td
-                          className="border-border border px-3 py-2 font-medium"
-                          colSpan={2}
-                        >
+                        <td className="border border-border px-3 py-2 font-medium" colSpan={2}>
                           Total Nilai
                         </td>
                         <td className="border border-border px-3 py-2">{totalNilai}</td>
@@ -288,5 +268,5 @@ export default function RaporAkhirPage() {
         </main>
       </div>
     </div>
-  );
+  )
 }

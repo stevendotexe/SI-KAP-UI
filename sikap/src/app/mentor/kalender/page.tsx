@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { ChevronDown, Plus, Pencil, Trash2, X } from "lucide-react"
 import { api } from "@/trpc/react"
+import { useMentorCompany } from "@/components/mentor/useMentorCompany"
 import { FileUploadField, type FileUploadValue } from "@/components/ui/file-upload-field"
 
 type DayCell = { date: Date; inMonth: boolean; day: number }
@@ -109,12 +110,12 @@ export default function Page() {
 
   const utils = api.useUtils()
 
-  // TODO: Replace hardcoded companyId with mentor's actual company from session/profile
+  const { companyId, isLoading: isMentorLoading, isError: isMentorError } = useMentorCompany()
   const { data: events, isLoading, isError, refetch } = api.calendarEvents.list.useQuery({
-    companyId: 1, // TODO: Get from mentor profile
+    companyId: companyId!,
     month: month + 1, // API expects 1-12
     year: year,
-  })
+  }, { enabled: !!companyId })
 
   const createMutation = api.calendarEvents.create.useMutation({
     onSuccess: () => {
@@ -243,7 +244,7 @@ export default function Page() {
 
         const colorClass = evt.colorHex 
           ? "" 
-          : EVENT_COLORS[evt.type as EventType] ?? "bg-chart-4"
+          : EVENT_COLORS[evt.type] ?? "bg-chart-4"
 
         return { 
           leftPct, 
@@ -319,7 +320,13 @@ export default function Page() {
           </Select>
         </div>
 
-        {isLoading ? (
+        {isMentorLoading ? (
+          <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+            <Spinner /> Memuat profil mentor...
+          </div>
+        ) : isMentorError ? (
+          <div className="mt-4 text-sm text-destructive">Gagal memuat profil mentor.</div>
+        ) : isLoading ? (
           <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
             <Spinner /> Memuat kalender...
           </div>
@@ -384,7 +391,7 @@ export default function Page() {
               {events.map((event) => {
                 const colorClass = event.colorHex 
                   ? "" 
-                  : EVENT_COLORS[event.type as EventType] ?? "bg-chart-4"
+                  : EVENT_COLORS[event.type] ?? "bg-chart-4"
                 const typeLabel = EVENT_TYPES.find(t => t.value === event.type)?.label ?? event.type
 
                 return (

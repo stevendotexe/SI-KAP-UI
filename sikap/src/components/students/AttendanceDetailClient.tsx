@@ -51,14 +51,16 @@ export default function AttendanceDetailClient({ date }: { date: string }) {
     return isNaN(d.getTime()) ? new Date() : d
   }, [date])
 
-  // TODO: Replace hardcoded companyId with mentor's actual company from session/profile
+  const isValidDate = !isNaN(dateObj.getTime())
+
   const { data, isLoading, isError, refetch } = api.attendances.detail.useQuery({
-    companyId: 1, // TODO: Get from mentor profile
     date: dateObj,
     status: mapStatusFilterToApi(status),
     search: q || undefined,
     limit: 200,
     offset: 0,
+  }, {
+    enabled: isValidDate,
   })
 
   const list = data?.items ?? []
@@ -111,11 +113,11 @@ export default function AttendanceDetailClient({ date }: { date: string }) {
             <div className="mt-2 space-y-2">
               {list.map((e) => {
                 const statusLabel = getStatusLabel(e.status)
-                const statusClass = 
+                const statusClass =
                   e.status === "present" ? "bg-green-100 text-green-800" :
-                  e.status === "late" ? "bg-yellow-100 text-yellow-800" :
-                  e.status === "excused" ? "bg-blue-100 text-blue-800" :
-                  "bg-red-100 text-red-800"
+                    e.status === "late" ? "bg-yellow-100 text-yellow-800" :
+                      e.status === "excused" ? "bg-blue-100 text-blue-800" :
+                        "bg-red-100 text-red-800"
 
                 return (
                   <div key={e.id} className="grid grid-cols-5 items-center gap-2 px-2 py-2 rounded-md">

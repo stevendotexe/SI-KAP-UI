@@ -281,7 +281,7 @@ export default function AdminKalenderPage() {
               </div>
 
               {/* Empty State */}
-              {eventsData && eventsData.length === 0 && (
+              {eventsData?.length === 0 && (
                 <div className="text-center py-12 text-muted-foreground">
                   Tidak ada event di bulan ini
                 </div>

@@ -1,4 +1,5 @@
 import React from "react"
+export const revalidate = 0
 
 import AddStudentDialog from "@/components/students/AddStudentDialog"
 import StudentsPageClient from "@/components/students/StudentsPageClient"

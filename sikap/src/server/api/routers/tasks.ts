@@ -2,6 +2,9 @@ import { z } from "zod";
 import { and, eq, sql, inArray, notInArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
+import { type db } from "@/server/db";
+import { type Session } from "@/server/better-auth/config";
+
 import {
   adminOrMentorProcedure,
   createTRPCRouter,
@@ -46,7 +49,10 @@ const docs = {
   },
 };
 
-async function requireStudentPlacement(ctx: { db: any; session: any }) {
+async function requireStudentPlacement(ctx: {
+  db: typeof db;
+  session: Session | null;
+}) {
   if (!ctx.session?.user) throw new TRPCError({ code: "UNAUTHORIZED" });
   const role = ctx.session.user.role;
   if (role !== "student") throw new TRPCError({ code: "FORBIDDEN" });
@@ -203,6 +209,73 @@ export const tasksRouter = createTRPCRouter({
       };
     }),
 
+  // Mentor version of task detail - allows mentors to view task details with attachments
+  detailForMentor: adminOrMentorProcedure
+    .input(z.object({ taskId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const t = await ctx.db.query.task.findFirst({
+        where: eq(task.id, input.taskId),
+      });
+
+      if (!t) throw new TRPCError({ code: "NOT_FOUND" });
+
+      // For mentors, verify they created the task or have access
+      if (ctx.session.user.role === "mentor") {
+        const mp = await ctx.db.query.mentorProfile.findFirst({
+          where: eq(mentorProfile.userId, ctx.session.user.id),
+        });
+        if (!mp) throw new TRPCError({ code: "FORBIDDEN" });
+        // Check if mentor created this task or has access to the placement
+        if (t.createdById !== ctx.session.user.id) {
+          const placementData = await ctx.db.query.placement.findFirst({
+            where: and(eq(placement.id, t.placementId), eq(placement.mentorId, mp.id)),
+          });
+          if (!placementData) throw new TRPCError({ code: "FORBIDDEN" });
+        }
+      }
+
+      const allFiles = await ctx.db.query.attachment.findMany({
+        where: and(
+          eq(attachment.ownerType, "task"),
+          eq(attachment.ownerId, t.id),
+        ),
+      });
+
+      // Separate files into mentor's (task materials) and student's (submission)
+      const taskAttachments = allFiles.filter(
+        (f) => f.createdById === t.createdById,
+      );
+      const submissionFiles = allFiles.filter(
+        (f) => f.createdById !== t.createdById,
+      );
+
+      return {
+        id: t.id,
+        title: t.title,
+        description: t.description ?? null,
+        dueDate: t.dueDate ?? null,
+        status: t.status,
+        attachments: taskAttachments.map((f) => ({
+          id: f.id,
+          url: f.url,
+          filename: f.filename ?? null,
+          mimeType: f.mimeType ?? null,
+          sizeBytes: f.sizeBytes ?? null,
+        })),
+        submission: {
+          note: t.submissionNote ?? null,
+          submittedAt: t.submittedAt ?? null,
+          files: submissionFiles.map((f) => ({
+            id: f.id,
+            url: f.url,
+            filename: f.filename ?? null,
+            mimeType: f.mimeType ?? null,
+            sizeBytes: f.sizeBytes ?? null,
+          })),
+        },
+      };
+    }),
+
   submit: protectedProcedure
     .meta(docs.submit)
     .input(
@@ -249,9 +322,7 @@ export const tasksRouter = createTRPCRouter({
       );
 
       await ctx.db.insert(attachment).values({
-        ownerType: ownerType.enumValues.includes("task")
-          ? "task"
-          : ("task" as any),
+        ownerType: "task",
         ownerId: t.id,
         url: input.fileUrl,
         filename: input.fileName ?? null,
@@ -316,7 +387,7 @@ export const tasksRouter = createTRPCRouter({
           description: task.description,
           dueDate: task.dueDate,
           targetMajor: task.targetMajor,
-          createdAt: task.createdAt,
+          createdAt: sql<Date>`min(${task.createdAt})`,
           assignedCount: sql<number>`count(*)`,
           submittedCount: sql<number>`sum(case when ${task.status} = 'submitted' then 1 else 0 end)`,
           id: sql<number>`min(${task.id})`,
@@ -329,7 +400,6 @@ export const tasksRouter = createTRPCRouter({
           task.description,
           task.dueDate,
           task.targetMajor,
-          task.createdAt,
         )
         .orderBy(sql`${task.dueDate} desc`)
         .limit(input.limit)
@@ -617,5 +687,165 @@ export const tasksRouter = createTRPCRouter({
         submissions,
         stats,
       };
+    }),
+
+  // List all tasks per student for Laporan page (mentor view)
+  listForMentor: adminOrMentorProcedure
+    .use(requirePermissions({ task: ["read"], placement: ["read"], studentProfile: ["read"] }))
+    .input(
+      z.object({
+        search: z.string().optional(),
+        status: z.enum(["belum_dikerjakan", "belum_direview", "sudah_direview"]).optional(),
+        from: z.date().optional(),
+        to: z.date().optional(),
+        limit: z.number().min(1).max(200).default(100),
+        offset: z.number().min(0).default(0),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      let mentorFilterId: number | null = null;
+      if (ctx.session.user.role === "mentor") {
+        const mp = await ctx.db.query.mentorProfile.findFirst({
+          where: eq(mentorProfile.userId, ctx.session.user.id),
+        });
+        if (!mp) throw new TRPCError({ code: "FORBIDDEN" });
+        mentorFilterId = mp.id;
+      }
+
+      // Map UI status to DB statuses
+      let statusFilter: typeof taskStatus.enumValues[number][] | undefined;
+      if (input.status === "belum_dikerjakan") {
+        statusFilter = ["todo", "in_progress"];
+      } else if (input.status === "belum_direview") {
+        statusFilter = ["submitted"];
+      } else if (input.status === "sudah_direview") {
+        statusFilter = ["approved"];
+      }
+      // Note: "rejected" is hidden from UI
+
+      const where = and(
+        mentorFilterId ? eq(placement.mentorId, mentorFilterId) : undefined,
+        statusFilter ? inArray(task.status, statusFilter) : notInArray(task.status, ["rejected"]), // Hide rejected
+        input.from
+          ? sql`${task.dueDate} >= ${input.from.toISOString()}`
+          : undefined,
+        input.to
+          ? sql`${task.dueDate} <= ${input.to.toISOString()}`
+          : undefined,
+        input.search
+          ? sql`(lower(${task.title}) like ${"%" + input.search.toLowerCase() + "%"} or lower(${user.name}) like ${"%" + input.search.toLowerCase() + "%"})`
+          : undefined,
+      );
+
+      const rows = await ctx.db
+        .select({
+          id: task.id,
+          title: task.title,
+          description: task.description,
+          dueDate: task.dueDate,
+          status: task.status,
+          submittedAt: task.submittedAt,
+          createdAt: task.createdAt,
+          studentId: studentProfile.id,
+          studentUserId: studentProfile.userId,
+          studentName: user.name,
+        })
+        .from(task)
+        .innerJoin(placement, eq(task.placementId, placement.id))
+        .innerJoin(studentProfile, eq(placement.studentId, studentProfile.id))
+        .innerJoin(user, eq(studentProfile.userId, user.id))
+        .where(where)
+        .orderBy(sql`${task.dueDate} desc nulls last`, sql`${task.createdAt} desc`)
+        .limit(input.limit)
+        .offset(input.offset);
+
+      const totalRows = await ctx.db
+        .select({ total: sql<number>`count(*)` })
+        .from(task)
+        .innerJoin(placement, eq(task.placementId, placement.id))
+        .innerJoin(studentProfile, eq(placement.studentId, studentProfile.id))
+        .innerJoin(user, eq(studentProfile.userId, user.id))
+        .where(where);
+      const total = totalRows[0]?.total ?? 0;
+
+      // Map DB status to UI status
+      const mapStatus = (s: string): "belum_dikerjakan" | "belum_direview" | "sudah_direview" => {
+        if (s === "todo" || s === "in_progress") return "belum_dikerjakan";
+        if (s === "submitted") return "belum_direview";
+        return "sudah_direview"; // approved
+      };
+
+      return {
+        items: rows.map((r) => ({
+          id: r.id,
+          title: r.title,
+          description: r.description ?? null,
+          dueDate: r.dueDate ?? null,
+          status: mapStatus(r.status),
+          dbStatus: r.status, // Keep original for detail page
+          submittedAt: r.submittedAt ?? null,
+          createdAt: r.createdAt,
+          student: {
+            id: r.studentId,
+            userId: r.studentUserId,
+            name: r.studentName ?? "",
+          },
+        })),
+        pagination: {
+          total: Number(total ?? 0),
+          limit: input.limit,
+          offset: input.offset,
+        },
+        lastUpdated: new Date().toISOString(),
+      };
+    }),
+
+  // Review/approve a task submission
+  review: adminOrMentorProcedure
+    .use(requirePermissions({ task: ["update"] }))
+    .input(
+      z.object({
+        taskId: z.number(),
+        status: z.enum(["approved", "rejected"]),
+        notes: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const t = await ctx.db.query.task.findFirst({
+        where: eq(task.id, input.taskId),
+      });
+
+      if (!t) throw new TRPCError({ code: "NOT_FOUND" });
+
+      // Only allow reviewing submitted tasks
+      if (t.status !== "submitted") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Hanya tugas yang sudah disubmit yang bisa direview"
+        });
+      }
+
+      // For mentors, verify they have access to this task
+      if (ctx.session.user.role === "mentor") {
+        const mp = await ctx.db.query.mentorProfile.findFirst({
+          where: eq(mentorProfile.userId, ctx.session.user.id),
+        });
+        if (!mp) throw new TRPCError({ code: "FORBIDDEN" });
+
+        const p = await ctx.db.query.placement.findFirst({
+          where: and(eq(placement.id, t.placementId), eq(placement.mentorId, mp.id)),
+        });
+        if (!p) throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
+      await ctx.db
+        .update(task)
+        .set({
+          status: input.status,
+          submissionNote: input.notes ? `${t.submissionNote ?? ""}\n\n[Review]: ${input.notes}` : t.submissionNote,
+        })
+        .where(eq(task.id, input.taskId));
+
+      return { ok: true };
     }),
 });

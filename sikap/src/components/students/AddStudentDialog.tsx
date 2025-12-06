@@ -17,11 +17,13 @@ export default function AddStudentDialog() {
     kelas: "",
     jurusan: "",
     tanggalLahir: "",
+    tempatLahir: "",
+    semester: "",
+    asalSekolah: "",
     alamat: "",
     telepon: "",
     email: "",
     password: "",
-    orangTua: "",
   })
   const [errors, setErrors] = React.useState<Record<string, string>>({})
 
@@ -32,6 +34,9 @@ export default function AddStudentDialog() {
     if (!form.kelas.trim()) e.kelas = "Wajib diisi"
     if (!form.jurusan.trim()) e.jurusan = "Wajib diisi"
     if (!form.tanggalLahir) e.tanggalLahir = "Wajib diisi"
+    if (!form.tempatLahir.trim()) e.tempatLahir = "Wajib diisi"
+    if (!form.asalSekolah.trim()) e.asalSekolah = "Wajib diisi"
+    if (!form.semester.trim()) e.semester = "Wajib diisi"
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Format email tidak valid"
     if (form.telepon && !/^[0-9+\-() ]{6,}$/.test(form.telepon)) e.telepon = "Format nomor tidak valid"
     if (!form.password || form.password.length < 8) e.password = "Minimal 8 karakter"
@@ -59,7 +64,6 @@ export default function AddStudentDialog() {
         telepon: "",
         email: "",
         password: "",
-        orangTua: "",
       })
     },
     onError: (err) => {
@@ -74,12 +78,14 @@ export default function AddStudentDialog() {
       email: form.email,
       password: form.password,
       nis: form.nis,
-      school: "SMK", // Default or add field if needed
+      school: form.asalSekolah,
       major: form.jurusan,
       cohort: form.kelas,
       phone: form.telepon,
       address: form.alamat,
       birthDate: new Date(form.tanggalLahir),
+      birthPlace: form.tempatLahir,
+      semester: Number(form.semester),
     })
   }
 
@@ -167,6 +173,19 @@ export default function AddStudentDialog() {
                 </FieldContent>
               </Field>
 
+              <Field orientation="vertical">
+                <FieldTitle>Tempat Lahir</FieldTitle>
+                <FieldContent>
+                  <Input
+                    placeholder="Kota Kelahiran"
+                    value={form.tempatLahir}
+                    onChange={(e) => update("tempatLahir", e.target.value)}
+                    aria-invalid={!!errors.tempatLahir}
+                  />
+                  {errors.tempatLahir && <span className="text-destructive text-sm">{errors.tempatLahir}</span>}
+                </FieldContent>
+              </Field>
+
               <Field orientation="vertical" className="sm:col-span-2">
                 <FieldTitle>Alamat</FieldTitle>
                 <FieldContent>
@@ -175,6 +194,33 @@ export default function AddStudentDialog() {
                     value={form.alamat}
                     onChange={(e) => update("alamat", e.target.value)}
                   />
+                </FieldContent>
+              </Field>
+
+              <Field orientation="vertical">
+                <FieldTitle>Semester</FieldTitle>
+                <FieldContent>
+                  <Input
+                    type="number"
+                    placeholder="6"
+                    value={form.semester}
+                    onChange={(e) => update("semester", e.target.value)}
+                    aria-invalid={!!errors.semester}
+                  />
+                  {errors.semester && <span className="text-destructive text-sm">{errors.semester}</span>}
+                </FieldContent>
+              </Field>
+
+              <Field orientation="vertical">
+                <FieldTitle>Asal Sekolah</FieldTitle>
+                <FieldContent>
+                  <Input
+                    placeholder="SMK 1 Tasikmalaya"
+                    value={form.asalSekolah}
+                    onChange={(e) => update("asalSekolah", e.target.value)}
+                    aria-invalid={!!errors.asalSekolah}
+                  />
+                  {errors.asalSekolah && <span className="text-destructive text-sm">{errors.asalSekolah}</span>}
                 </FieldContent>
               </Field>
 
@@ -216,17 +262,6 @@ export default function AddStudentDialog() {
                     aria-invalid={!!errors.password}
                   />
                   {errors.password && <span className="text-destructive text-sm">{errors.password}</span>}
-                </FieldContent>
-              </Field>
-
-              <Field orientation="vertical" className="sm:col-span-2">
-                <FieldTitle>Nama Orang Tua</FieldTitle>
-                <FieldContent>
-                  <Input
-                    placeholder="Nama Orang Tua/Wali"
-                    value={form.orangTua}
-                    onChange={(e) => update("orangTua", e.target.value)}
-                  />
                 </FieldContent>
               </Field>
             </div>

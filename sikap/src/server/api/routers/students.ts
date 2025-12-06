@@ -2,26 +2,9 @@ import { z } from "zod";
 import { and, eq, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
-import {
-  createTRPCRouter,
-  adminOrMentorProcedure,
-  requirePermissions,
-  protectedProcedure,
-} from "@/server/api/trpc";
+import { createTRPCRouter, adminOrMentorProcedure, protectedProcedure, requirePermissions } from "@/server/api/trpc";
 import { auth } from "@/server/better-auth";
-import {
-  assessment,
-  attendanceLog,
-  mentorProfile,
-  placement,
-  report,
-  task,
-  studentProfile,
-  user,
-  attachment,
-} from "@/server/db/schema";
-import { calculateDistanceInMeters } from "@/lib/haversine";
-import { buildPublicUrlAction } from "@/server/storage";
+import { assessment, attendanceLog, mentorProfile, placement, report, studentProfile, task, user } from "@/server/db/schema";
 
 const docs = {
   list: {
@@ -48,22 +31,6 @@ const docs = {
     description:
       "## Delete Siswa\n\nMenghapus akun siswa dan seluruh relasi yang dikaitkan.\n\n### Parameters\n- `userId` (string)\n\n### Response\n`{ ok: true }`.\n\n### Example (React)\n```ts\nconst m = api.students.delete.useMutation();\nm.mutate({ userId });\n```",
   },
-  getDashboardData: {
-    description:
-      "## Dashboard Data (Siswa)\n\nRingkasan statistik untuk kartu dashboard siswa.\n\n### Response\n`{ assignedAssessments, pendingReviewAssessments, submittedReports, averageScore }`.\n\n### Example (React)\n```ts\nconst { data } = api.students.getDashboardData.useQuery();\n```",
-  },
-  getTodayStatus: {
-    description:
-      "## Status Hari Ini (Siswa)\n\nStatus absensi untuk hari ini, termasuk izin check-in / check-out.\n\n### Response\n`{ canCheckIn, canCheckOut, hasCompleted, logData, placementId, studentName, studentId }`.\n\n### Example (React)\n```ts\nconst { data } = api.students.getTodayStatus.useQuery();\n```",
-  },
-  checkIn: {
-    description:
-      "## Check In (Siswa)\n\nMelakukan absensi masuk dengan validasi jarak maksimum 100 meter dan wajib menyertakan nama file selfie yang sudah di-upload oleh FE.\n\n### Parameters\n- `latitude` (number)\n- `longitude` (number)\n- `selfieFilename` (string)\n\n### Response\n`{ success: true }`.\n\n### Example (React)\n```ts\nconst m = api.students.checkIn.useMutation();\nm.mutate({ latitude, longitude, selfieFilename: 'in.jpg' });\n```",
-  },
-  checkOut: {
-    description:
-      "## Check Out (Siswa)\n\nMelakukan absensi keluar dengan validasi jarak maksimum 100 meter, memastikan sudah check-in, dan wajib menyertakan nama file selfie yang sudah di-upload oleh FE.\n\n### Parameters\n- `latitude` (number)\n- `longitude` (number)\n- `selfieFilename` (string)\n\n### Response\n`{ success: true }`.\n\n### Example (React)\n```ts\nconst m = api.students.checkOut.useMutation();\nm.mutate({ latitude, longitude, selfieFilename: 'out.jpg' });\n```",
-  },
   me: {
     description:
       "## Profile Siswa (Self)\n\nAmbil biodata siswa yang sedang login.\n\n### Response\n`{ id, userId, name, email, nis, birthPlace, birthDate, gender, semester, school, major, cohort, address, phone }`.\n\n### Example (React)\n```ts\nconst { data } = api.students.me.useQuery();\n```",
@@ -76,6 +43,7 @@ const docs = {
 
 export const studentsRouter = createTRPCRouter({
   list: adminOrMentorProcedure
+    .meta(docs.list)
     .use(requirePermissions({ studentProfile: ["read"], placement: ["read"] }))
     .input(
       z.object({
@@ -162,11 +130,7 @@ export const studentsRouter = createTRPCRouter({
           status: r.status ? String(r.status) : "active", // Default to "active" if no placement
           nis: r.nis ?? null,
         })),
-        pagination: {
-          total: Number(total),
-          limit: input.limit,
-          offset: input.offset,
-        },
+        pagination: { total: Number(total), limit: input.limit, offset: input.offset },
         lastUpdated: new Date().toISOString(),
       };
     }),
@@ -180,6 +144,7 @@ export const studentsRouter = createTRPCRouter({
         report: ["read"],
         assessment: ["read"],
         attendanceLog: ["read"],
+        task: ["read"],
       }),
     )
     .input(z.object({ userId: z.string() }))
@@ -217,8 +182,7 @@ export const studentsRouter = createTRPCRouter({
         else if (st === "excused") excused += v;
         total += v;
       }
-      const attendancePercent =
-        total === 0 ? 0 : Math.round(((present + late) / total) * 100);
+      const attendancePercent = total === 0 ? 0 : Math.round(((present + late) / total) * 100);
 
       const reports = await ctx.db
         .select({
@@ -233,6 +197,13 @@ export const studentsRouter = createTRPCRouter({
         .innerJoin(placement, eq(report.placementId, placement.id))
         .where(eq(placement.studentId, sp.id))
         .orderBy(report.submittedAt);
+
+      const tasks = await ctx.db
+        .select({ id: task.id, title: task.title, dueDate: task.dueDate, status: task.status })
+        .from(task)
+        .innerJoin(placement, eq(task.placementId, placement.id))
+        .where(eq(placement.studentId, sp.id))
+        .orderBy(task.dueDate);
 
       // Score History (Weekly Average)
       const scoreHistoryRows = await ctx.db
@@ -267,9 +238,9 @@ export const studentsRouter = createTRPCRouter({
         const p = r.period;
         if (!attendanceHistoryMap[p]) attendanceHistoryMap[p] = { present: 0, total: 0 };
         const val = Number(r.count);
-        attendanceHistoryMap[p]!.total += val;
+        attendanceHistoryMap[p].total += val;
         if (r.status === "present" || r.status === "late") {
-          attendanceHistoryMap[p]!.present += val;
+          attendanceHistoryMap[p].present += val;
         }
       }
       const attendanceHistory = Object.entries(attendanceHistoryMap)
@@ -280,25 +251,16 @@ export const studentsRouter = createTRPCRouter({
         .sort((a, b) => a.period.localeCompare(b.period));
 
       const assessments = await ctx.db
-        .select({
-          id: assessment.id,
-          totalScore: assessment.totalScore,
-          createdAt: assessment.createdAt,
-        })
+        .select({ id: assessment.id, totalScore: assessment.totalScore, createdAt: assessment.createdAt })
         .from(assessment)
         .innerJoin(placement, eq(assessment.placementId, placement.id))
         .where(eq(placement.studentId, sp.id))
         .orderBy(assessment.createdAt);
 
-      const activePlacement = await ctx.db.query.placement.findFirst({
-        where: eq(placement.studentId, sp.id),
-      });
+      const activePlacement = await ctx.db.query.placement.findFirst({ where: eq(placement.studentId, sp.id) });
       let mentorName: string | null = null;
       if (activePlacement?.mentorId) {
-        const mp = await ctx.db.query.mentorProfile.findFirst({
-          where: eq(mentorProfile.id, activePlacement.mentorId),
-          with: { user: true },
-        });
+        const mp = await ctx.db.query.mentorProfile.findFirst({ where: eq(mentorProfile.id, activePlacement.mentorId), with: { user: true } });
         mentorName = mp?.user?.name ?? null;
       }
 
@@ -309,6 +271,7 @@ export const studentsRouter = createTRPCRouter({
           name: sp.user?.name ?? "",
           email: sp.user?.email ?? "",
           school: sp.school ?? null,
+          major: sp.major ?? null,
           cohort: sp.cohort ?? null,
           phone: sp.phone ?? null,
           active: sp.active,
@@ -319,14 +282,9 @@ export const studentsRouter = createTRPCRouter({
           endDate: activePlacement?.endDate ? new Date(activePlacement.endDate).toISOString().slice(0, 10) : null,
         },
         stats: { averageScore: Number(avgScoreRow?.avg ?? 0) },
-        attendance: {
-          percent: attendancePercent,
-          present,
-          late,
-          absent,
-          excused,
-        },
+        attendance: { percent: attendancePercent, present, late, absent, excused },
         reports,
+        tasks,
         assessments,
         scoreHistory: scoreHistoryRows.map((r) => ({
           period: r.period,
@@ -339,13 +297,7 @@ export const studentsRouter = createTRPCRouter({
 
   reportDetail: adminOrMentorProcedure
     .meta(docs.reportDetail)
-    .use(
-      requirePermissions({
-        report: ["read"],
-        placement: ["read"],
-        mentorProfile: ["read"],
-      }),
-    )
+    .use(requirePermissions({ report: ["read"], placement: ["read"], mentorProfile: ["read"] }))
     .input(z.object({ reportId: z.number() }))
     .query(async ({ ctx, input }) => {
       const row = await ctx.db
@@ -365,10 +317,7 @@ export const studentsRouter = createTRPCRouter({
         })
         .from(report)
         .innerJoin(placement, eq(report.placementId, placement.id))
-        .leftJoin(
-          mentorProfile,
-          eq(report.reviewedByMentorId, mentorProfile.id),
-        )
+        .leftJoin(mentorProfile, eq(report.reviewedByMentorId, mentorProfile.id))
         .leftJoin(user, eq(mentorProfile.userId, user.id))
         .where(eq(report.id, input.reportId))
         .limit(1);
@@ -402,23 +351,18 @@ export const studentsRouter = createTRPCRouter({
         cohort: z.string().optional(),
         phone: z.string().optional(),
         nis: z.string().optional(),
+        birthPlace: z.string().optional(),
         birthDate: z.date().optional(),
         address: z.string().optional(),
+        semester: z.number().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       await auth.api.createUser({
-        body: {
-          email: input.email,
-          password: input.password,
-          name: input.name,
-          role: "student",
-        },
+        body: { email: input.email, password: input.password, name: input.name, role: "student" },
         headers: ctx.headers,
       });
-      const u = await ctx.db.query.user.findFirst({
-        where: eq(user.email, input.email),
-      });
+      const u = await ctx.db.query.user.findFirst({ where: eq(user.email, input.email) });
       if (!u) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       await ctx.db.insert(studentProfile).values({
         userId: u.id,
@@ -427,8 +371,10 @@ export const studentsRouter = createTRPCRouter({
         cohort: input.cohort ?? null,
         phone: input.phone ?? null,
         nis: input.nis ?? null,
+        birthPlace: input.birthPlace ?? null,
         birthDate: input.birthDate ? input.birthDate.toISOString().slice(0, 10) : null,
         address: input.address ?? null,
+        semester: input.semester ?? null,
       });
       const sp = await ctx.db.query.studentProfile.findFirst({ where: eq(studentProfile.userId, u.id) });
 
@@ -438,7 +384,7 @@ export const studentsRouter = createTRPCRouter({
           where: eq(mentorProfile.userId, ctx.session.user.id),
         });
 
-        if (mp && mp.companyId) {
+        if (mp?.companyId) {
           await ctx.db.insert(placement).values({
             studentId: sp.id,
             mentorId: mp.id,
@@ -448,6 +394,7 @@ export const studentsRouter = createTRPCRouter({
           });
         }
       }
+
       return sp ?? null;
     }),
 
@@ -461,15 +408,21 @@ export const studentsRouter = createTRPCRouter({
         major: z.string().nullable().optional(),
         cohort: z.string().nullable().optional(),
         phone: z.string().nullable().optional(),
+        address: z.string().nullable().optional(),
+        nis: z.string().nullable().optional(),
+        birthPlace: z.string().nullable().optional(),
+        birthDate: z.date().nullable().optional(),
+        gender: z.string().nullable().optional(),
+        semester: z.number().nullable().optional(),
+        startDate: z.date().nullable().optional(),
+        endDate: z.date().nullable().optional(),
         active: z.boolean().optional(),
         name: z.string().min(1).optional(),
         email: z.string().email().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const sp = await ctx.db.query.studentProfile.findFirst({
-        where: eq(studentProfile.userId, input.userId),
-      });
+      const sp = await ctx.db.query.studentProfile.findFirst({ where: eq(studentProfile.userId, input.userId) });
       if (sp) {
         await ctx.db
           .update(studentProfile)
@@ -478,16 +431,33 @@ export const studentsRouter = createTRPCRouter({
             major: input.major ?? null,
             cohort: input.cohort ?? null,
             phone: input.phone ?? null,
+            address: input.address ?? null,
+            nis: input.nis ?? null,
+            birthPlace: input.birthPlace ?? null,
+            birthDate: input.birthDate ? input.birthDate.toISOString().slice(0, 10) : null,
+            gender: input.gender ?? null,
+            semester: input.semester ?? null,
             active: input.active ?? undefined,
           })
           .where(eq(studentProfile.id, sp.id));
+
+        // Update active placement dates if provided
+        if (input.startDate !== undefined || input.endDate !== undefined) {
+          const pl = await ctx.db.query.placement.findFirst({ where: eq(placement.studentId, sp.id) });
+          if (pl) {
+            await ctx.db
+              .update(placement)
+              .set({
+                startDate: input.startDate ? input.startDate.toISOString().slice(0, 10) : undefined,
+                endDate: input.endDate ? input.endDate.toISOString().slice(0, 10) : undefined,
+              })
+              .where(eq(placement.id, pl.id));
+          }
+        }
       }
       if (input.name || input.email) {
         await auth.api.adminUpdateUser({
-          body: {
-            userId: input.userId,
-            data: { name: input.name, email: input.email },
-          },
+          body: { userId: input.userId, data: { name: input.name, email: input.email } },
           headers: ctx.headers,
         });
       }
@@ -502,344 +472,6 @@ export const studentsRouter = createTRPCRouter({
       return { ok: true };
     }),
 
-
-  getDashboardData: protectedProcedure
-    .meta(docs.getDashboardData)
-    .use(
-      requirePermissions({
-        task: ["read"],
-        report: ["read"],
-        assessment: ["read"],
-        placement: ["read"],
-      }),
-    )
-    .query(async ({ ctx }) => {
-      const student = await ctx.db.query.studentProfile.findFirst({
-        where: eq(studentProfile.userId, ctx.session.user.id),
-      });
-      if (!student) {
-        return {
-          assignedAssessments: 0,
-          pendingReviewAssessments: 0,
-          submittedReports: 0,
-          averageScore: 0,
-        };
-      }
-
-      const activePlacement = await ctx.db.query.placement.findFirst({
-        where: and(
-          eq(placement.studentId, student.id),
-          eq(placement.status, "active"),
-        ),
-      });
-
-      if (!activePlacement) {
-        return {
-          assignedAssessments: 0,
-          pendingReviewAssessments: 0,
-          submittedReports: 0,
-          averageScore: 0,
-        };
-      }
-
-      const [assigned] = await ctx.db
-        .select({ count: sql<number>`count(*)` })
-        .from(task)
-        .where(
-          and(
-            eq(task.placementId, activePlacement.id),
-            sql`${task.status} IN ('todo', 'in_progress')`,
-          ),
-        );
-
-      const [pending] = await ctx.db
-        .select({ count: sql<number>`count(*)` })
-        .from(task)
-        .where(
-          and(
-            eq(task.placementId, activePlacement.id),
-            eq(task.status, "submitted"),
-          ),
-        );
-
-      const [reports] = await ctx.db
-        .select({ count: sql<number>`count(*)` })
-        .from(report)
-        .where(eq(report.placementId, activePlacement.id));
-
-      const [avgScore] = await ctx.db
-        .select({ avg: sql<number>`avg(${assessment.totalScore})` })
-        .from(assessment)
-        .where(eq(assessment.placementId, activePlacement.id));
-
-      return {
-        assignedAssessments: Number(assigned?.count ?? 0),
-        pendingReviewAssessments: Number(pending?.count ?? 0),
-        submittedReports: Number(reports?.count ?? 0),
-        averageScore: Number(avgScore?.avg ?? 0),
-      };
-    }),
-
-  getTodayStatus: protectedProcedure
-    .meta(docs.getTodayStatus)
-    .use(
-      requirePermissions({
-        attendanceLog: ["read"],
-        placement: ["read"],
-        studentProfile: ["read"],
-      }),
-    )
-    .query(async ({ ctx }) => {
-      const student = await ctx.db.query.studentProfile.findFirst({
-        where: eq(studentProfile.userId, ctx.session.user.id),
-        with: { user: true },
-      });
-      if (!student) throw new TRPCError({ code: "UNAUTHORIZED" });
-
-      const activePlacement = await ctx.db.query.placement.findFirst({
-        where: and(
-          eq(placement.studentId, student.id),
-          eq(placement.status, "active"),
-        ),
-      });
-
-      if (!activePlacement) {
-        return {
-          canCheckIn: false,
-          canCheckOut: false,
-          hasCompleted: false,
-          logData: null,
-          placementId: null,
-          studentName: student.user.name,
-          studentId: student.userId,
-        };
-      }
-
-      const todayStr = new Date().toISOString().slice(0, 10);
-
-      const log = await ctx.db.query.attendanceLog.findFirst({
-        where: and(
-          eq(attendanceLog.placementId, activePlacement.id),
-          eq(attendanceLog.date, todayStr),
-        ),
-      });
-
-      const canCheckIn = !log;
-      const canCheckOut = !!log && !log.checkOutAt;
-      const hasCompleted = !!log && !!log.checkOutAt;
-
-      return {
-        canCheckIn,
-        canCheckOut,
-        hasCompleted,
-        logData: log ?? null,
-        placementId: String(activePlacement.id),
-        studentName: student.user.name,
-        studentId: student.userId,
-      };
-    }),
-
-  checkIn: protectedProcedure
-    .meta(docs.checkIn)
-    .use(
-      requirePermissions({
-        attendance: ["create"],
-        placement: ["read"],
-        studentProfile: ["read"],
-      }),
-    )
-    .input(
-      z.object({
-        latitude: z.number(),
-        longitude: z.number(),
-        selfieFilename: z.string().min(1),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const student = await ctx.db.query.studentProfile.findFirst({
-        where: eq(studentProfile.userId, ctx.session.user.id),
-      });
-      if (!student)
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "Not a student",
-        });
-
-      const activePlacement = await ctx.db.query.placement.findFirst({
-        where: and(
-          eq(placement.studentId, student.id),
-          eq(placement.status, "active"),
-        ),
-        with: { company: true },
-      });
-
-      if (!activePlacement)
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: "No active placement",
-        });
-      if (!activePlacement.company)
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: "Placement has no company",
-        });
-
-      const companyLat = Number(activePlacement.company.latitude);
-      const companyLon = Number(activePlacement.company.longitude);
-
-      console.log(activePlacement.company);
-      const distance = calculateDistanceInMeters(
-        input.latitude,
-        input.longitude,
-        companyLat,
-        companyLon,
-      );
-
-      if (distance > 100) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: `Too far from company location (${Math.round(distance)}m)`,
-        });
-      }
-
-      const todayStr = new Date().toISOString().slice(0, 10);
-
-      const existing = await ctx.db.query.attendanceLog.findFirst({
-        where: and(
-          eq(attendanceLog.placementId, activePlacement.id),
-          eq(attendanceLog.date, todayStr),
-        ),
-      });
-
-      if (existing)
-        throw new TRPCError({
-          code: "CONFLICT",
-          message: "Already checked in today",
-        });
-
-      await ctx.db.insert(attendanceLog).values({
-        placementId: activePlacement.id,
-        date: todayStr,
-        checkInAt: new Date(),
-        status: "present",
-        latitude: input.latitude.toString(),
-        longitude: input.longitude.toString(),
-      });
-      const saved = await ctx.db.query.attendanceLog.findFirst({
-        where: and(
-          eq(attendanceLog.placementId, activePlacement.id),
-          eq(attendanceLog.date, todayStr),
-        ),
-      });
-      if (!saved) {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      }
-      const url = await buildPublicUrlAction(input.selfieFilename);
-      await ctx.db.insert(attachment).values({
-        ownerType: "attendance_log",
-        ownerId: saved.id,
-        filename: input.selfieFilename,
-        url,
-        createdById: ctx.session.user.id,
-      });
-      return { success: true };
-    }),
-
-  checkOut: protectedProcedure
-    .meta(docs.checkOut)
-    .use(
-      requirePermissions({
-        attendance: ["create"],
-        placement: ["read"],
-        studentProfile: ["read"],
-      }),
-    )
-    .input(
-      z.object({
-        latitude: z.number(),
-        longitude: z.number(),
-        selfieFilename: z.string().min(1),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const student = await ctx.db.query.studentProfile.findFirst({
-        where: eq(studentProfile.userId, ctx.session.user.id),
-      });
-      if (!student)
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "Not a student",
-        });
-
-      const activePlacement = await ctx.db.query.placement.findFirst({
-        where: and(
-          eq(placement.studentId, student.id),
-          eq(placement.status, "active"),
-        ),
-        with: { company: true },
-      });
-
-      if (!activePlacement)
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: "No active placement",
-        });
-      if (!activePlacement.company)
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: "Placement has no company",
-        });
-
-      const companyLat = Number(activePlacement.company.latitude);
-      const companyLon = Number(activePlacement.company.longitude);
-      const distance = calculateDistanceInMeters(
-        input.latitude,
-        input.longitude,
-        companyLat,
-        companyLon,
-      );
-
-      if (distance > 100) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: `Too far from company location (${Math.round(distance)}m)`,
-        });
-      }
-
-      const todayStr = new Date().toISOString().slice(0, 10);
-
-      const existing = await ctx.db.query.attendanceLog.findFirst({
-        where: and(
-          eq(attendanceLog.placementId, activePlacement.id),
-          eq(attendanceLog.date, todayStr),
-        ),
-      });
-
-      if (!existing)
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Not checked in yet",
-        });
-      if (existing.checkOutAt)
-        throw new TRPCError({
-          code: "CONFLICT",
-          message: "Already checked out",
-        });
-
-      await ctx.db
-        .update(attendanceLog)
-        .set({ checkOutAt: new Date() })
-        .where(eq(attendanceLog.id, existing.id));
-      const url = await buildPublicUrlAction(input.selfieFilename);
-      await ctx.db.insert(attachment).values({
-        ownerType: "attendance_log",
-        ownerId: existing.id,
-        filename: input.selfieFilename,
-        url,
-        createdById: ctx.session.user.id,
-      });
-      return { success: true };
-    }),
   me: protectedProcedure
     .meta(docs.me)
     .query(async ({ ctx }) => {
@@ -932,6 +564,5 @@ export const studentsRouter = createTRPCRouter({
         address: updated.address ?? null,
         phone: updated.phone ?? null,
       };
-
     }),
 });

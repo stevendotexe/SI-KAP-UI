@@ -1,16 +1,14 @@
 "use client"
 
 import React from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams } from "next/navigation"
 import { api } from "@/trpc/react"
 import { Spinner } from "@/components/ui/spinner"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Input } from "@/components/ui/input"
 import BackButton from "@/components/students/BackButton"
 import { formatFileSize } from "@/lib/file-utils"
-import { sanitizeHtml } from "@/lib/sanitize-html"
-import { FileText, Image as ImageIcon, File as FileIcon, Download, CheckCircle2, XCircle, Clock } from "lucide-react"
+import { FileText, Image as ImageIcon, File as FileIcon, Download, CheckCircle2, Clock, ClipboardList } from "lucide-react"
 
 // Format date to Indonesian locale
 function formatDate(date: Date | string | null): string {
@@ -27,48 +25,36 @@ function getFileIcon(mimeType: string | null) {
   return <FileIcon className="size-5" />
 }
 
-// Map report type to Indonesian label
-function getReportTypeLabel(type: string): string {
-  switch (type) {
-    case "daily": return "Harian"
-    case "weekly": return "Mingguan"
-    case "monthly": return "Bulanan"
-    default: return type
-  }
-}
-
-// Status badge component
+// Status badge component for task
 function StatusBadge({ status }: { status: string }) {
   switch (status) {
     case "approved":
       return (
         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm bg-green-100 text-green-800">
-          <CheckCircle2 className="size-4" /> Disetujui
+          <CheckCircle2 className="size-4" /> Sudah Direview
         </span>
       )
-    case "rejected":
-      return (
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm bg-red-100 text-red-800">
-          <XCircle className="size-4" /> Ditolak
-        </span>
-      )
-    default:
+    case "submitted":
       return (
         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm bg-yellow-100 text-yellow-800">
-          <Clock className="size-4" /> Menunggu Review
+          <Clock className="size-4" /> Belum Direview
+        </span>
+      )
+    default: // todo, in_progress
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm bg-gray-100 text-gray-800">
+          <ClipboardList className="size-4" /> Belum Dikerjakan
         </span>
       )
   }
 }
 
-// Review form component (client-side interactive)
-function ReviewForm({ reportId, onSuccess }: { reportId: number; onSuccess: () => void }) {
+// Review form component for task submission
+function ReviewForm({ taskId, onSuccess }: { taskId: number; onSuccess: () => void }) {
   const [notes, setNotes] = React.useState("")
-  const [score, setScore] = React.useState("")
-  const [status, setStatus] = React.useState<"approved" | "rejected">("approved")
   const [error, setError] = React.useState<string | null>(null)
 
-  const reviewMutation = api.reports.review.useMutation({
+  const reviewMutation = api.tasks.review.useMutation({
     onSuccess: () => {
       onSuccess()
     },
@@ -81,89 +67,32 @@ function ReviewForm({ reportId, onSuccess }: { reportId: number; onSuccess: () =
     e.preventDefault()
     setError(null)
 
-    // Validation
-    if (!notes.trim() || notes.trim().length < 10) {
-      setError("Catatan review minimal 10 karakter")
-      return
-    }
-
-    const scoreNum = Number(score)
-    if (isNaN(scoreNum) || scoreNum < 0 || scoreNum > 100) {
-      setError("Nilai harus berupa angka antara 0-100")
-      return
-    }
-
     reviewMutation.mutate({
-      reportId,
-      notes: notes.trim(),
-      score: scoreNum,
-      status,
+      taskId,
+      status: "approved",
+      notes: notes.trim() || undefined,
     })
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium mb-2">Status Review</label>
-        <div className="flex gap-4">
-          <label className="inline-flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              name="status"
-              value="approved"
-              checked={status === "approved"}
-              onChange={() => setStatus("approved")}
-              className="size-4"
-            />
-            <span className="text-sm">Disetujui</span>
-          </label>
-          <label className="inline-flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              name="status"
-              value="rejected"
-              checked={status === "rejected"}
-              onChange={() => setStatus("rejected")}
-              className="size-4"
-            />
-            <span className="text-sm">Ditolak</span>
-          </label>
-        </div>
-      </div>
-
-      <div>
-        <label htmlFor="score" className="block text-sm font-medium mb-2">Nilai (0-100)</label>
-        <Input
-          id="score"
-          type="number"
-          min={0}
-          max={100}
-          value={score}
-          onChange={(e) => setScore(e.target.value)}
-          placeholder="Masukkan nilai"
-          className="w-32"
-          required
-        />
-      </div>
-
-      <div>
-        <label htmlFor="notes" className="block text-sm font-medium mb-2">Catatan Review</label>
+        <label htmlFor="notes" className="block text-sm font-medium mb-2">Catatan Review (opsional)</label>
         <Textarea
           id="notes"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="Tulis catatan review untuk siswa (minimal 10 karakter)"
+          placeholder="Tulis catatan review untuk siswa"
           rows={4}
-          required
+          className="rounded"
         />
-        <div className="text-xs text-muted-foreground mt-1">{notes.length} karakter</div>
       </div>
 
       {error && <div className="text-sm text-destructive">{error}</div>}
 
-      <Button 
-        type="submit" 
-        variant="destructive" 
+      <Button
+        type="submit"
+        variant="destructive"
         disabled={reviewMutation.isPending}
         className="w-full sm:w-auto"
       >
@@ -172,7 +101,7 @@ function ReviewForm({ reportId, onSuccess }: { reportId: number; onSuccess: () =
             <Spinner className="size-4 mr-2" /> Menyimpan...
           </>
         ) : (
-          "Simpan Review"
+          "Setujui Tugas"
         )}
       </Button>
     </form>
@@ -181,24 +110,23 @@ function ReviewForm({ reportId, onSuccess }: { reportId: number; onSuccess: () =
 
 export default function Page() {
   const params = useParams()
-  const router = useRouter()
-  const reportId = Number(params.id)
+  const taskId = Number(params.id)
 
-  const { data, isLoading, isError, refetch } = api.reports.detail.useQuery(
-    { reportId },
-    { enabled: !isNaN(reportId) }
+  const { data, isLoading, isError, refetch } = api.tasks.detailForMentor.useQuery(
+    { taskId },
+    { enabled: !isNaN(taskId) }
   )
 
   const handleReviewSuccess = React.useCallback(() => {
     refetch()
   }, [refetch])
 
-  if (isNaN(reportId)) {
+  if (isNaN(taskId)) {
     return (
       <main className="min-h-screen bg-muted text-foreground">
         <div className="max-w-[1200px] mx-auto px-6 py-8">
           <BackButton hrefFallback="/mentor/laporan" />
-          <div className="mt-4 text-destructive">ID laporan tidak valid.</div>
+          <div className="mt-4 text-destructive">ID tugas tidak valid.</div>
         </div>
       </main>
     )
@@ -208,14 +136,14 @@ export default function Page() {
     <main className="min-h-screen bg-muted text-foreground">
       <div className="max-w-[1200px] mx-auto px-6 py-8">
         <BackButton hrefFallback="/mentor/laporan" />
-        
+
         {isLoading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground mt-6">
-            <Spinner /> Memuat laporan...
+            <Spinner /> Memuat tugas...
           </div>
         ) : isError ? (
           <div className="flex flex-col items-start gap-2 mt-6">
-            <div className="text-sm text-destructive">Gagal memuat laporan.</div>
+            <div className="text-sm text-destructive">Gagal memuat tugas.</div>
             <Button variant="outline" size="sm" onClick={() => refetch()}>Coba Lagi</Button>
           </div>
         ) : data ? (
@@ -223,64 +151,30 @@ export default function Page() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
               <div>
-                <h1 className="text-2xl font-semibold">{data.title ?? "Laporan Tanpa Judul"}</h1>
+                <h1 className="text-2xl font-semibold">{data.title}</h1>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Laporan {getReportTypeLabel(data.type)}
+                  {data.dueDate ? `Deadline: ${formatDate(data.dueDate)}` : "Tanpa deadline"}
                 </p>
               </div>
-              <StatusBadge status={data.reviewStatus} />
+              <StatusBadge status={data.status} />
             </div>
 
-            {/* Student Info */}
+            {/* Task Description */}
             <div className="bg-card border rounded-xl shadow-sm p-4">
-              <h2 className="text-sm font-medium text-muted-foreground mb-3">Informasi Siswa</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <div className="text-xs text-muted-foreground">Nama</div>
-                  <div className="text-sm font-medium">{data.student.name}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground">Email</div>
-                  <div className="text-sm">{data.student.email ?? "-"}</div>
-                </div>
+              <h2 className="text-sm font-medium text-muted-foreground mb-3">Deskripsi Tugas</h2>
+              <div className="text-sm whitespace-pre-wrap bg-muted/50 rounded-lg p-4">
+                {data.description || "Tidak ada deskripsi."}
               </div>
             </div>
 
-            {/* Report Details */}
-            <div className="bg-card border rounded-xl shadow-sm p-4">
-              <h2 className="text-sm font-medium text-muted-foreground mb-3">Detail Laporan</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-                <div>
-                  <div className="text-xs text-muted-foreground">Periode Mulai</div>
-                  <div className="text-sm">{formatDate(data.periodStart)}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground">Periode Selesai</div>
-                  <div className="text-sm">{formatDate(data.periodEnd)}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground">Tanggal Submit</div>
-                  <div className="text-sm">{formatDate(data.submittedAt)}</div>
-                </div>
-              </div>
-              
-              <div>
-                <div className="text-xs text-muted-foreground mb-2">Isi Laporan</div>
-                <div 
-                  className="prose prose-sm max-w-none text-sm bg-muted/50 rounded-lg p-4"
-                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(data.content) || "<p>Tidak ada konten.</p>" }}
-                />
-              </div>
-            </div>
-
-            {/* Attachments */}
-            {data.files.length > 0 && (
+            {/* Task Attachments (from mentor) */}
+            {data.attachments && data.attachments.length > 0 && (
               <div className="bg-card border rounded-xl shadow-sm p-4">
                 <h2 className="text-sm font-medium text-muted-foreground mb-3">
-                  Lampiran ({data.files.length} file)
+                  Lampiran Tugas ({data.attachments.length} file)
                 </h2>
                 <div className="space-y-2">
-                  {data.files.map((file) => (
+                  {data.attachments.map((file) => (
                     <div key={file.id} className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30">
                       <div className="flex-shrink-0 text-muted-foreground">
                         {getFileIcon(file.mimeType)}
@@ -307,38 +201,86 @@ export default function Page() {
               </div>
             )}
 
-            {/* Existing Review */}
-            {data.reviewStatus !== "pending" && (
+            {/* Submission Section - Only show if submitted or approved */}
+            {(data.status === "submitted" || data.status === "approved") && data.submission && (
               <div className="bg-card border rounded-xl shadow-sm p-4">
-                <h2 className="text-sm font-medium text-muted-foreground mb-3">Review Mentor</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                <h2 className="text-sm font-medium text-muted-foreground mb-3">Submission Siswa</h2>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                   <div>
-                    <div className="text-xs text-muted-foreground">Mentor</div>
-                    <div className="text-sm font-medium">{data.mentor?.name ?? "-"}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-muted-foreground">Nilai</div>
-                    <div className="text-lg font-semibold text-primary">{data.score ?? "-"}/100</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-muted-foreground">Tanggal Review</div>
-                    <div className="text-sm">{formatDate(data.reviewedAt)}</div>
+                    <div className="text-xs text-muted-foreground">Tanggal Submit</div>
+                    <div className="text-sm">{formatDate(data.submission.submittedAt)}</div>
                   </div>
                 </div>
-                <div>
-                  <div className="text-xs text-muted-foreground mb-2">Catatan Review</div>
-                  <div className="text-sm bg-muted/50 rounded-lg p-4">
-                    {data.reviewNotes ?? "Tidak ada catatan."}
+
+                {data.submission.note && (
+                  <div className="mb-4">
+                    <div className="text-xs text-muted-foreground mb-2">Catatan Siswa</div>
+                    <div className="text-sm bg-muted/50 rounded-lg p-4 whitespace-pre-wrap">
+                      {data.submission.note}
+                    </div>
                   </div>
+                )}
+
+                {data.submission.files && data.submission.files.length > 0 && (
+                  <div>
+                    <div className="text-xs text-muted-foreground mb-2">File Submission ({data.submission.files.length} file)</div>
+                    <div className="space-y-2">
+                      {data.submission.files.map((file) => (
+                        <div key={file.id} className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30">
+                          <div className="flex-shrink-0 text-muted-foreground">
+                            {getFileIcon(file.mimeType)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium truncate">{file.filename ?? "File"}</div>
+                            {file.sizeBytes && (
+                              <div className="text-xs text-muted-foreground">{formatFileSize(file.sizeBytes)}</div>
+                            )}
+                          </div>
+                          <a
+                            href={file.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-shrink-0"
+                          >
+                            <Button variant="outline" size="sm" className="gap-1.5">
+                              <Download className="size-4" /> Unduh
+                            </Button>
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Review Form - Only show if status is submitted */}
+            {data.status === "submitted" && (
+              <div className="bg-card border rounded-xl shadow-sm p-4">
+                <h2 className="text-sm font-medium text-muted-foreground mb-3">Form Review</h2>
+                <ReviewForm taskId={data.id} onSuccess={handleReviewSuccess} />
+              </div>
+            )}
+
+            {/* Review Result - Only show if approved */}
+            {data.status === "approved" && (
+              <div className="bg-card border rounded-xl shadow-sm p-4">
+                <h2 className="text-sm font-medium text-muted-foreground mb-3">Review Mentor</h2>
+                <div className="text-sm">
+                  <CheckCircle2 className="inline-block size-4 text-green-600 mr-1" />
+                  Tugas ini telah disetujui.
                 </div>
               </div>
             )}
 
-            {/* Review Form (if pending) */}
-            {data.reviewStatus === "pending" && (
-              <div className="bg-card border rounded-xl shadow-sm p-4">
-                <h2 className="text-sm font-medium text-muted-foreground mb-3">Form Review</h2>
-                <ReviewForm reportId={data.id} onSuccess={handleReviewSuccess} />
+            {/* Info for not submitted tasks */}
+            {(data.status === "todo" || data.status === "in_progress") && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl shadow-sm p-4">
+                <h2 className="text-sm font-medium text-amber-800 mb-2">Tugas Belum Dikerjakan</h2>
+                <div className="text-sm text-amber-700">
+                  Siswa belum mengumpulkan tugas ini. Anda akan bisa mereview setelah siswa mengumpulkan tugas.
+                </div>
               </div>
             )}
           </div>
@@ -347,4 +289,3 @@ export default function Page() {
     </main>
   )
 }
-

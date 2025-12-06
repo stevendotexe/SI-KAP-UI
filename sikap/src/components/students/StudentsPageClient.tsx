@@ -34,6 +34,10 @@ export default function StudentsPageClient() {
     status: mapUIStatusToBackend(filters.status),
     search: q || undefined,
     limit: 200,
+  }, {
+    staleTime: 60_000,
+    refetchOnWindowFocus: true,
+    refetchInterval: 10_000,
   })
 
   const rows = React.useMemo(() => {
@@ -45,6 +49,15 @@ export default function StudentsPageClient() {
       batch: s.year ?? s.cohort ?? "-",
       status: mapBackendStatusToUI(s.status),
     }))
+  }, [data])
+
+  React.useEffect(() => {
+    if (data?.items) {
+      try {
+        const snapshot = { timestamp: Date.now(), items: data.items }
+        localStorage.setItem("mentor-siswa-backup", JSON.stringify(snapshot))
+      } catch {}
+    }
   }, [data])
 
   if (isLoading) {

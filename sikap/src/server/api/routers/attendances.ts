@@ -187,8 +187,12 @@ export const attendancesRouter = createTRPCRouter({
         const mp = await ctx.db.query.mentorProfile.findFirst({
           where: eq(mentorProfile.userId, ctx.session.user.id),
         });
-        if (!mp) throw new TRPCError({ code: "FORBIDDEN" });
-        mentorFilterId = mp.id;
+        if (mp) {
+          mentorFilterId = mp.id;
+        } else {
+          // Mentor without profile - allow access but show all data (unfiltered)
+          console.warn("[attendances.detail] Mentor has no profile, showing unfiltered data", { userId: ctx.session.user.id });
+        }
       }
 
       const where = and(
@@ -547,5 +551,129 @@ export const attendancesRouter = createTRPCRouter({
         .returning();
 
       return updated;
+    }),
+
+  /**
+   * Aggregates attendance per student for a period (for AccumulationTable)
+   */
+  listStudentAccumulation: adminOrMentorProcedure
+    .use(
+      requirePermissions({
+        attendanceLog: ["read"],
+        placement: ["read"],
+        studentProfile: ["read"],
+      }),
+    )
+    .input(
+      z.object({
+        companyId: z.number().optional(),
+        from: z.date().optional(),
+        to: z.date().optional(),
+        search: z.string().optional(),
+        limit: z.number().min(1).max(200).default(50),
+        offset: z.number().min(0).default(0),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const range = coerceRange({ from: input.from, to: input.to });
+
+      // For mentors, filter by their company
+      let mentorFilterId: number | null = null;
+      let effectiveCompanyId = input.companyId;
+
+      if (ctx.session.user.role === "mentor") {
+        const mp = await ctx.db.query.mentorProfile.findFirst({
+          where: eq(mentorProfile.userId, ctx.session.user.id),
+        });
+        if (!mp) throw new TRPCError({ code: "FORBIDDEN" });
+        mentorFilterId = mp.id;
+        effectiveCompanyId = mp.companyId ?? undefined;
+      }
+
+      // Build where clause - convert dates to string format for comparison
+      const fromStr = range.from ? range.from.toISOString().slice(0, 10) : undefined;
+      const toStr = range.to ? range.to.toISOString().slice(0, 10) : undefined;
+
+      const where = and(
+        fromStr ? gte(attendanceLog.date, fromStr) : undefined,
+        toStr ? lte(attendanceLog.date, toStr) : undefined,
+        effectiveCompanyId ? eq(placement.companyId, effectiveCompanyId) : undefined,
+        mentorFilterId ? eq(placement.mentorId, mentorFilterId) : undefined,
+        input.search
+          ? sql`lower(${studentUser.name}) like ${`%${input.search.toLowerCase()}%`}`
+          : undefined,
+      );
+
+      // Aggregate attendance counts per student
+      const rows = await ctx.db
+        .select({
+          studentId: studentProfile.id,
+          studentName: studentUser.name,
+          studentNis: studentProfile.nis,
+          status: attendanceLog.status,
+          count: sql<number>`count(*)`,
+        })
+        .from(attendanceLog)
+        .innerJoin(placement, eq(attendanceLog.placementId, placement.id))
+        .innerJoin(studentProfile, eq(placement.studentId, studentProfile.id))
+        .innerJoin(studentUser, eq(studentProfile.userId, studentUser.id))
+        .where(where)
+        .groupBy(studentProfile.id, studentUser.name, studentProfile.nis, attendanceLog.status)
+        .orderBy(studentUser.name);
+
+      // Transform rows into per-student aggregation
+      const studentMap = new Map<number, {
+        studentId: number;
+        studentName: string;
+        studentNis: string | null;
+        present: number;
+        excused: number;
+        absent: number;
+        late: number;
+      }>();
+
+      for (const row of rows) {
+        if (!studentMap.has(row.studentId)) {
+          studentMap.set(row.studentId, {
+            studentId: row.studentId,
+            studentName: row.studentName ?? "Unknown",
+            studentNis: row.studentNis,
+            present: 0,
+            excused: 0,
+            absent: 0,
+            late: 0,
+          });
+        }
+        const student = studentMap.get(row.studentId)!;
+        const count = Number(row.count);
+        if (row.status === "present") student.present += count;
+        else if (row.status === "excused") student.excused += count;
+        else if (row.status === "absent") student.absent += count;
+        else if (row.status === "late") {
+          student.late += count;
+          student.present += count; // Late is still present
+        }
+      }
+
+      // Convert to array and apply pagination
+      const allStudents = Array.from(studentMap.values());
+      const paginatedStudents = allStudents.slice(input.offset, input.offset + input.limit);
+
+      return {
+        items: paginatedStudents.map((s, idx) => ({
+          no: input.offset + idx + 1,
+          studentId: s.studentId,
+          name: s.studentName,
+          nis: s.studentNis,
+          present: s.present,
+          excused: s.excused,
+          absent: s.absent,
+        })),
+        pagination: {
+          total: allStudents.length,
+          limit: input.limit,
+          offset: input.offset,
+        },
+      };
     }),
 });

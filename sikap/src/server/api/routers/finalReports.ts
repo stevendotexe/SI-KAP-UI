@@ -298,4 +298,74 @@ export const finalReportsRouter = createTRPCRouter({
 
       return { finalReportId: fr.id, totalScore: total, averageScore: avg };
     }),
+
+  /**
+   * Get student attendance and score trends per month for charts
+   */
+  getStudentTrends: adminOrMentorProcedure
+    .use(requirePermissions({ attendanceLog: ["read"], placement: ["read"] }))
+    .input(z.object({ placementId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      // Validate mentor access
+      if (ctx.session.user.role === "mentor") {
+        await enforceMentorScope(ctx, input.placementId);
+      }
+
+      // Import attendanceLog table
+      const { attendanceLog } = await import("@/server/db/schema");
+
+      // Get attendance stats grouped by month
+      const attendanceRows = await ctx.db
+        .select({
+          month: sql<string>`to_char(${attendanceLog.date}::date, 'YYYY-MM')`,
+          total: sql<number>`count(*)`,
+          present: sql<number>`count(*) filter (where ${attendanceLog.status} in ('present', 'late'))`,
+        })
+        .from(attendanceLog)
+        .where(eq(attendanceLog.placementId, input.placementId))
+        .groupBy(sql`to_char(${attendanceLog.date}::date, 'YYYY-MM')`)
+        .orderBy(sql`to_char(${attendanceLog.date}::date, 'YYYY-MM')`);
+
+      // Calculate attendance percentage per month
+      const attendanceTrend = attendanceRows.map((row) => ({
+        period: row.month,
+        count: row.total > 0 ? Math.round((row.present / row.total) * 100) : 0,
+      }));
+
+      // Get score history - we don't have historical scores, so just return current score as placeholder
+      // In a full implementation, you'd track score changes over time
+      const fr = await ctx.db.query.finalReport.findFirst({
+        where: eq(finalReport.placementId, input.placementId),
+      });
+
+      let scoreTrend: { period: string; count: number }[] = [];
+      if (fr) {
+        const scores = await ctx.db
+          .select({ score: finalReportScore.score })
+          .from(finalReportScore)
+          .where(eq(finalReportScore.finalReportId, fr.id));
+
+        const totalScore = scores.reduce((acc, s) => acc + Number(s.score ?? 0), 0);
+        const avgScore = scores.length > 0 ? Math.round(totalScore / scores.length) : 0;
+
+        // Create score trend matching attendance months (or default 6 months)
+        const months = attendanceTrend.length > 0
+          ? attendanceTrend.map(a => a.period)
+          : Array.from({ length: 6 }, (_, i) => {
+            const d = new Date();
+            d.setMonth(d.getMonth() - (5 - i));
+            return d.toISOString().slice(0, 7);
+          });
+
+        scoreTrend = months.map((period) => ({
+          period,
+          count: avgScore, // Same score for all months since we don't track history
+        }));
+      }
+
+      return {
+        attendanceTrend,
+        scoreTrend,
+      };
+    }),
 });
