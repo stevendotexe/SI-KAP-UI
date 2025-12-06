@@ -5,7 +5,7 @@ import { FileUploadField, type FileUploadValue } from "@/components/ui/file-uplo
 import { Spinner } from "@/components/ui/spinner"
 import { api } from "@/trpc/react"
 import { Send, ChevronLeft } from "lucide-react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 
 export default function UnggahTugasPage() {
@@ -44,15 +44,23 @@ export default function UnggahTugasPage() {
     taskId,
   })
 
-  // Pre-load existing files if any
+  // Track if initial data has been loaded
+  const initializedRef = useRef(false)
+
+  // Pre-load existing files only once when task data is first available
   useEffect(() => {
-    if (task?.submission?.files && task.submission.files.length > 0) {
+    if (initializedRef.current) return
+    if (!task) return
+
+    initializedRef.current = true
+
+    if (task.submission?.files && task.submission.files.length > 0) {
       setAttachments(task.submission.files.map(f => ({
         url: f.url,
         filename: f.filename ?? undefined,
       })))
     }
-    if (task?.submission?.note) {
+    if (task.submission?.note) {
       setNotes(task.submission.note)
     }
   }, [task])

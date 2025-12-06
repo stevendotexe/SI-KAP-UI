@@ -24,6 +24,7 @@ export default function DaftarTugasSiswaPage() {
   const { data, isLoading, error } = api.tasks.listAssigned.useQuery({
     search: q || undefined,
     status: selectedStatus ?? undefined,
+    excludeStatuses: ["submitted", "approved"],
     limit: 50,
     offset: 0,
   })
@@ -78,51 +79,28 @@ export default function DaftarTugasSiswaPage() {
                 <div className="max-h-64 overflow-auto py-1">
                   <DropdownMenuItem
                     onClick={() => setSelectedStatus("todo")}
-                    className={`w-full px-3 py-2 text-left text-sm justify-start ${
-                      selectedStatus === "todo"
+                    className={`w-full px-3 py-2 text-left text-sm justify-start ${selectedStatus === "todo"
                         ? "bg-accent/50"
                         : "hover:bg-accent hover:text-accent-foreground"
-                    }`}
+                      }`}
                   >
                     Belum Dikerjakan
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => setSelectedStatus("in_progress")}
-                    className={`w-full px-3 py-2 text-left text-sm justify-start ${
-                      selectedStatus === "in_progress"
+                    className={`w-full px-3 py-2 text-left text-sm justify-start ${selectedStatus === "in_progress"
                         ? "bg-accent/50"
                         : "hover:bg-accent hover:text-accent-foreground"
-                    }`}
+                      }`}
                   >
                     Sedang Dikerjakan
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onClick={() => setSelectedStatus("submitted")}
-                    className={`w-full px-3 py-2 text-left text-sm justify-start ${
-                      selectedStatus === "submitted"
-                        ? "bg-accent/50"
-                        : "hover:bg-accent hover:text-accent-foreground"
-                    }`}
-                  >
-                    Menunggu Review
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => setSelectedStatus("approved")}
-                    className={`w-full px-3 py-2 text-left text-sm justify-start ${
-                      selectedStatus === "approved"
-                        ? "bg-accent/50"
-                        : "hover:bg-accent hover:text-accent-foreground"
-                    }`}
-                  >
-                    Disetujui
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
                     onClick={() => setSelectedStatus("rejected")}
-                    className={`w-full px-3 py-2 text-left text-sm justify-start ${
-                      selectedStatus === "rejected"
+                    className={`w-full px-3 py-2 text-left text-sm justify-start ${selectedStatus === "rejected"
                         ? "bg-accent/50"
                         : "hover:bg-accent hover:text-accent-foreground"
-                    }`}
+                      }`}
                   >
                     Ditolak
                   </DropdownMenuItem>

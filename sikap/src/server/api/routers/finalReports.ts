@@ -95,9 +95,9 @@ export const finalReportsRouter = createTRPCRouter({
         mentorId ? eq(placement.mentorId, mentorId) : undefined,
         input.search
           ? or(
-              ilike(user.name, `%${input.search}%`),
-              ilike(studentProfile.nis, `%${input.search}%`),
-            )
+            ilike(user.name, `%${input.search}%`),
+            ilike(studentProfile.nis, `%${input.search}%`),
+          )
           : undefined,
       );
 

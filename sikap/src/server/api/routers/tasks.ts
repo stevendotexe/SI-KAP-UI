@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, eq, sql, inArray } from "drizzle-orm";
+import { and, eq, sql, inArray, notInArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 import {
@@ -64,21 +64,36 @@ export const tasksRouter = createTRPCRouter({
       z.object({
         search: z.string().optional(),
         status: z.enum(taskStatus.enumValues).optional(),
+        statuses: z.array(z.enum(taskStatus.enumValues)).optional(),
+        excludeStatuses: z.array(z.enum(taskStatus.enumValues)).optional(),
         limit: z.number().min(1).max(200).default(100),
         offset: z.number().min(0).default(0),
       }),
     )
     .query(async ({ ctx, input }) => {
       const sp = await requireStudentPlacement(ctx);
-      const where = and(
+
+      // Build status filter
+      const conditions = [
         eq(placement.studentId, sp.id),
-        input.status ? eq(task.status, input.status) : undefined,
         input.search
-          ? sql`(lower(${task.title}) like ${"%" + input.search.toLowerCase() + "%"} or lower(${task.description}) like ${
-              "%" + input.search.toLowerCase() + "%"
-            })`
+          ? sql`(lower(${task.title}) like ${"%" + input.search.toLowerCase() + "%"} or lower(${task.description}) like ${"%" + input.search.toLowerCase() + "%"})`
           : undefined,
-      );
+      ];
+
+      if (input.statuses && input.statuses.length > 0) {
+        conditions.push(inArray(task.status, input.statuses));
+      }
+
+      if (input.excludeStatuses && input.excludeStatuses.length > 0) {
+        conditions.push(notInArray(task.status, input.excludeStatuses));
+      }
+
+      if (input.status) {
+        conditions.push(eq(task.status, input.status));
+      }
+
+      const where = and(...conditions);
 
       const rows = await ctx.db
         .select({
@@ -290,8 +305,7 @@ export const tasksRouter = createTRPCRouter({
           ? sql`${task.dueDate} <= ${input.to.toISOString()}`
           : undefined,
         input.search
-          ? sql`(lower(${task.title}) like ${"%" + input.search.toLowerCase() + "%"} or lower(${task.description}) like ${
-              "%" + input.search.toLowerCase() + "%"
+          ? sql`(lower(${task.title}) like ${"%" + input.search.toLowerCase() + "%"} or lower(${task.description}) like ${"%" + input.search.toLowerCase() + "%"
             })`
           : undefined,
       );
@@ -547,11 +561,11 @@ export const tasksRouter = createTRPCRouter({
       const attachments =
         taskIds.length > 0
           ? await ctx.db.query.attachment.findMany({
-              where: and(
-                eq(attachment.ownerType, "task"),
-                inArray(attachment.ownerId, taskIds),
-              ),
-            })
+            where: and(
+              eq(attachment.ownerType, "task"),
+              inArray(attachment.ownerId, taskIds),
+            ),
+          })
           : [];
 
       // 4. Calculate stats

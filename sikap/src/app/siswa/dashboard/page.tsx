@@ -69,14 +69,20 @@ export default function DashboardPage() {
     const tasksQuery = api.tasks.listAssigned.useQuery({ limit: 200 })
     const reportsQuery = api.reports.listMine.useQuery({
         limit: 200,
-        from: weekRange.from,
-        to: weekRange.to,
     })
+
+    // Fetch today's attendance to persist state across refreshes
+    const todayAttendance = api.attendances.getTodayLog.useQuery()
+
 
     // Calculate real-time statistics
     const todoCount = tasksQuery.data?.items?.filter(task => task.status === "todo").length ?? 0
-    const pendingReviewCount = reportsQuery.data?.items?.filter(report => report.reviewStatus === REVIEW_STATUS.PENDING).length ?? 0
-    const totalReportsCount = reportsQuery.data?.items?.length ?? 0
+
+    const submittedTasks = tasksQuery.data?.items?.filter(task => ["submitted", "approved"].includes(task.status)) ?? []
+    const pendingTasksCount = tasksQuery.data?.items?.filter(task => task.status === "submitted").length ?? 0
+
+    const pendingReviewCount = (reportsQuery.data?.items?.filter(report => report.reviewStatus === REVIEW_STATUS.PENDING).length ?? 0) + pendingTasksCount
+    const totalReportsCount = (reportsQuery.data?.items?.length ?? 0) + submittedTasks.length
 
     const statsLoading = tasksQuery.isLoading || reportsQuery.isLoading
     const statsError = tasksQuery.isError || reportsQuery.isError
@@ -141,6 +147,42 @@ export default function DashboardPage() {
         const id = setInterval(() => setNow(new Date()), 1000)
         return () => clearInterval(id)
     }, [])
+
+    // Initialize attendance state from today's log
+    useEffect(() => {
+        if (todayAttendance.data) {
+            const log = todayAttendance.data
+            if (log.checkInAt) {
+                setIsMasukSaved(true)
+                setMasukAt(new Intl.DateTimeFormat("en-GB", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                    hour12: false,
+                }).format(new Date(log.checkInAt)))
+                setMasukImageName("presensi-masuk.png")
+                if (log.latitude && log.longitude) {
+                    const lat = parseFloat(log.latitude)
+                    const lon = parseFloat(log.longitude)
+                    setMasukCoords({ latitude: lat, longitude: lon })
+                }
+                if (log.locationNote) {
+                    setMasukLocation(log.locationNote)
+                }
+            }
+            if (log.checkOutAt) {
+                setIsKeluarSaved(true)
+                setKeluarAt(new Intl.DateTimeFormat("en-GB", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                    hour12: false,
+                }).format(new Date(log.checkOutAt)))
+                setKeluarImageName("presensi-keluar.png")
+            }
+        }
+    }, [todayAttendance.data])
+
 
     const formatTs = () =>
         new Intl.DateTimeFormat("en-GB", {
@@ -591,17 +633,17 @@ export default function DashboardPage() {
                                     <div className="rounded-2xl border bg-card p-5 shadow-sm">
                                         <div className="text-sm font-semibold text-foreground">Belum Dikerjakan</div>
                                         <div className="mt-2 text-3xl font-semibold">{statsLoading ? "..." : todoCount}</div>
-                                        <div className="mt-1 text-xs text-muted-foreground">Minggu ini</div>
+                                        <div className="mt-1 text-xs text-muted-foreground">Total</div>
                                     </div>
                                     <div className="rounded-2xl border bg-card p-5 shadow-sm">
-                                        <div className="text-sm font-semibold text-foreground">Menunggu Direview</div>
+                                        <div className="text-sm font-semibold text-foreground">Menunggu Review</div>
                                         <div className="mt-2 text-3xl font-semibold">{statsLoading ? "..." : pendingReviewCount}</div>
                                         <div className="mt-1 text-xs text-muted-foreground">Menunggu respon Mentor</div>
                                     </div>
                                     <div className="rounded-2xl border bg-card p-5 shadow-sm">
                                         <div className="text-sm font-semibold text-foreground">Laporan Terkirim</div>
                                         <div className="mt-2 text-3xl font-semibold">{statsLoading ? "..." : totalReportsCount}</div>
-                                        <div className="mt-1 text-xs text-muted-foreground">Minggu ini</div>
+                                        <div className="mt-1 text-xs text-muted-foreground">Total</div>
                                     </div>
                                 </div>
                                 {statsError && (

@@ -113,8 +113,11 @@ export async function uploadFilesAction(
     if (!it) continue;
     const size = prepared[i]?.result?.size;
 
-    // Use the URL returned by the service, or fallback to constructing it
-    const fileUrl = it.url || buildPublicUrl(it.filename);
+    // Always construct the full URL since the API returns relative paths
+    const fileUrl = buildPublicUrl(it.filename);
+
+    // Update the item URL to be absolute for the response
+    it.url = fileUrl;
 
     await db.insert(attachment).values({
       ownerType,

@@ -353,6 +353,49 @@ export const attendancesRouter = createTRPCRouter({
       };
     }),
 
+  getTodayLog: protectedProcedure
+    .query(async ({ ctx }) => {
+      // Verify user is a student
+      if (ctx.session.user.role !== "student") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Only students can access their attendance log" });
+      }
+
+      // Get student profile
+      const student = await ctx.db.query.studentProfile.findFirst({
+        where: eq(studentProfile.userId, ctx.session.user.id),
+      });
+
+      if (!student) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Student profile not found" });
+      }
+
+      // Get active placement
+      const activePlacement = await ctx.db.query.placement.findFirst({
+        where: and(
+          eq(placement.studentId, student.id),
+          eq(placement.status, "active"),
+        ),
+      });
+
+      if (!activePlacement) {
+        // If no active placement, return null
+        return null;
+      }
+
+      // Get today's date in YYYY-MM-DD format
+      const today = new Date().toISOString().slice(0, 10);
+
+      // Query today's attendance log
+      const todayLog = await ctx.db.query.attendanceLog.findFirst({
+        where: and(
+          eq(attendanceLog.placementId, activePlacement.id),
+          eq(attendanceLog.date, today),
+        ),
+      });
+
+      return todayLog ?? null;
+    }),
+
   recordCheckIn: protectedProcedure
     .input(
       z.object({

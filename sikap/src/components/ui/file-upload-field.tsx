@@ -194,10 +194,16 @@ export function FileUploadField({
   // Sync internal files state with controlled value prop
   useEffect(() => {
     const valueFiles = value ?? [];
+    const valueUrls = new Set(valueFiles.map((f) => f.url));
 
     setFiles((prevFiles) => {
       // Keep uploading files as they are
       const uploadingFiles = prevFiles.filter((f) => f.status === "uploading");
+
+      // Keep success files that are not yet in value (race condition protection)
+      const recentSuccessFiles = prevFiles.filter(
+        (f) => f.status === "success" && f.url && !valueUrls.has(f.url)
+      );
 
       // Build new files from value, preserving metadata where URL still exists
       const syncedFiles: FileState[] = valueFiles.map((file) => {
@@ -215,8 +221,8 @@ export function FileUploadField({
         };
       });
 
-      // Combine uploading files with synced files
-      return [...syncedFiles, ...uploadingFiles];
+      // Combine: synced files from value + uploading files + recent success files not in value
+      return [...syncedFiles, ...uploadingFiles, ...recentSuccessFiles];
     });
   }, [value]);
 
@@ -288,9 +294,12 @@ export function FileUploadField({
         const response = await uploadFilesAction(formData);
 
         if (response.status === "success" && response.data) {
-          // Update file states with successful uploads
-          const uploadedFiles: FileUploadValue[] = [];
+          // Build uploadedFiles array from response data first
+          const uploadedFiles: FileUploadValue[] = response.data
+            .filter((item): item is NonNullable<typeof item> => !!item)
+            .map((item) => ({ url: item.url, filename: item.filename }));
 
+          // Update file states with successful uploads
           setFiles((prev) => {
             const updated = [...prev];
 
@@ -300,16 +309,19 @@ export function FileUploadField({
               if (!uploadItem || !pendingFile) continue;
 
               const idx = updated.findIndex((f) => f.id === pendingFile.id);
+
+              const newFileState: FileState = {
+                id: uploadItem.url,
+                filename: uploadItem.filename,
+                url: uploadItem.url,
+                mimeType: uploadItem.mimetype,
+                status: "success",
+              };
+
               if (idx !== -1) {
-                updated[idx] = {
-                  ...updated[idx]!,
-                  id: uploadItem.url,
-                  filename: uploadItem.filename,
-                  url: uploadItem.url,
-                  mimeType: uploadItem.mimetype,
-                  status: "success",
-                };
-                uploadedFiles.push({ url: uploadItem.url, filename: uploadItem.filename });
+                updated[idx] = newFileState;
+              } else {
+                updated.push(newFileState);
               }
             }
 
@@ -317,7 +329,7 @@ export function FileUploadField({
           });
 
           // Notify parent of new files
-          if (onChange) {
+          if (onChange && uploadedFiles.length > 0) {
             onChange([...(value ?? []), ...uploadedFiles]);
           }
         }

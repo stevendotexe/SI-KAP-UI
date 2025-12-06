@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { alias } from "drizzle-orm/pg-core";
-import { and, eq, gte, lte, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 import { adminOrMentorProcedure, createTRPCRouter, protectedProcedure, requirePermissions } from "@/server/api/trpc";
@@ -373,14 +373,18 @@ export const calendarEventsRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const sp = await requireStudentPlacement(ctx);
 
-      // Get student's placement
-      const placementRow = await ctx.db.query.placement.findFirst({
+      // Get ALL student's placements (not just the first one)
+      const placements = await ctx.db.query.placement.findMany({
         where: eq(placement.studentId, sp.id),
       });
-      if (!placementRow) {
-        // Student has no placement, return empty events
+
+      if (placements.length === 0) {
+        // Student has no placements, return empty events
         return { items: [] };
       }
+
+      // Extract all placement IDs
+      const placementIds = placements.map((p) => p.id);
 
       const range = monthRange({ month: input.month, year: input.year });
       const startStr = range.start.toISOString().slice(0, 10);
@@ -406,7 +410,10 @@ export const calendarEventsRouter = createTRPCRouter({
         .from(calendarEvent)
         .where(
           and(
-            eq(calendarEvent.placementId, placementRow.id),
+            or(
+              inArray(calendarEvent.placementId, placementIds),
+              isNull(calendarEvent.placementId),
+            ),
             overlapWhere,
             input.type ? eq(calendarEvent.type, input.type) : undefined,
           ),
