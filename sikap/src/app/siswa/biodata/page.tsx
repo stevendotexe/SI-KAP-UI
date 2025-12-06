@@ -166,7 +166,7 @@ export default function BiodataSiswaPage() {
     if (dob) {
       // Parse as UTC to avoid timezone issues: "YYYY-MM-DD" -> UTC midnight
       const [year, month, day] = dob.split("-").map(Number)
-      birthDateValue = new Date(Date.UTC(year!, month! - 1, day!))
+      birthDateValue = new Date(Date.UTC(year!, month! - 1, day))
     }
     
     updateMutation.mutate({

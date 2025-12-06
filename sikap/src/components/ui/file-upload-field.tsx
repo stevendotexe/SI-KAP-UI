@@ -260,6 +260,9 @@ export function FileUploadField({
       }
 
       const filesToUpload = selectedFiles.slice(0, availableSlots);
+      if (process.env.NODE_ENV !== "production") {
+        console.debug("[upload-ui] select", { count: filesToUpload.length, names: filesToUpload.map(f => f.name) });
+      }
 
       // Validate files
       for (const file of filesToUpload) {
@@ -325,6 +328,9 @@ export function FileUploadField({
               }
             }
 
+            if (process.env.NODE_ENV !== "production") {
+              console.debug("[upload-ui] uploaded", { count: response.data.length });
+            }
             return updated;
           });
 
@@ -334,6 +340,9 @@ export function FileUploadField({
           }
         }
       } catch (err) {
+        if (process.env.NODE_ENV !== "production") {
+          console.debug("[upload-ui] error", err);
+        }
         // Mark pending files as error
         const errorMessage =
           err instanceof Error ? err.message : "Upload gagal";

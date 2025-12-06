@@ -20,17 +20,24 @@ import {
 } from "@/components/ui/dialog";
 import { Search, Plus, Pencil, Trash2 } from "lucide-react";
 import { api } from "@/trpc/react";
+import ActivityTaskCard from "@/components/activities/ActivityTaskCard";
 
 const typeColors = {
     "in_class": "bg-blue-100 text-blue-700",
     "field_trip": "bg-green-100 text-green-700",
     "meet_greet": "bg-amber-100 text-amber-700",
+    "meeting": "bg-purple-100 text-purple-700",
+    "deadline": "bg-red-100 text-red-700",
+    "milestone": "bg-indigo-100 text-indigo-700",
 };
 
 const typeLabels = {
     "in_class": "In-Class",
     "field_trip": "Field Trip",
     "meet_greet": "Meet & Greet",
+    "meeting": "Meeting",
+    "deadline": "Deadline",
+    "milestone": "Milestone",
 };
 
 export default function AktivitasPage() {
@@ -46,6 +53,11 @@ export default function AktivitasPage() {
         // companyId is optional - admin users will see all activities
         search: search || undefined,
         type: filterType === "all" ? undefined : filterType,
+    });
+
+    const { data: tasksData } = api.tasks.list.useQuery({
+        search: search || undefined,
+        limit: 100,
     });
 
     const deleteMutation = api.calendarEvents.delete.useMutation({
@@ -131,109 +143,53 @@ export default function AktivitasPage() {
                     </div>
                 )}
 
-                {/* Table */}
+                {/* Cards (Events + Tasks) */}
                 {!isLoading && !isError && (
-                    <div className="rounded-xl overflow-hidden border bg-card shadow-sm">
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead className="bg-destructive text-white">
-                                    <tr>
-                                        <th className="text-left text-sm font-medium px-4 py-3">
-                                            Nama Kegiatan
-                                        </th>
-                                        <th className="text-left text-sm font-medium px-4 py-3">
-                                            Tipe
-                                        </th>
-                                        <th className="text-left text-sm font-medium px-4 py-3">
-                                            Tanggal & Waktu
-                                        </th>
-                                        <th className="text-left text-sm font-medium px-4 py-3">
-                                            Penyelenggara
-                                        </th>
-                                        <th className="text-left text-sm font-medium px-4 py-3">
-                                            Warna
-                                        </th>
-                                        <th className="text-left text-sm font-medium px-4 py-3">
-                                            Aksi
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {events && events.length > 0 ? (
-                                        events.map((activity, index) => {
-                                            const type = activity.type as keyof typeof typeColors;
-                                            return (
-                                                <tr
-                                                    key={activity.id}
-                                                    className={`border-t ${index % 2 === 0 ? "bg-background" : "bg-muted/30"}`}
-                                                >
-                                                    <td className="px-4 py-3 text-sm font-medium">
-                                                        {activity.title}
-                                                    </td>
-                                                    <td className="px-4 py-3">
-                                                        <span
-                                                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${typeColors[type] ?? "bg-gray-100 text-gray-700"}`}
-                                                        >
-                                                            {typeLabels[type] ?? activity.type}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-4 py-3 text-sm">
-                                                        {new Date(activity.startDate).toLocaleDateString("id-ID", {
-                                                            day: "numeric",
-                                                            month: "short",
-                                                            year: "numeric",
-                                                        })}{" "}
-                                                        - {new Date(activity.startDate).toLocaleTimeString("id-ID", {
-                                                            hour: "2-digit",
-                                                            minute: "2-digit",
-                                                        })}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-sm">{activity.organizerName ?? "-"}</td>
-                                                    <td className="px-4 py-3">
-                                                        <div className="flex items-center gap-2">
-                                                            <div
-                                                                className="w-6 h-6 rounded-full border"
-                                                                style={{ backgroundColor: activity.colorHex ?? "#3b82f6" }}
-                                                            ></div>
-                                                            <span className="text-xs text-muted-foreground">
-                                                                {activity.colorHex ?? "#3b82f6"}
-                                                            </span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-4 py-3">
-                                                        <div className="flex items-center gap-2">
-                                                            <Link href={`/admin/aktivitas/${activity.id}/edit`}>
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="ghost"
-                                                                    className="hover:bg-muted cursor-pointer"
-                                                                >
-                                                                    <Pencil className="w-4 h-4" />
-                                                                </Button>
-                                                            </Link>
-                                                            <Button
-                                                                size="sm"
-                                                                variant="ghost"
-                                                                className="hover:bg-destructive/10 text-destructive cursor-pointer"
-                                                                onClick={() => handleDeleteClick({ id: activity.id, title: activity.title })}
-                                                            >
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </Button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })
-                                    ) : (
-                                        <tr>
-                                            <td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground">
-                                                Tidak ada aktivitas ditemukan
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {(events ?? []).map((ev) => (
+                            <ActivityTaskCard
+                                key={`event-${ev.id}`}
+                                item={{
+                                    kind: "event",
+                                    id: ev.id,
+                                    title: ev.title,
+                                    description: ev.description ?? null,
+                                    dateLabel: new Date(ev.startDate).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }),
+                                    timeLabel: new Date(ev.startDate).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
+                                    typeLabel: typeLabels[ev.type] ?? ev.type,
+                                    organizerName: ev.organizerName ?? null,
+                                    colorHex: ev.colorHex ?? undefined,
+                                }}
+                                actions={
+                                    <>
+                                        <Link href={`/admin/aktivitas/${ev.id}/edit`}>
+                                            <Button variant="ghost" size="sm">Edit</Button>
+                                        </Link>
+                                        <Button variant="ghost" size="sm" className="text-destructive" onClick={() => handleDeleteClick({ id: ev.id, title: ev.title })}>Hapus</Button>
+                                    </>
+                                }
+                            />
+                        ))}
+
+                        {(tasksData?.items ?? []).map((t) => (
+                            <ActivityTaskCard
+                                key={`task-${t.id}`}
+                                item={{
+                                    kind: "task",
+                                    id: t.id,
+                                    title: t.title,
+                                    description: t.description ?? undefined,
+                                    dateLabel: t.dueDate ? new Date(t.dueDate).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : "",
+                                    timeLabel: undefined,
+                                    status: (t.status as "todo" | "in_progress" | "submitted" | "approved" | "rejected") ?? "todo",
+                                }}
+                                actions={
+                                    <Link href={`/mentor/tugas/${t.id}/monitoring`}>
+                                        <Button variant="outline" size="sm">Monitoring</Button>
+                                    </Link>
+                                }
+                            />
+                        ))}
                     </div>
                 )}
             </div>

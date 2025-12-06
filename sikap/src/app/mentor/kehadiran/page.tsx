@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Spinner } from "@/components/ui/spinner"
 import Link from "next/link"
 import { api } from "@/trpc/react"
+import { useMentorCompany } from "@/components/mentor/useMentorCompany"
 
 export default function Page() {
   const [month, setMonth] = React.useState("Semua Tanggal")
@@ -17,22 +18,23 @@ export default function Page() {
     }
     const [year, monthNum] = month.split("-").map(Number)
     if (!year || !monthNum) return {}
-    
+
     const from = new Date(year, monthNum - 1, 1)
     const to = new Date(year, monthNum, 0) // Last day of the month
     to.setHours(23, 59, 59, 999)
-    
+
     return { from, to }
   }, [month])
 
-  // TODO: Replace hardcoded companyId with mentor's actual company from session/profile
+  const { companyId, isLoading: isMentorLoading, isError: isMentorError } = useMentorCompany()
+
   const { data, isLoading, isError, refetch } = api.attendances.list.useQuery({
-    companyId: 1, // TODO: Get from mentor profile
+    companyId: companyId!,
     from: dateRange.from,
     to: dateRange.to,
     limit: 100,
     offset: 0,
-  })
+  }, { enabled: !!companyId })
 
   const items = data?.items ?? []
   const summary = data?.summary ?? { date: new Date().toISOString().slice(0, 10), presentCount: 0, absentCount: 0, total: 0, attendancePercent: 0 }
@@ -83,7 +85,11 @@ export default function Page() {
         </div>
 
         <div className="mt-4 bg-card border rounded-xl shadow-sm p-4">
-          {isLoading ? (
+          {isMentorLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground"><Spinner /> Memuat profil mentor...</div>
+          ) : isMentorError ? (
+            <div className="text-sm text-destructive">Gagal memuat profil mentor.</div>
+          ) : isLoading ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground"><Spinner /> Memuat data kehadiran...</div>
           ) : isError ? (
             <div className="flex flex-col items-start gap-2">
@@ -121,30 +127,22 @@ export default function Page() {
 }
 
 function AccumulationTable() {
-  // TODO: Replace hardcoded companyId with mentor's actual company from session/profile
-  // This table shows cumulative attendance per student - requires a different API endpoint
-  // For now, we'll derive it from the list data or use a separate query
-  const { data, isLoading } = api.attendances.list.useQuery({
-    companyId: 1,
+  const { companyId, isLoading: isMentorLoading } = useMentorCompany()
+
+  // Use the new accumulation endpoint
+  const { data, isLoading, isError, refetch } = api.attendances.listStudentAccumulation.useQuery({
+    companyId: companyId!,
     limit: 200,
     offset: 0,
-  })
+  }, { enabled: !!companyId })
 
   const [page, setPage] = React.useState(1)
   const [q, setQ] = React.useState("")
   const perPage = 10
 
-  // Create a summary per student from the attendance data
-  // Note: This is a simplified approach - ideally the backend should provide an aggregated endpoint
-  const studentSummary = React.useMemo(() => {
-    if (!data?.items) return []
-    
-    // For now, return an empty array since we need detail data per student
-    // The actual implementation would need a dedicated API endpoint for student accumulation
-    return []
-  }, [data])
+  const studentSummary = data?.items ?? []
 
-  const filtered = React.useMemo(() => studentSummary.filter((r: { name: string }) => (q ? r.name.toLowerCase().includes(q.toLowerCase()) : true)), [studentSummary, q])
+  const filtered = React.useMemo(() => studentSummary.filter((r) => (q ? r.name.toLowerCase().includes(q.toLowerCase()) : true)), [studentSummary, q])
   const totalPages = Math.ceil(filtered.length / perPage) || 1
   const start = (page - 1) * perPage
   const rows = filtered.slice(start, start + perPage)

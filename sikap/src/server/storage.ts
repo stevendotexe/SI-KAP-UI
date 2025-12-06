@@ -52,7 +52,7 @@ export async function uploadFilesAction(
   if (!session?.user) {
     throw new Error("UNAUTHORIZED");
   }
-  console.log("upload:start", { userId: session.user.id });
+  console.log("[storage] upload:start", { userId: session.user.id });
   const ownerTypeEntry = formData.get("ownerType");
   const ownerType = (
     typeof ownerTypeEntry === "string" ? ownerTypeEntry : ""
@@ -80,6 +80,7 @@ export async function uploadFilesAction(
     if (f.size > MAX_BYTES) {
       throw new Error("PAYLOAD_TOO_LARGE");
     }
+    console.log("[storage] upload:validate", { name: f.name, type: f.type, size: f.size });
     const compressed = await maybeCompress(f);
     const name = f.name;
     const blobName =
@@ -102,7 +103,7 @@ export async function uploadFilesAction(
     body: outForm,
   });
   if (!res.ok) {
-    console.error("upload:error", { status: res.status });
+    console.error("[storage] upload:error", { status: res.status });
     throw new Error("STORAGE_UPLOAD_FAILED");
   }
   const json = (await res.json()) as UploadResponse;
@@ -119,18 +120,23 @@ export async function uploadFilesAction(
     // Update the item URL to be absolute for the response
     it.url = fileUrl;
 
-    await db.insert(attachment).values({
-      ownerType,
-      ownerId,
-      url: fileUrl,
-      filename: it.filename,
-      mimeType: it.mimetype,
-      sizeBytes: typeof size === "number" ? size : undefined,
-      createdById: session.user.id,
-    });
+    // Jika ownerId <= 0, lewati insert DB (entity belum terbentuk), tetap kembalikan hasil upload
+    if (ownerId > 0) {
+      await db.insert(attachment).values({
+        ownerType,
+        ownerId,
+        url: fileUrl,
+        filename: it.filename,
+        mimeType: it.mimetype,
+        sizeBytes: typeof size === "number" ? size : undefined,
+        createdById: session.user.id,
+      });
+    } else {
+      console.log("[storage] upload:skip-db", { filename: it.filename, reason: "placeholder-ownerId" });
+    }
   }
 
-  console.log("upload:success", {
+  console.log("[storage] upload:success", {
     count: items.length,
     userId: session.user.id,
   });

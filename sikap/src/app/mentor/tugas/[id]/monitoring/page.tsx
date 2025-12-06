@@ -6,8 +6,11 @@ import PieChart from "@/components/dashboard/PieChart"
 import BackButton from "@/components/students/BackButton"
 import { Loader2 } from "lucide-react"
 
-export default function Page({ params }: { params: { id: string } }) {
-  const { data, isLoading, isError, error } = api.tasks.getSubmissions.useQuery({ taskId: Number(params.id) });
+export default function Page({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = React.use(params)
+  const taskId = Number(id)
+  const { data, isLoading, isError, error } = api.tasks.getSubmissions.useQuery({ taskId })
+  const { data: taskDetail } = api.tasks.detailForMentor.useQuery({ taskId })
 
   if (isLoading) {
     return (
@@ -29,11 +32,9 @@ export default function Page({ params }: { params: { id: string } }) {
   const { task, submissions, stats } = data
 
   const pie = [
-    { name: "Belum Mulai", value: stats.todo },
-    { name: "Dalam Proses", value: stats.inProgress },
-    { name: "Menunggu Review", value: stats.submitted },
-    { name: "Selesai", value: stats.approved },
-    { name: "Ditolak", value: stats.rejected },
+    { name: "Belum Dikerjakan", value: stats.todo + stats.inProgress + stats.rejected },
+    { name: "Belum Direview", value: stats.submitted },
+    { name: "Sudah Direview", value: stats.approved },
   ]
 
   // Filter out zero values for cleaner chart
@@ -48,17 +49,28 @@ export default function Page({ params }: { params: { id: string } }) {
           <p className="text-sm text-muted-foreground">Deadline: {task.dueDate ? new Date(task.dueDate).toLocaleDateString("id-ID", { dateStyle: "long" }) : "-"}</p>
         </div>
 
+        {taskDetail?.attachments && taskDetail.attachments.length > 0 && (
+          <div className="bg-card border rounded-xl shadow-sm p-4 mt-4">
+            <div className="text-sm font-medium mb-3">Lampiran Tugas</div>
+            <div className="flex flex-wrap gap-2">
+              {taskDetail.attachments.map((f) => (
+                <a key={f.id} href={f.url} target="_blank" rel="noreferrer" className="text-primary hover:underline truncate max-w-[200px]">
+                  {f.filename ?? "File"}
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
           <div className="bg-card border rounded-xl shadow-sm p-4">
             <div className="text-sm font-medium mb-3">Ringkasan Status</div>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between"><span>Total Siswa</span><span className="font-medium">{stats.total}</span></div>
               <div className="h-px bg-border my-2" />
-              <div className="flex justify-between"><span>Belum Mulai</span><span>{stats.todo}</span></div>
-              <div className="flex justify-between"><span>Dalam Proses</span><span>{stats.inProgress}</span></div>
-              <div className="flex justify-between"><span>Menunggu Review</span><span>{stats.submitted}</span></div>
-              <div className="flex justify-between"><span>Selesai</span><span>{stats.approved}</span></div>
-              <div className="flex justify-between"><span>Ditolak/Revisi</span><span>{stats.rejected}</span></div>
+              <div className="flex justify-between"><span>Belum Dikerjakan</span><span>{stats.todo + stats.inProgress + stats.rejected}</span></div>
+              <div className="flex justify-between"><span>Belum Direview</span><span>{stats.submitted}</span></div>
+              <div className="flex justify-between"><span>Sudah Direview</span><span>{stats.approved}</span></div>
             </div>
           </div>
 
@@ -118,11 +130,11 @@ export default function Page({ params }: { params: { id: string } }) {
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string, cls: string }> = {
-    todo: { label: "Belum Mulai", cls: "bg-slate-100 text-slate-700 border-slate-200" },
-    in_progress: { label: "Dalam Proses", cls: "bg-blue-100 text-blue-700 border-blue-200" },
-    submitted: { label: "Menunggu Review", cls: "bg-yellow-100 text-yellow-700 border-yellow-200" },
-    approved: { label: "Selesai", cls: "bg-green-100 text-green-700 border-green-200" },
-    rejected: { label: "Ditolak", cls: "bg-red-100 text-red-700 border-red-200" },
+    todo: { label: "Belum Dikerjakan", cls: "bg-slate-100 text-slate-700 border-slate-200" },
+    in_progress: { label: "Belum Dikerjakan", cls: "bg-slate-100 text-slate-700 border-slate-200" },
+    submitted: { label: "Belum Direview", cls: "bg-yellow-100 text-yellow-700 border-yellow-200" },
+    approved: { label: "Sudah Direview", cls: "bg-green-100 text-green-700 border-green-200" },
+    rejected: { label: "Belum Dikerjakan", cls: "bg-red-100 text-red-700 border-red-200" },
   }
   const s = map[status] ?? { label: status, cls: "bg-gray-100" }
   return <span className={`px-2 py-0.5 rounded-full text-xs border ${s.cls}`}>{s.label}</span>

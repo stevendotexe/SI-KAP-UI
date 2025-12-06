@@ -137,10 +137,10 @@ export default function SiswaAktivitasPage() {
                                     {/* Type badge */}
                                     <div className="mb-3">
                                         <span
-                                            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${typeColors[event.type as keyof typeof typeColors] || "bg-gray-100 text-gray-700 border-gray-200"
+                                            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${typeColors[event.type] || "bg-gray-100 text-gray-700 border-gray-200"
                                                 }`}
                                         >
-                                            {typeLabels[event.type as keyof typeof typeLabels] || event.type}
+                                            {typeLabels[event.type] || event.type}
                                         </span>
                                     </div>
 

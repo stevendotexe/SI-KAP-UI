@@ -18,7 +18,8 @@
     "lint:fix": "next lint --fix",
     "preview": "next build && next start",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:unit": "tsx tests/add-task-dialog.test.ts"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.7.2",

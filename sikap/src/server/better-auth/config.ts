@@ -8,8 +8,9 @@ import { db } from "@/server/db";
 
 const statements = {
   ...defaultStatements,
+  ...adminAc.statements,
   placement: ["create", "read", "update"],
-  user: ["create", "read", "update", "delete"],
+
   attendanceLog: ["create", "read", "verify"],
   assessment: ["create", "read", "update", "delete"],
   task: ["create", "read", "update", "delete", "review"],
@@ -17,6 +18,7 @@ const statements = {
   studentProfile: ["create", "read", "update"],
   mentorProfile: ["read", "update"],
   calendarEvent: ["create", "read", "update", "delete"],
+  analytics: ["read"],
 } as const;
 
 const ac = createAccessControl(statements);
@@ -31,6 +33,7 @@ const adminRole = ac.newRole({
   studentProfile: ["read"],
   mentorProfile: ["read", "update"],
   calendarEvent: ["create", "read", "update", "delete"],
+  analytics: ["read"],
 });
 
 const mentorRole = ac.newRole({
@@ -43,6 +46,7 @@ const mentorRole = ac.newRole({
   studentProfile: ["create", "read", "update"],
   mentorProfile: ["read", "update"],
   calendarEvent: ["create", "read", "update"],
+  analytics: ["read"],
 });
 
 const studentRole = ac.newRole({

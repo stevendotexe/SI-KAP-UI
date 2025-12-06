@@ -48,8 +48,21 @@ export default function Page() {
 function TaskClient() {
   const [q, setQ] = React.useState("")
   const [date, setDate] = React.useState("Semua Tanggal")
-  const { data: tasksData, refetch } = api.tasks.list.useQuery({
-    search: q,
+
+  const range = React.useMemo(() => {
+    if (date === "Semua Tanggal") return {}
+    const [year, month] = date.split("-").map(Number)
+    if (!year || !month) return {}
+    const from = new Date(year, month - 1, 1)
+    const to = new Date(year, month, 0)
+    to.setHours(23,59,59,999)
+    return { from, to }
+  }, [date])
+
+  const { data: tasksData, isLoading, isError, error, refetch } = api.tasks.list.useQuery({
+    search: q || undefined,
+    from: range.from,
+    to: range.to,
     limit: 100,
   })
 
@@ -77,12 +90,10 @@ function TaskClient() {
           <h1 className="text-2xl font-semibold">Tugas</h1>
           <p className="text-sm text-muted-foreground">Kelola tugas untuk siswa</p>
         </div>
-        {/* 
-          TODO: Add FileUploadField to AddTaskDialog for task attachments
-          Reference: sikap/src/components/ui/file-upload-field.tsx
-          Usage: <FileUploadField ownerType="task" ownerId={taskId} value={attachments} onChange={setAttachments} />
-        */}
-        <AddTaskDialog onAdd={onAdd} />
+        {/* Pastikan tombol selalu terlihat */}
+        <div className="shrink-0 z-10">
+          <AddTaskDialog onAdd={onAdd} />
+        </div>
       </div>
 
       <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cari Judul/Deskripsi Tugas" className="h-10" />
@@ -98,9 +109,16 @@ function TaskClient() {
         </SelectContent>
       </Select>
 
-      {/* NOTE: TaskCard monitoring link also requires backend support (see monitoring page) */}
       <div className="space-y-3">
-        {filtered.length === 0 ? (
+        {isLoading ? (
+          <div className="text-sm text-muted-foreground">Memuat tugas...</div>
+        ) : isError ? (
+          <div className="flex flex-col items-start gap-2">
+            <div className="text-sm text-destructive">Gagal memuat tugas.</div>
+            <button className="px-3 py-1 rounded-(--radius-sm) border" onClick={() => refetch()}>Coba Lagi</button>
+            <div className="text-xs text-muted-foreground">{error?.message}</div>
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="text-sm text-muted-foreground">Tidak ada tugas.</div>
         ) : (
           filtered.map((t) => <TaskCard key={t.id} t={t} />)

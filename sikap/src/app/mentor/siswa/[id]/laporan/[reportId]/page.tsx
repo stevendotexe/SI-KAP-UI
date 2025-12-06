@@ -1,4 +1,5 @@
 import React from "react"
+export const revalidate = 0
 import BackButton from "@/components/students/BackButton"
 import ReportDetailClient from "@/components/students/ReportDetailClient"
 import { createTRPCContext } from "@/server/api/trpc"

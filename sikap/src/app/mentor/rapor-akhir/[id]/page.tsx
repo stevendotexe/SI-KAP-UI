@@ -64,19 +64,39 @@ export default function EditRaporAkhirPage() {
         setRataRata(Math.round(average * 10) / 10);
     }, [personalityScores, technicalScores]);
 
-    // Mock graph data (kept from original)
+    // Fetch real trend data from API
+    const { data: trendsData } = api.finalReports.getStudentTrends.useQuery(
+        { placementId: reportData?.placementId ?? 0 },
+        { enabled: !!reportData?.placementId }
+    );
+
+    // Use real data or empty array
     const attendanceSeries = useMemo(() => {
-        // Use major from reportData if available, default to TKJ
-        const major = reportData?.student.major || "TKJ";
-        const base = major === "RPL" ? 85 : 82;
-        return [0, 1, 2, 3, 4, 5].map((i) => ({ period: `M${i + 1}`, count: Math.max(60, Math.min(98, Math.round(base + (i - 3) * 2 + (i % 2 ? 3 : -2)))) }));
-    }, [reportData]);
+        if (!trendsData?.attendanceTrend?.length) {
+            // Return empty or default 6 months if no data
+            return Array.from({ length: 6 }, (_, i) => ({
+                period: `M${i + 1}`,
+                count: 0,
+            }));
+        }
+        return trendsData.attendanceTrend.map((item, idx) => ({
+            period: `M${idx + 1}`,
+            count: item.count,
+        }));
+    }, [trendsData]);
 
     const scoreSeries = useMemo(() => {
-        const major = reportData?.student.major || "TKJ";
-        const base = major === "RPL" ? 78 : 75;
-        return [0, 1, 2, 3, 4, 5].map((i) => ({ period: `M${i + 1}`, count: Math.max(60, Math.min(98, Math.round(base + (i - 3) * 2 + (i % 2 ? 2 : -1)))) }));
-    }, [reportData]);
+        if (!trendsData?.scoreTrend?.length) {
+            return Array.from({ length: 6 }, (_, i) => ({
+                period: `M${i + 1}`,
+                count: 0,
+            }));
+        }
+        return trendsData.scoreTrend.map((item, idx) => ({
+            period: `M${idx + 1}`,
+            count: item.count,
+        }));
+    }, [trendsData]);
 
     const attGrowth = useMemo(() => {
         const first = attendanceSeries[0]?.count ?? 0;

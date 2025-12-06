@@ -255,14 +255,12 @@ export const dashboardsRouter = createTRPCRouter({
         mentorFilterId = mp.id;
       }
 
-      // Students: count active students (filtered by mentor if applicable)
+      // Students: count students with active placements (filtered by mentor if applicable)
       const [studentsRow] = await ctx.db
-        .select({ count: sql<number>`count(distinct ${studentProfile.id})` })
-        .from(studentProfile)
-        .innerJoin(placement, eq(studentProfile.id, placement.studentId))
+        .select({ count: sql<number>`count(distinct ${placement.studentId})` })
+        .from(placement)
         .where(
           and(
-            eq(studentProfile.active, true),
             eq(placement.status, "active"),
             mentorFilterId ? eq(placement.mentorId, mentorFilterId) : undefined,
           ),

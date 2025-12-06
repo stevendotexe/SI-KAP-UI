@@ -1,7 +1,8 @@
 import React from "react"
+export const revalidate = 0
 import StudentDetailHeader from "@/components/students/StudentDetailHeader"
 import ClientSection from "@/components/students/ClientSection"
-import { type Report } from "@/components/students/StudentReportTable"
+import { type Report, type StudentTask } from "@/components/students/StudentReportTable"
 import { createTRPCContext } from "@/server/api/trpc"
 import { createCaller } from "@/server/api/root"
 import Link from "next/link"
@@ -58,7 +59,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     )
   }
 
-  const { profile, stats, attendance, reports: backendReports } = studentData
+  const { profile, stats, attendance, reports: backendReports, tasks: backendTasks } = studentData
 
   // Map data for components
   const name = profile.name
@@ -77,6 +78,13 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     date: formatDate(r.submittedAt),
     score: r.score ?? 0,
     reviewed: r.reviewStatus === "approved" || r.reviewStatus === "rejected",
+  }))
+
+  const tasks: StudentTask[] = (backendTasks ?? []).map((t) => ({
+    id: t.id,
+    title: t.title ?? "Tugas",
+    date: formatDate(t.dueDate),
+    status: t.status as any,
   }))
 
   // Create score series from reports
@@ -102,13 +110,15 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
 
   // Map info object
   const info = {
+    userId: profile.userId,
+    name: name,
     email: profile.email,
     sekolah: profile.school ?? "-",
-    jurusan: profile.cohort ?? "-",
-    mulai: "-",
-    selesai: "-",
+    jurusan: profile.major ?? profile.cohort ?? "-",
+    mulai: formatDate(profile.startDate),
+    selesai: formatDate(profile.endDate),
     mesh: attendance.percent >= 80 ? "Masuk" : "Kurang",
-    alamat: "-",
+    alamat: profile.address ?? "-",
   }
 
   return (
@@ -116,7 +126,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       <div className="max-w-[1200px] mx-auto px-6 py-8">
         <StudentDetailHeader name={name} code={code} status={status} totalReports={totalReports} avgScore={avgScore} mentor={mentor} />
 
-        <ClientSection scoreSeries={scoreSeries} attendanceSeries={attendanceSeries} reports={reports} info={info} />
+        <ClientSection scoreSeries={scoreSeries} attendanceSeries={attendanceSeries} reports={reports} tasks={tasks} info={info} />
       </div>
     </main>
   )

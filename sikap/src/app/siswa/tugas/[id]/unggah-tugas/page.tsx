@@ -1,5 +1,6 @@
 "use client"
 
+import React from "react"
 import { Button } from "@/components/ui/button"
 import { FileUploadField, type FileUploadValue } from "@/components/ui/file-upload-field"
 import { Spinner } from "@/components/ui/spinner"
@@ -9,7 +10,8 @@ import { useState, useEffect, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 
 export default function UnggahTugasPage() {
-  const params = useParams()
+  const paramsPromise = useParams()
+  const params = React.use(paramsPromise as unknown as Promise<Record<string, string>>)
   const router = useRouter()
   const taskId = Number(params.id)
 

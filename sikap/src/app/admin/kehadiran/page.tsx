@@ -28,11 +28,17 @@ export default function AdminKehadiranPage() {
   // TODO: Add company selector UI - hardcoded to company 1 for now
   const companyId = 1;
 
+  // Validate date before query
+  const dateObj = new Date(selectedDate);
+  const isValidDate = !isNaN(dateObj.getTime());
+
   const { data, isLoading, isError } = api.attendances.detail.useQuery({
     companyId,
-    date: new Date(selectedDate),
+    date: dateObj,
     search: search || undefined,
     limit: 200,
+  }, {
+    enabled: isValidDate,
   });
 
   const formatDate = (dateStr: string) => {

@@ -169,13 +169,12 @@ export const calendarEventsRouter = createTRPCRouter({
           organizerName: calendarEvent.organizerName,
           organizerLogoUrl: calendarEvent.organizerLogoUrl,
           colorHex: calendarEvent.colorHex,
-          placementId: placement.id,
+          placementId: calendarEvent.placementId,
           createdById: calendarEvent.createdById,
           createdByName: creatorUser.name,
           createdByEmail: creatorUser.email,
         })
         .from(calendarEvent)
-        .innerJoin(placement, eq(calendarEvent.placementId, placement.id))
         .leftJoin(creatorUser, eq(calendarEvent.createdById, creatorUser.id))
         .where(eq(calendarEvent.id, input.eventId))
         .limit(1);
@@ -183,7 +182,8 @@ export const calendarEventsRouter = createTRPCRouter({
       const ev = rows[0];
       if (!ev) throw new TRPCError({ code: "NOT_FOUND" });
 
-      if (ctx.session.user.role === "mentor") {
+      // For mentors, check access only if event has a placementId
+      if (ctx.session.user.role === "mentor" && ev.placementId) {
         const mp = await ctx.db.query.mentorProfile.findFirst({
           where: eq(mentorProfile.userId, ctx.session.user.id),
         });
