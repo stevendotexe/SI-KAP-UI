@@ -58,7 +58,7 @@ export default function AdminKehadiranPage() {
     hadir: data?.items.filter((a) => a.status === "present").length ?? 0,
     tidakHadir: data?.items.filter((a) => a.status === "absent").length ?? 0,
     izin: data?.items.filter((a) => a.status === "excused").length ?? 0,
-    terlambat: data?.items.filter((a) => a.status === "late").length ?? 0,
+
   };
 
   return (
@@ -107,7 +107,7 @@ export default function AdminKehadiranPage() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="rounded-2xl border bg-card p-4 shadow-sm text-center">
             <div className="text-3xl font-semibold text-emerald-600">{summary.hadir}</div>
             <div className="text-sm text-muted-foreground mt-1">Hadir</div>
@@ -120,10 +120,7 @@ export default function AdminKehadiranPage() {
             <div className="text-3xl font-semibold text-blue-600">{summary.izin}</div>
             <div className="text-sm text-muted-foreground mt-1">Izin</div>
           </div>
-          <div className="rounded-2xl border bg-card p-4 shadow-sm text-center">
-            <div className="text-3xl font-semibold text-amber-600">{summary.terlambat}</div>
-            <div className="text-sm text-muted-foreground mt-1">Terlambat</div>
-          </div>
+
         </div>
 
         {/* Search */}
@@ -165,7 +162,7 @@ export default function AdminKehadiranPage() {
                     <th className="text-center text-sm font-medium text-emerald-700 px-4 py-3 bg-emerald-50">H</th>
                     <th className="text-center text-sm font-medium text-red-700 px-4 py-3 bg-red-50">TH</th>
                     <th className="text-center text-sm font-medium text-blue-700 px-4 py-3 bg-blue-50">I</th>
-                    <th className="text-center text-sm font-medium text-amber-700 px-4 py-3 bg-amber-50">T</th>
+
                   </tr>
                 </thead>
                 <tbody>
@@ -193,9 +190,7 @@ export default function AdminKehadiranPage() {
                       <td className="px-4 py-3 text-center text-sm font-semibold text-blue-700">
                         {attendance.counters.izin}
                       </td>
-                      <td className="px-4 py-3 text-center text-sm font-semibold text-amber-700">
-                        {attendance.counters.terlambat}
-                      </td>
+
                     </tr>
                   ))}
                 </tbody>
