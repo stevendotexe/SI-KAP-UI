@@ -145,7 +145,7 @@ export default function AdminKehadiranPage() {
           <div className="overflow-x-auto">
             {isLoading ? (
               <div className="flex justify-center py-12">
-                <Spinner size="lg" />
+                <Spinner className="size-8" />
               </div>
             ) : isError ? (
               <div className="text-center py-12 text-destructive">
