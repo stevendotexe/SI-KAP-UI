@@ -9,10 +9,12 @@ import { db } from "@/server/db";
 const statements = {
   ...defaultStatements,
   placement: ["create", "read", "update"],
-  attendance: ["create", "read", "verify"],
+  user: ["create", "read", "update", "delete"],
+  attendanceLog: ["create", "read", "verify"],
+  assessment: ["create", "read", "update", "delete"],
   task: ["create", "read", "update", "delete", "review"],
   report: ["create", "read", "update", "review"],
-  studentProfile: ["read"],
+  studentProfile: ["create", "read", "update"],
   mentorProfile: ["read", "update"],
   calendarEvent: ["create", "read", "update", "delete"],
 } as const;
@@ -22,7 +24,8 @@ const ac = createAccessControl(statements);
 const adminRole = ac.newRole({
   ...adminAc.statements,
   placement: ["create", "read", "update"],
-  attendance: ["read", "verify"],
+  attendanceLog: ["read", "verify"],
+  assessment: ["create", "read", "update", "delete"],
   task: ["create", "read", "update", "delete", "review"],
   report: ["create", "read", "update", "review"],
   studentProfile: ["read"],
@@ -32,17 +35,20 @@ const adminRole = ac.newRole({
 
 const mentorRole = ac.newRole({
   placement: ["read", "update"],
-  attendance: ["read", "verify"],
+  attendanceLog: ["read", "verify"],
+  assessment: ["create", "read", "update"],
   task: ["create", "read", "update", "review"],
   report: ["read", "review"],
-  studentProfile: ["read"],
+  user: ["create"],
+  studentProfile: ["create", "read", "update"],
   mentorProfile: ["read", "update"],
   calendarEvent: ["create", "read", "update"],
 });
 
 const studentRole = ac.newRole({
   placement: ["read"],
-  attendance: ["create", "read"],
+  attendanceLog: ["create", "read"],
+  assessment: ["read"],
   task: ["read", "update"],
   report: ["create", "read"],
   studentProfile: ["read"],

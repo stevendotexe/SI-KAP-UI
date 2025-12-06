@@ -13,6 +13,11 @@ import superjson from "superjson";
 import { ZodError } from "zod";
 
 import { auth } from "@/server/better-auth";
+import { type headers } from "next/headers";
+
+// Derive the exact return type of `headers()` from Next.js so we can accept it without
+// depending on an exported symbol that may not exist across Next versions.
+type ReadonlyHeadersFromNext = Awaited<ReturnType<typeof headers>>;
 import { db } from "@/server/db";
 
 /**
@@ -27,14 +32,18 @@ import { db } from "@/server/db";
  *
  * @see https://trpc.io/docs/server/context
  */
-export const createTRPCContext = async (opts: { headers: Headers }) => {
+export const createTRPCContext = async (opts: { headers: HeadersInit | ReadonlyHeadersFromNext }) => {
+  // Normalize incoming headers (ReadonlyHeaders from `next/headers()` or HeadersInit)
+  const normalized = new Headers((opts.headers as unknown) as HeadersInit);
+
   const session = await auth.api.getSession({
-    headers: opts.headers,
+    headers: normalized,
   });
+
   return {
     db,
     session,
-    ...opts,
+    headers: normalized,
   };
 };
 

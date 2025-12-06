@@ -5,6 +5,20 @@
 import "./src/env.js";
 
 /** @type {import("next").NextConfig} */
-const config = {};
+const config = {
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "5mb",
+    },
+  },
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "via.placeholder.com",
+      },
+    ],
+  },
+};
 
 export default config;

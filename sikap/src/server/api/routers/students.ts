@@ -64,15 +64,22 @@ const docs = {
     description:
       "## Check Out (Siswa)\n\nMelakukan absensi keluar dengan validasi jarak maksimum 100 meter, memastikan sudah check-in, dan wajib menyertakan nama file selfie yang sudah di-upload oleh FE.\n\n### Parameters\n- `latitude` (number)\n- `longitude` (number)\n- `selfieFilename` (string)\n\n### Response\n`{ success: true }`.\n\n### Example (React)\n```ts\nconst m = api.students.checkOut.useMutation();\nm.mutate({ latitude, longitude, selfieFilename: 'out.jpg' });\n```",
   },
+  me: {
+    description:
+      "## Profile Siswa (Self)\n\nAmbil biodata siswa yang sedang login.\n\n### Response\n`{ id, userId, name, email, nis, birthPlace, birthDate, gender, semester, school, major, cohort, address, phone }`.\n\n### Example (React)\n```ts\nconst { data } = api.students.me.useQuery();\n```",
+  },
+  updateProfile: {
+    description:
+      "## Update Profile Siswa (Self)\n\nPerbarui biodata siswa yang sedang login.\n\n### Parameters\n- `name` (string, optional)\n- `nis` (string, optional)\n- `birthPlace` (string, optional)\n- `birthDate` (Date, optional)\n- `gender` (string, optional)\n- `semester` (number, optional)\n- `school` (string, optional)\n- `major` (string, optional)\n- `cohort` (string, optional)\n- `address` (string, optional)\n- `phone` (string, optional)\n\n### Response\nProfil yang sudah diperbarui.\n\n### Example (React)\n```ts\nconst m = api.students.updateProfile.useMutation();\nm.mutate({ name: 'Rafif', nis: '123', semester: 6 });\n```",
+  },
 };
 
 export const studentsRouter = createTRPCRouter({
   list: adminOrMentorProcedure
-    .meta(docs.list)
     .use(requirePermissions({ studentProfile: ["read"], placement: ["read"] }))
     .input(
       z.object({
-        companyId: z.number(),
+        companyId: z.number().optional(),
         year: z.number().optional(),
         school: z.string().optional(),
         status: z.enum(["active", "completed", "canceled"]).optional(),
@@ -82,6 +89,18 @@ export const studentsRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
+      // Note: companyId parameter is kept for backwards compatibility but not used for filtering anymore
+      // For mentors, we show all students in the system regardless of placement company
+
+      let mentorId: number | null = null;
+      if (ctx.session.user.role === "mentor") {
+        const mp = await ctx.db.query.mentorProfile.findFirst({
+          where: eq(mentorProfile.userId, ctx.session.user.id),
+        });
+        if (!mp) throw new TRPCError({ code: "FORBIDDEN" });
+        mentorId = mp.id;
+      }
+
       const rows = await ctx.db
         .select({
           id: studentProfile.id,
@@ -89,15 +108,16 @@ export const studentsRouter = createTRPCRouter({
           name: user.name,
           school: studentProfile.school,
           cohort: studentProfile.cohort,
-          year: sql<number>`date_part('year', ${placement.startDate}::timestamp)`,
+          year: sql<number | null>`date_part('year', ${placement.startDate}::timestamp)`,
           status: placement.status,
+          nis: studentProfile.nis,
         })
-        .from(placement)
-        .innerJoin(studentProfile, eq(placement.studentId, studentProfile.id))
+        .from(studentProfile)
         .innerJoin(user, eq(studentProfile.userId, user.id))
+        .leftJoin(placement, eq(placement.studentId, studentProfile.id))
         .where(
           and(
-            eq(placement.companyId, input.companyId),
+            mentorId ? eq(placement.mentorId, mentorId) : undefined,
             input.status ? eq(placement.status, input.status) : undefined,
             input.school ? eq(studentProfile.school, input.school) : undefined,
             input.year !== undefined
@@ -113,12 +133,12 @@ export const studentsRouter = createTRPCRouter({
 
       const countRows = await ctx.db
         .select({ total: sql<number>`count(*)` })
-        .from(placement)
-        .innerJoin(studentProfile, eq(placement.studentId, studentProfile.id))
+        .from(studentProfile)
         .innerJoin(user, eq(studentProfile.userId, user.id))
+        .leftJoin(placement, eq(placement.studentId, studentProfile.id))
         .where(
           and(
-            eq(placement.companyId, input.companyId),
+            mentorId ? eq(placement.mentorId, mentorId) : undefined,
             input.status ? eq(placement.status, input.status) : undefined,
             input.school ? eq(studentProfile.school, input.school) : undefined,
             input.year !== undefined
@@ -139,7 +159,8 @@ export const studentsRouter = createTRPCRouter({
           school: r.school ?? null,
           cohort: r.cohort ?? null,
           year: r.year ?? null,
-          status: String(r.status),
+          status: r.status ? String(r.status) : "active", // Default to "active" if no placement
+          nis: r.nis ?? null,
         })),
         pagination: {
           total: Number(total),
@@ -213,6 +234,51 @@ export const studentsRouter = createTRPCRouter({
         .where(eq(placement.studentId, sp.id))
         .orderBy(report.submittedAt);
 
+      // Score History (Weekly Average)
+      const scoreHistoryRows = await ctx.db
+        .select({
+          period: sql<string>`to_char(date_trunc('week', ${assessment.createdAt}::timestamp), 'IYYY-"W"IW')`,
+          avgScore: sql<number>`avg(${assessment.totalScore})`,
+        })
+        .from(assessment)
+        .innerJoin(placement, eq(assessment.placementId, placement.id))
+        .where(eq(placement.studentId, sp.id))
+        .groupBy(sql`to_char(date_trunc('week', ${assessment.createdAt}::timestamp), 'IYYY-"W"IW')`)
+        .orderBy(sql`to_char(date_trunc('week', ${assessment.createdAt}::timestamp), 'IYYY-"W"IW')`);
+
+      // Attendance History (Weekly Percentage)
+      const attendanceHistoryRows = await ctx.db
+        .select({
+          period: sql<string>`to_char(date_trunc('week', ${attendanceLog.date}::timestamp), 'IYYY-"W"IW')`,
+          status: attendanceLog.status,
+          count: sql<number>`count(*)`,
+        })
+        .from(attendanceLog)
+        .innerJoin(placement, eq(attendanceLog.placementId, placement.id))
+        .where(eq(placement.studentId, sp.id))
+        .groupBy(
+          sql`to_char(date_trunc('week', ${attendanceLog.date}::timestamp), 'IYYY-"W"IW')`,
+          attendanceLog.status,
+        )
+        .orderBy(sql`to_char(date_trunc('week', ${attendanceLog.date}::timestamp), 'IYYY-"W"IW')`);
+
+      const attendanceHistoryMap: Record<string, { present: number; total: number }> = {};
+      for (const r of attendanceHistoryRows) {
+        const p = r.period;
+        if (!attendanceHistoryMap[p]) attendanceHistoryMap[p] = { present: 0, total: 0 };
+        const val = Number(r.count);
+        attendanceHistoryMap[p]!.total += val;
+        if (r.status === "present" || r.status === "late") {
+          attendanceHistoryMap[p]!.present += val;
+        }
+      }
+      const attendanceHistory = Object.entries(attendanceHistoryMap)
+        .map(([period, data]) => ({
+          period,
+          count: data.total === 0 ? 0 : Math.round((data.present / data.total) * 100),
+        }))
+        .sort((a, b) => a.period.localeCompare(b.period));
+
       const assessments = await ctx.db
         .select({
           id: assessment.id,
@@ -247,6 +313,10 @@ export const studentsRouter = createTRPCRouter({
           phone: sp.phone ?? null,
           active: sp.active,
           mentorName,
+          nis: sp.nis ?? null,
+          address: sp.address ?? null,
+          startDate: activePlacement?.startDate ? new Date(activePlacement.startDate).toISOString().slice(0, 10) : null,
+          endDate: activePlacement?.endDate ? new Date(activePlacement.endDate).toISOString().slice(0, 10) : null,
         },
         stats: { averageScore: Number(avgScoreRow?.avg ?? 0) },
         attendance: {
@@ -258,6 +328,11 @@ export const studentsRouter = createTRPCRouter({
         },
         reports,
         assessments,
+        scoreHistory: scoreHistoryRows.map((r) => ({
+          period: r.period,
+          count: Number(r.avgScore ?? 0),
+        })),
+        attendanceHistory,
         lastUpdated: new Date().toISOString(),
       };
     }),
@@ -326,6 +401,9 @@ export const studentsRouter = createTRPCRouter({
         major: z.string().optional(),
         cohort: z.string().optional(),
         phone: z.string().optional(),
+        nis: z.string().optional(),
+        birthDate: z.date().optional(),
+        address: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -348,10 +426,28 @@ export const studentsRouter = createTRPCRouter({
         major: input.major ?? null,
         cohort: input.cohort ?? null,
         phone: input.phone ?? null,
+        nis: input.nis ?? null,
+        birthDate: input.birthDate ? input.birthDate.toISOString().slice(0, 10) : null,
+        address: input.address ?? null,
       });
-      const sp = await ctx.db.query.studentProfile.findFirst({
-        where: eq(studentProfile.userId, u.id),
-      });
+      const sp = await ctx.db.query.studentProfile.findFirst({ where: eq(studentProfile.userId, u.id) });
+
+      // If creator is a mentor, automatically create a placement
+      if (ctx.session.user.role === "mentor" && sp) {
+        const mp = await ctx.db.query.mentorProfile.findFirst({
+          where: eq(mentorProfile.userId, ctx.session.user.id),
+        });
+
+        if (mp && mp.companyId) {
+          await ctx.db.insert(placement).values({
+            studentId: sp.id,
+            mentorId: mp.id,
+            companyId: mp.companyId,
+            status: "active" as any,
+            startDate: new Date().toISOString().slice(0, 10),
+          });
+        }
+      }
       return sp ?? null;
     }),
 
@@ -405,6 +501,7 @@ export const studentsRouter = createTRPCRouter({
       await ctx.db.delete(user).where(eq(user.id, input.userId));
       return { ok: true };
     }),
+
 
   getDashboardData: protectedProcedure
     .meta(docs.getDashboardData)
@@ -637,7 +734,7 @@ export const studentsRouter = createTRPCRouter({
       if (!saved) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       }
-      const url = buildPublicUrlAction(input.selfieFilename);
+      const url = await buildPublicUrlAction(input.selfieFilename);
       await ctx.db.insert(attachment).values({
         ownerType: "attendance_log",
         ownerId: saved.id,
@@ -733,7 +830,7 @@ export const studentsRouter = createTRPCRouter({
         .update(attendanceLog)
         .set({ checkOutAt: new Date() })
         .where(eq(attendanceLog.id, existing.id));
-      const url = buildPublicUrlAction(input.selfieFilename);
+      const url = await buildPublicUrlAction(input.selfieFilename);
       await ctx.db.insert(attachment).values({
         ownerType: "attendance_log",
         ownerId: existing.id,
@@ -742,5 +839,99 @@ export const studentsRouter = createTRPCRouter({
         createdById: ctx.session.user.id,
       });
       return { success: true };
+    }),
+  me: protectedProcedure
+    .meta(docs.me)
+    .query(async ({ ctx }) => {
+      if (ctx.session.user.role !== "student") throw new TRPCError({ code: "FORBIDDEN" });
+      const sp = await ctx.db.query.studentProfile.findFirst({
+        where: eq(studentProfile.userId, ctx.session.user.id),
+        with: { user: true },
+      });
+      if (!sp) throw new TRPCError({ code: "NOT_FOUND" });
+      return {
+        id: sp.id,
+        userId: sp.userId,
+        name: sp.user?.name ?? "",
+        email: sp.user?.email ?? "",
+        nis: sp.nis ?? null,
+        birthPlace: sp.birthPlace ?? null,
+        birthDate: sp.birthDate ?? null,
+        gender: sp.gender ?? null,
+        semester: sp.semester ?? null,
+        school: sp.school ?? null,
+        major: sp.major ?? null,
+        cohort: sp.cohort ?? null,
+        address: sp.address ?? null,
+        phone: sp.phone ?? null,
+      };
+    }),
+
+  updateProfile: protectedProcedure
+    .meta(docs.updateProfile)
+    .input(
+      z.object({
+        name: z.string().min(1).optional(),
+        nis: z.string().optional(),
+        birthPlace: z.string().optional(),
+        birthDate: z.date().optional(),
+        gender: z.string().optional(),
+        semester: z.number().optional(),
+        school: z.string().optional(),
+        major: z.string().optional(),
+        cohort: z.string().optional(),
+        address: z.string().optional(),
+        phone: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.session.user.role !== "student") throw new TRPCError({ code: "FORBIDDEN" });
+      const sp = await ctx.db.query.studentProfile.findFirst({
+        where: eq(studentProfile.userId, ctx.session.user.id),
+      });
+      if (!sp) throw new TRPCError({ code: "NOT_FOUND" });
+
+      await ctx.db
+        .update(studentProfile)
+        .set({
+          nis: input.nis ?? undefined,
+          birthPlace: input.birthPlace ?? undefined,
+          birthDate: input.birthDate ? input.birthDate.toISOString().slice(0, 10) : undefined,
+          gender: input.gender ?? undefined,
+          semester: input.semester ?? undefined,
+          school: input.school ?? undefined,
+          major: input.major ?? undefined,
+          cohort: input.cohort ?? undefined,
+          address: input.address ?? undefined,
+          phone: input.phone ?? undefined,
+        })
+        .where(eq(studentProfile.id, sp.id));
+
+      if (input.name) {
+        await ctx.db.update(user).set({ name: input.name }).where(eq(user.id, ctx.session.user.id));
+      }
+
+      const updated = await ctx.db.query.studentProfile.findFirst({
+        where: eq(studentProfile.userId, ctx.session.user.id),
+        with: { user: true },
+      });
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND" });
+      return {
+        id: updated.id,
+        userId: updated.userId,
+        name: updated.user?.name ?? "",
+        email: updated.user?.email ?? "",
+        nis: updated.nis ?? null,
+        birthPlace: updated.birthPlace ?? null,
+        birthDate: updated.birthDate ?? null,
+        gender: updated.gender ?? null,
+        semester: updated.semester ?? null,
+        school: updated.school ?? null,
+        major: updated.major ?? null,
+        cohort: updated.cohort ?? null,
+        address: updated.address ?? null,
+        phone: updated.phone ?? null,
+      };
+
     }),
 });

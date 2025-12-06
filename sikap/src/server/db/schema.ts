@@ -40,12 +40,17 @@ export const reviewStatus = pgEnum("review_status", [
   "approved",
   "rejected",
 ]);
+export const competencyCategory = pgEnum("competency_category", [
+  "personality",
+  "technical",
+]);
 export const ownerType = pgEnum("owner_type", [
   "task",
   "report",
   "final_report",
   "assessment",
   "attendance_log",
+  "calendar_event",
 ]);
 export const notificationType = pgEnum("notification_type", [
   "assignment",
@@ -57,6 +62,9 @@ export const eventType = pgEnum("event_type", [
   "meeting",
   "deadline",
   "milestone",
+  "in_class",
+  "field_trip",
+  "meet_greet",
 ]);
 
 /**
@@ -246,9 +254,15 @@ export const studentProfile = createTable(
       .varchar({ length: 255 })
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    nis: d.text(),
+    birthPlace: d.text(),
+    birthDate: d.date(),
+    gender: d.text(),
+    semester: d.integer(),
     school: d.text(),
     major: d.text(),
     cohort: d.text(),
+    address: d.text(),
     phone: d.varchar({ length: 30 }),
     active: d.boolean().notNull().default(true),
     createdAt: d
@@ -354,6 +368,9 @@ export const task = createTable(
       .$defaultFn(() => new Date())
       .notNull(),
     updatedAt: d.timestamp({ withTimezone: true }).$onUpdate(() => new Date()),
+    submissionNote: d.text(),
+    submittedAt: d.timestamp({ withTimezone: true }),
+    targetMajor: d.text(),
   }),
   (t) => [
     index("task_placement_status_idx").on(t.placementId, t.status),
@@ -500,6 +517,8 @@ export const finalReport = createTable("final_report", (d) => ({
   approvedByMentorId: d.integer().references(() => mentorProfile.id),
   approvedAt: d.timestamp({ withTimezone: true }),
   grade: d.text(),
+  totalScore: d.numeric({ precision: 10, scale: 2 }),
+  averageScore: d.numeric({ precision: 5, scale: 2 }),
   createdAt: d
     .timestamp({ withTimezone: true })
     .$defaultFn(() => new Date())
@@ -514,6 +533,43 @@ export const finalReportRelations = relations(finalReport, ({ one }) => ({
   approvedBy: one(mentorProfile, {
     fields: [finalReport.approvedByMentorId],
     references: [mentorProfile.id],
+  }),
+}));
+
+export const competencyTemplate = createTable("competency_template", (d) => ({
+  id: d.integer().primaryKey().generatedByDefaultAsIdentity(),
+  name: d.text().notNull(),
+  category: competencyCategory("category").notNull(),
+  major: d.text().notNull(), // contoh: "RPL" atau "TKJ"
+  weight: d.numeric({ precision: 5, scale: 2 }),
+  position: d.integer(),
+  createdAt: d
+    .timestamp({ withTimezone: true })
+    .$defaultFn(() => new Date())
+    .notNull(),
+}));
+
+export const finalReportScore = createTable("final_report_score", (d) => ({
+  id: d.integer().primaryKey().generatedByDefaultAsIdentity(),
+  finalReportId: d
+    .integer()
+    .notNull()
+    .references(() => finalReport.id, { onDelete: "cascade" }),
+  competencyTemplateId: d
+    .integer()
+    .notNull()
+    .references(() => competencyTemplate.id, { onDelete: "cascade" }),
+  score: d.numeric({ precision: 5, scale: 2 }),
+}));
+
+export const finalReportScoreRelations = relations(finalReportScore, ({ one }) => ({
+  finalReport: one(finalReport, {
+    fields: [finalReportScore.finalReportId],
+    references: [finalReport.id],
+  }),
+  competency: one(competencyTemplate, {
+    fields: [finalReportScore.competencyTemplateId],
+    references: [competencyTemplate.id],
   }),
 }));
 
@@ -567,6 +623,32 @@ export const assessmentItemRelations = relations(assessmentItem, ({ one }) => ({
   assessment: one(assessment, {
     fields: [assessmentItem.assessmentId],
     references: [assessment.id],
+  }),
+}));
+
+/**
+ * TaskCompetencyImpact
+ */
+export const taskCompetencyImpact = createTable("task_competency_impact", (d) => ({
+  id: d.integer().primaryKey().generatedByDefaultAsIdentity(),
+  taskId: d
+    .integer()
+    .notNull()
+    .references(() => task.id, { onDelete: "cascade" }),
+  competencyTemplateId: d
+    .integer()
+    .notNull()
+    .references(() => competencyTemplate.id, { onDelete: "cascade" }),
+}));
+
+export const taskCompetencyImpactRelations = relations(taskCompetencyImpact, ({ one }) => ({
+  task: one(task, {
+    fields: [taskCompetencyImpact.taskId],
+    references: [task.id],
+  }),
+  competency: one(competencyTemplate, {
+    fields: [taskCompetencyImpact.competencyTemplateId],
+    references: [competencyTemplate.id],
   }),
 }));
 
@@ -643,6 +725,9 @@ export const calendarEvent = createTable("calendar_event", (d) => ({
   scheduledAt: d.timestamp({ withTimezone: true }).notNull(),
   endDate: d.timestamp({ withTimezone: true }),
   location: d.text(),
+  organizerName: d.text(),
+  organizerLogoUrl: d.text(),
+  colorHex: d.varchar({ length: 16 }),
   createdById: d.varchar({ length: 255 }).references(() => user.id),
   createdAt: d
     .timestamp({ withTimezone: true })
@@ -692,6 +777,12 @@ export type AssessmentItem = typeof assessmentItem.$inferSelect;
 export type AssessmentItemInsert = typeof assessmentItem.$inferInsert;
 export type Attachment = typeof attachment.$inferSelect;
 export type AttachmentInsert = typeof attachment.$inferInsert;
+export type CompetencyTemplate = typeof competencyTemplate.$inferSelect;
+export type CompetencyTemplateInsert = typeof competencyTemplate.$inferInsert;
+export type FinalReportScore = typeof finalReportScore.$inferSelect;
+export type FinalReportScoreInsert = typeof finalReportScore.$inferInsert;
+export type TaskCompetencyImpact = typeof taskCompetencyImpact.$inferSelect;
+export type TaskCompetencyImpactInsert = typeof taskCompetencyImpact.$inferInsert;
 export type Notification = typeof notification.$inferSelect;
 export type NotificationInsert = typeof notification.$inferInsert;
 export type CalendarEvent = typeof calendarEvent.$inferSelect;
