@@ -24,7 +24,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
     return (
       <main className="min-h-screen bg-muted text-foreground p-8">
         <div className="text-destructive">Error: {error?.message ?? "Gagal memuat data"}</div>
-        <BackButton hrefFallback="/mentor/tugas" className="mt-4" />
+        <BackButton hrefFallback="/mentor/tugas" />
       </main>
     )
   }

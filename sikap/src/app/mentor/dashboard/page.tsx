@@ -104,7 +104,7 @@ export default async function DashboardPage() {
     no: i + 1,
     name: r.student.name,
     major: undefined as string | undefined,
-    status: (r.status === 'present' ? 'Hadir' : r.status === 'excused' ? 'Izin' : 'Tidak Hadir'),
+    status: (r.status === 'present' ? 'Hadir' : r.status === 'excused' ? 'Izin' : 'Tidak Hadir') as "Hadir" | "Izin" | "Tidak Hadir",
     date: r.date,
   }));
   return (

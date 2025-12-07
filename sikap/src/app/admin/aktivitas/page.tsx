@@ -62,7 +62,7 @@ export default function AktivitasPage() {
 
     const deleteMutation = api.calendarEvents.delete.useMutation({
         onSuccess: () => {
-            utils.calendarEvents.list.invalidate();
+            void utils.calendarEvents.list.invalidate();
             setDeleteDialogOpen(false);
             setEventToDelete(null);
         },

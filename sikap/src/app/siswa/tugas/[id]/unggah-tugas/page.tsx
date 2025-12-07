@@ -18,6 +18,34 @@ export default function UnggahTugasPage() {
   const [notes, setNotes] = useState("")
   const [attachments, setAttachments] = useState<FileUploadValue[]>([])
 
+  // Track if initial data has been loaded
+  const initializedRef = useRef(false)
+
+  // Fetch task detail to check status
+  const { data: task, isLoading: isLoadingTask, error } = api.tasks.detail.useQuery({
+    taskId,
+  }, {
+    enabled: !isNaN(taskId),
+  })
+
+  // Pre-load existing files only once when task data is first available
+  useEffect(() => {
+    if (initializedRef.current) return
+    if (!task) return
+
+    initializedRef.current = true
+
+    if (task.submission?.files && task.submission.files.length > 0) {
+      setAttachments(task.submission.files.map(f => ({
+        url: f.url,
+        filename: f.filename ?? undefined,
+      })))
+    }
+    if (task.submission?.note) {
+      setNotes(task.submission.note)
+    }
+  }, [task])
+
   // Validate task ID
   if (isNaN(taskId)) {
     return (
@@ -39,32 +67,6 @@ export default function UnggahTugasPage() {
       </div>
     )
   }
-
-  // Fetch task detail to check status
-  const { data: task, isLoading: isLoadingTask, error } = api.tasks.detail.useQuery({
-    taskId,
-  })
-
-  // Track if initial data has been loaded
-  const initializedRef = useRef(false)
-
-  // Pre-load existing files only once when task data is first available
-  useEffect(() => {
-    if (initializedRef.current) return
-    if (!task) return
-
-    initializedRef.current = true
-
-    if (task.submission?.files && task.submission.files.length > 0) {
-      setAttachments(task.submission.files.map(f => ({
-        url: f.url,
-        filename: f.filename ?? undefined,
-      })))
-    }
-    if (task.submission?.note) {
-      setNotes(task.submission.note)
-    }
-  }, [task])
 
   // tRPC mutation for submitting task
   const submitTask = api.tasks.submit.useMutation({

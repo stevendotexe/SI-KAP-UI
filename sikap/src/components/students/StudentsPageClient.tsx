@@ -47,7 +47,7 @@ export default function StudentsPageClient() {
       code: s.studentId,
       school: s.school ?? "-",
       batch: s.year ?? s.cohort ?? "-",
-      status: mapBackendStatusToUI(s.status),
+      status: mapBackendStatusToUI(s.status) as "Aktif" | "Lulus" | "Non-Aktif" | "Pindah",
     }))
   }, [data])
 
@@ -56,7 +56,7 @@ export default function StudentsPageClient() {
       try {
         const snapshot = { timestamp: Date.now(), items: data.items }
         localStorage.setItem("mentor-siswa-backup", JSON.stringify(snapshot))
-      } catch {}
+      } catch { }
     }
   }, [data])
 

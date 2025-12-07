@@ -39,7 +39,7 @@ export default function StudentInfo({ info }: { info: Info }) {
   const [error, setError] = useState<string>("")
   const utils = api.useUtils()
   const updateMutation = api.students.update.useMutation({
-    onSuccess: () => { utils.students.detail.invalidate() },
+    onSuccess: () => { void utils.students.detail.invalidate() },
     onError: (e) => setError(e.message),
   })
 

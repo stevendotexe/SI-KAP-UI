@@ -53,13 +53,16 @@ export default function AddStudentDialog() {
     onSuccess: () => {
       toast.success("Siswa berhasil ditambahkan")
       setOpen(false)
-      utils.students.list.invalidate()
+      void utils.students.list.invalidate()
       setForm({
         namaLengkap: "",
         nis: "",
         kelas: "",
         jurusan: "",
         tanggalLahir: "",
+        tempatLahir: "",
+        semester: "",
+        asalSekolah: "",
         alamat: "",
         telepon: "",
         email: "",

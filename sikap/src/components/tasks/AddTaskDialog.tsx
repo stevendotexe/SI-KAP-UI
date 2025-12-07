@@ -56,11 +56,11 @@ export default function AddTaskDialog({ onAdd }: { onAdd: (t: TaskItem) => void 
   function toggleMajor(m: "RPL" | "TKJ" | "Umum") {
     setMajors((prev) => {
       if (m === "Umum") {
-        const next = prev.includes("Umum") ? prev.filter((x) => x !== "Umum") : ["Umum"]
+        const next = prev.includes("Umum") ? prev.filter((x) => x !== "Umum") : ["Umum"] as ("RPL" | "TKJ" | "Umum")[]
         return next
       }
       if (prev.includes("Umum")) return prev
-      return prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]
+      return (prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]) as ("RPL" | "TKJ" | "Umum")[]
     })
   }
 
@@ -84,7 +84,7 @@ export default function AddTaskDialog({ onAdd }: { onAdd: (t: TaskItem) => void 
     onSuccess: () => {
       toast.success("Tugas berhasil dibuat")
       setOpen(false)
-      utils.tasks.list.invalidate()
+      void utils.tasks.list.invalidate()
       onAdd({
         id: "temp",
         titleMain: "",

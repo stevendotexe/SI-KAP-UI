@@ -76,7 +76,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     title: r.title ?? "Laporan",
     description: "",
     date: formatDate(r.submittedAt),
-    score: r.score ?? 0,
+    score: Number(r.score ?? 0),
     reviewed: r.reviewStatus === "approved" || r.reviewStatus === "rejected",
   }))
 
@@ -91,7 +91,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const scoreSeries: SeriesPoint[] = backendReports.length > 0
     ? backendReports.map((r, index) => ({
       period: `M${index + 1}`,
-      count: r.score ?? 0,
+      count: Number(r.score ?? 0),
     }))
     : [
       { period: "M1", count: 0 },

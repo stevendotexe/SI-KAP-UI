@@ -55,7 +55,7 @@ function TaskClient() {
     if (!year || !month) return {}
     const from = new Date(year, month - 1, 1)
     const to = new Date(year, month, 0)
-    to.setHours(23,59,59,999)
+    to.setHours(23, 59, 59, 999)
     return { from, to }
   }, [date])
 
@@ -80,7 +80,7 @@ function TaskClient() {
     .filter((t) => (date === "Semua Tanggal" ? true : t.date.startsWith(date)))
 
   function onAdd() {
-    refetch()
+    void refetch()
   }
 
   return (
