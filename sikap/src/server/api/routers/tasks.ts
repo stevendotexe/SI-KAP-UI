@@ -14,7 +14,6 @@ import {
 import {
   attachment,
   mentorProfile,
-  ownerType,
   placement,
   studentProfile,
   task,
@@ -108,6 +107,7 @@ export const tasksRouter = createTRPCRouter({
           description: task.description,
           dueDate: task.dueDate,
           status: task.status,
+          submittedAt: task.submittedAt,
         })
         .from(task)
         .innerJoin(placement, eq(task.placementId, placement.id))
@@ -130,6 +130,7 @@ export const tasksRouter = createTRPCRouter({
           description: r.description ?? null,
           dueDate: r.dueDate ?? null,
           status: r.status,
+          submittedAt: r.submittedAt ?? null,
         })),
         pagination: {
           total: Number(total ?? 0),

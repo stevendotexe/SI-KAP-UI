@@ -10,8 +10,7 @@ import { useState, useEffect, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 
 export default function UnggahTugasPage() {
-  const paramsPromise = useParams()
-  const params = React.use(paramsPromise as unknown as Promise<Record<string, string>>)
+  const params = useParams()
   const router = useRouter()
   const taskId = Number(params.id)
 

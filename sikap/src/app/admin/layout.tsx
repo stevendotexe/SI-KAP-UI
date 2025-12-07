@@ -13,10 +13,14 @@ export default async function AdminLayout({
     redirect("/sign-in");
   }
 
-  // Optional: Check if user is actually an admin
-  // if (session.user.role !== "admin") {
-  //   redirect("/unauthorized");
-  // }
+  // Redirect non-admins to their own dashboard
+  if (session.user.role !== "admin") {
+    if (session.user.role === "mentor") {
+      redirect("/mentor/dashboard");
+    } else {
+      redirect("/siswa/dashboard");
+    }
+  }
 
   return (
     <AppShell
