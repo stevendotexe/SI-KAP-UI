@@ -21,4 +21,5 @@ export type OwnerType =
   | "report"
   | "final_report"
   | "assessment"
-  | "attendance_log";
+  | "attendance_log"
+  | "calendar_event";
