@@ -56,6 +56,7 @@ export default function LaporanSiswaPage() {
       reviewStatus: t.status === "submitted" ? "pending" : t.status, // Map task status to report review status
       itemType: "task" as const,
       submittedAt: t.submittedAt,
+      updatedAt: t.updatedAt,
       originalStatus: t.status
     })) ?? [])
   ].sort((a, b) => {
@@ -314,8 +315,8 @@ export default function LaporanSiswaPage() {
                       <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${isTask ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"
                         }`}>
                         {isTask
-                          ? ((item as any).submittedAt
-                            ? `Diserahkan ${formatSubmissionDate((item as any).submittedAt)}`
+                          ? ((item as any).submittedAt || (item as any).updatedAt
+                            ? `Diserahkan ${formatSubmissionDate((item as any).submittedAt || (item as any).updatedAt)}`
                             : "Diserahkan")
                           : getTypeLabel(item.type)}
                       </span>

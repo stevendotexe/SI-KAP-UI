@@ -108,6 +108,7 @@ export const tasksRouter = createTRPCRouter({
           dueDate: task.dueDate,
           status: task.status,
           submittedAt: task.submittedAt,
+          updatedAt: task.updatedAt,
         })
         .from(task)
         .innerJoin(placement, eq(task.placementId, placement.id))
@@ -131,6 +132,7 @@ export const tasksRouter = createTRPCRouter({
           dueDate: r.dueDate ?? null,
           status: r.status,
           submittedAt: r.submittedAt ?? null,
+          updatedAt: r.updatedAt ?? null,
         })),
         pagination: {
           total: Number(total ?? 0),
