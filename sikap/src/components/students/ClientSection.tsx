@@ -11,7 +11,7 @@ type Info = { userId: string; name: string; email: string; sekolah: string; juru
 
 export default function ClientSection({ scoreSeries, attendanceSeries, reports, tasks = [], info }: { scoreSeries: SeriesPoint[]; attendanceSeries: SeriesPoint[]; reports: Report[]; tasks?: StudentTask[]; info: Info }) {
   const [mode, setMode] = React.useState<"laporan" | "informasi">("laporan")
-  const [reviewed, setReviewed] = React.useState<"belum" | "sudah">("sudah")
+  const [reviewed, setReviewed] = React.useState<"belum" | "sudah" | "belum_dikerjakan">("sudah")
 
   return (
     <div className="space-y-6">

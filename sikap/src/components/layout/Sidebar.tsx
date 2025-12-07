@@ -33,6 +33,7 @@ export type SidebarProps = {
   role: "siswa" | "mentor" | "admin";
   userName?: string;
   userRole?: string;
+  userId?: string;
 };
 
 // Navigation items per role

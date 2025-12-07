@@ -153,7 +153,7 @@ export default function AktivitasPage() {
                                     kind: "event",
                                     id: ev.id,
                                     title: ev.title,
-                                    description: ev.description ?? null,
+                                    description: null,
                                     dateLabel: new Date(ev.startDate).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }),
                                     timeLabel: new Date(ev.startDate).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
                                     typeLabel: typeLabels[ev.type] ?? ev.type,

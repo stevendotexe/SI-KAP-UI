@@ -71,7 +71,7 @@ type CalendarEvent = {
   dueDate: Date
   organizerName: string | null
   colorHex: string | null
-  placementId: number
+  placementId: number | null
 }
 
 type FormData = {

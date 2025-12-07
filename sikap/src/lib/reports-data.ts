@@ -69,7 +69,7 @@ export const TASKS = [
 
 export function distributeTaskToStudents(taskId: string, title: string, date: string) {
   const now = new Date().toISOString()
-  const newEntries: ReportItem[] = STUDENTS.map((s) => ({ id: s.id, student: s.student, title, date, status: "belum_dikerjakan", taskId, createdAt: now, updatedAt: now }))
+  const newEntries: ReportItem[] = STUDENTS.map((s) => ({ id: s.id, student: s.student, title, date, status: "belum_dikerjakan" as const, taskId, createdAt: now, updatedAt: now }))
   reports = [...reports, ...newEntries]
   listeners.forEach((l) => l(reports))
 }
@@ -79,7 +79,7 @@ export function ensureTaskForAllStudents(taskId: string, title: string, date: st
   const missing = STUDENTS.filter((s) => !seen.has(s.id))
   if (missing.length) {
     const now = new Date().toISOString()
-    const add = missing.map((s) => ({ id: s.id, student: s.student, title, date, status: "belum_dikerjakan", taskId, createdAt: now, updatedAt: now }))
+    const add = missing.map((s) => ({ id: s.id, student: s.student, title, date, status: "belum_dikerjakan" as const, taskId, createdAt: now, updatedAt: now }))
     reports = [...reports, ...add]
   }
 }
@@ -93,8 +93,8 @@ export function listStudentTasks(studentId: string) {
 
 export function updateStatus(studentId: string, taskId: string, status: "belum_dikerjakan" | "belum_direview" | "sudah_direview") {
   const idx = reports.findIndex((r) => r.id === studentId && r.taskId === taskId)
-  if (idx !== -1) {
-    reports[idx] = { ...reports[idx], status, updatedAt: new Date().toISOString() }
+  if (idx !== -1 && reports[idx]) {
+    reports[idx] = { ...reports[idx], status, updatedAt: new Date().toISOString() } as ReportItem
     listeners.forEach((l) => l(reports))
   }
 }

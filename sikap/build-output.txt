@@ -1,0 +1,373 @@
+
+> sikap@0.1.0 build
+> next build
+
+node.exe :  ??? Warning: Next.js inferred your workspace root, but 
+it may not be correct.
+At C:\Program Files\nodejs\npm.ps1:16 char:5
++     & "$basedir/node$exe"  
+"$basedir/node_modules/npm/bin/npm-cli.js" ...
++     
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ( ??? Warning: N.    
+..not be correct.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ We detected multiple lockfiles and selected the directory of 
+C:\Users\USER\Documents\aCoding\package-lock.json as the root 
+directory.
+ To silence this warning, set `outputFileTracingRoot` in your 
+Next.js config, or consider removing one of the lockfiles if it's 
+not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-j
+s/output#caveats for more information.
+ Detected additional lockfiles: 
+   * C:\Users\USER\Documents\aCoding\prokon\SI-KAP-UI\sikap\package-l
+ock.json
+   * 
+C:\Users\USER\Documents\aCoding\prokon\SI-KAP-UI\package-lock.json
+
+   ??? Next.js 15.5.6
+   - Environments: .env
+   - Experiments (use with caution):
+     ?? serverActions
+
+   Creating an optimized production build ...
+ ??? Compiled successfully in 10.2s
+   Linting and checking validity of types ...
+
+./src/app/admin/aktivitas/page.tsx
+21:24  Warning: 'Pencil' is defined but never used.  @typescript-eslint/no-unused-vars
+21:32  Warning: 'Trash2' is defined but never used.  @typescript-eslint/no-unused-vars
+25:7  Warning: 'typeColors' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/admin/kalender/page.tsx
+98:43  Warning: Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.  @typescript-eslint/prefer-nullish-coalescing
+272:57  Warning: Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.  @typescript-eslint/prefer-nullish-coalescing
+
+./src/app/admin/laporan/page.tsx
+62:9  Warning: The 'reports' logical expression could make the dependencies of useMemo Hook (at line 74) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'reports' in its own useMemo() Hook.  react-hooks/exhaustive-deps
+246:28  Warning: Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.  @typescript-eslint/prefer-nullish-coalescing
+
+./src/app/admin/rapor-akhir/page.tsx
+84:45  Warning: Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.  @typescript-eslint/prefer-nullish-coalescing
+98:45  Warning: Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.  @typescript-eslint/prefer-nullish-coalescing
+99:65  Warning: Unsafe argument of type `any` assigned to a parameter of type `SetStateAction<"active" | "completed" | "canceled" | undefined>`.  @typescript-eslint/no-unsafe-argument
+99:100  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+178:98  Warning: Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.  @typescript-eslint/prefer-nullish-coalescing
+179:98  Warning: Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.  @typescript-eslint/prefer-nullish-coalescing
+
+./src/app/admin/rapor-akhir/[id]/page.tsx
+70:49  Warning: Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.  @typescript-eslint/prefer-nullish-coalescing
+76:49  Warning: Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.  @typescript-eslint/prefer-nullish-coalescing
+138:79  Warning: Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.  @typescript-eslint/prefer-nullish-coalescing
+
+./src/app/admin/siswa/[id]/page.tsx
+185:63  Warning: Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.  @typescript-eslint/prefer-nullish-coalescing
+
+./src/app/examples/page.tsx
+50:64  Warning: Unexpected empty arrow function.  @typescript-eslint/no-empty-function
+
+./src/app/mentor/aktivitas/[id]/page.tsx
+12:5  Warning: 'MapPin' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/mentor/dashboard/page.tsx
+107:13  Warning: This assertion is unnecessary since it does not change the type of the expression.  @typescript-eslint/no-unnecessary-type-assertion
+
+./src/app/mentor/kalender/page.tsx
+8:60  Warning: 'DialogTrigger' is defined but never used.  @typescript-eslint/no-unused-vars
+9:45  Warning: 'X' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/mentor/kehadiran/page.tsx
+130:33  Warning: 'isMentorLoading' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+133:28  Warning: 'isError' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+133:37  Warning: 'refetch' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+143:9  Warning: The 'studentSummary' logical expression could make the dependencies of useMemo Hook (at line 145) change on every render. To fix this, wrap the initialization of 'studentSummary' in its own useMemo() Hook.  react-hooks/exhaustive-deps
+
+./src/app/mentor/laporan/[id]/page.tsx
+166:35  Warning: Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.  @typescript-eslint/prefer-nullish-coalescing
+
+./src/app/mentor/rapor-akhir/[id]/page.tsx
+140:13  Warning: Unsafe assignment of an `any` value.  @typescript-eslint/no-unsafe-assignment
+140:41  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+140:46  Warning: Unsafe member access .placementId on an `any` value.  @typescript-eslint/no-unsafe-member-access
+158:79  Warning: Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.  @typescript-eslint/prefer-nullish-coalescing
+
+./src/app/mentor/siswa/[id]/page.tsx
+87:5  Warning: Unsafe assignment of an `any` value.  @typescript-eslint/no-unsafe-assignment
+87:25  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/siswa/aktivitas/page.tsx
+53:14  Warning: Prefer using an optional chain expression instead, as it's more concise and easier to read.  @typescript-eslint/prefer-optional-chain
+53:90  Warning: Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.  @typescript-eslint/prefer-nullish-coalescing
+54:14  Warning: Prefer using an optional chain expression instead, as it's more concise and easier to read.  @typescript-eslint/prefer-optional-chain
+127:78  Warning: Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.  @typescript-eslint/prefer-nullish-coalescing
+149:60  Warning: Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.  @typescript-eslint/prefer-nullish-coalescing
+
+./src/app/siswa/aktivitas/[id]/page.tsx
+7:57  Warning: 'FileText' is defined but never used.  @typescript-eslint/no-unused-vars
+92:73  Warning: Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.  @typescript-eslint/prefer-nullish-coalescing
+
+./src/app/siswa/dashboard/page.tsx
+18:10  Warning: 'Spinner' is defined but never used.  @typescript-eslint/no-unused-vars
+55:11  Warning: 'weekRange' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+303:12  Warning: 'attendanceError' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/siswa/laporan/page.tsx
+28:5  Warning: Unsafe assignment of an `any` value.  @typescript-eslint/no-unsafe-assignment
+28:66  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+44:30  Warning: Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.  @typescript-eslint/prefer-nullish-coalescing
+62:11  Warning: 'a' is defined but never used. Allowed unused args must match /^_/u.  @typescript-eslint/no-unused-vars
+62:14  Warning: 'b' is defined but never used. Allowed unused args must match /^_/u.  @typescript-eslint/no-unused-vars
+318:39  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+318:44  Warning: Unsafe member access .submittedAt on an `any` value.  @typescript-eslint/no-unsafe-member-access
+318:68  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+318:73  Warning: Unsafe member access .updatedAt on an `any` value.  @typescript-eslint/no-unsafe-member-access
+319:66  Warning: Unsafe argument of type `any` assigned to a parameter of type `string | Date | null`.  @typescript-eslint/no-unsafe-argument
+319:75  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+319:80  Warning: Unsafe member access .submittedAt on an `any` value.  @typescript-eslint/no-unsafe-member-access
+319:92  Warning: Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.  @typescript-eslint/prefer-nullish-coalescing
+319:104  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+319:109  Warning: Unsafe member access .updatedAt on an `any` value.  @typescript-eslint/no-unsafe-member-access
+329:40  Warning: Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.  @typescript-eslint/prefer-nullish-coalescing
+
+./src/app/siswa/rapor-akhir/page.tsx
+60:9  Warning: Unsafe assignment of an `any` value.  @typescript-eslint/no-unsafe-assignment
+60:28  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+60:34  Warning: Unsafe member access .studentProfile on an `any` value.  @typescript-eslint/no-unsafe-member-access
+61:9  Warning: Unsafe assignment of an `any` value.  @typescript-eslint/no-unsafe-assignment
+61:33  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+61:39  Warning: Unsafe member access .reports on an `any` value.  @typescript-eslint/no-unsafe-member-access
+64:9  Warning: Unsafe assignment of an `any` value.  @typescript-eslint/no-unsafe-assignment
+65:5  Warning: Unsafe call of a(n) `any` typed value.  @typescript-eslint/no-unsafe-call
+65:15  Warning: Unsafe member access .getMine on an `any` value.  @typescript-eslint/no-unsafe-member-access
+68:9  Warning: Unsafe assignment of an `any` value.  @typescript-eslint/no-unsafe-assignment
+69:5  Warning: Unsafe call of a(n) `any` typed value.  @typescript-eslint/no-unsafe-call
+69:20  Warning: Unsafe member access .finalScore on an `any` value.  @typescript-eslint/no-unsafe-member-access
+74:11  Warning: Unsafe assignment of an `any` value.  @typescript-eslint/no-unsafe-assignment
+74:35  Warning: Unsafe member access .birthPlace on an `any` value.  @typescript-eslint/no-unsafe-member-access
+74:70  Warning: Unsafe member access .birthPlace on an `any` value.  @typescript-eslint/no-unsafe-member-access
+74:98  Warning: Unsafe member access .birthPlace on an `any` value.  @typescript-eslint/no-unsafe-member-access
+75:11  Warning: Unsafe assignment of an `any` value.  @typescript-eslint/no-unsafe-assignment
+75:28  Warning: Unsafe member access .birthDate on an `any` value.  @typescript-eslint/no-unsafe-member-access
+85:9  Warning: Unsafe assignment of an `any` value.  @typescript-eslint/no-unsafe-assignment
+86:21  Warning: Unsafe member access .skillCompetency on an `any` value.  @typescript-eslint/no-unsafe-member-access
+86:61  Warning: Unsafe member access .skillCompetency on an `any` value.  @typescript-eslint/no-unsafe-member-access
+87:17  Warning: Unsafe member access .skillCompetency on an `any` value.  @typescript-eslint/no-unsafe-member-access
+91:36  Warning: Unsafe member access .total on an `any` value.  @typescript-eslint/no-unsafe-member-access
+91:70  Warning: Unsafe member access .total on an `any` value.  @typescript-eslint/no-unsafe-member-access
+92:34  Warning: Unsafe member access .avg on an `any` value.  @typescript-eslint/no-unsafe-member-access
+92:71  Warning: Unsafe argument of type `any` assigned to a parameter of type `number`.  @typescript-eslint/no-unsafe-argument
+92:77  Warning: Unsafe member access .avg on an `any` value.  @typescript-eslint/no-unsafe-member-access
+127:46  Warning: Unsafe member access .name on an `any` value.  @typescript-eslint/no-unsafe-member-access
+127:75  Warning: Unsafe member access .name on an `any` value.  @typescript-eslint/no-unsafe-member-access
+127:98  Warning: Unsafe member access .name on an `any` value.  @typescript-eslint/no-unsafe-member-access
+135:46  Warning: Unsafe member access .semester on an `any` value.  @typescript-eslint/no-unsafe-member-access
+135:86  Warning: Unsafe member access .semester on an `any` value.  @typescript-eslint/no-unsafe-member-access
+139:46  Warning: Unsafe member access .schoolName on an `any` value.  @typescript-eslint/no-unsafe-member-access
+139:81  Warning: Unsafe member access .schoolName on an `any` value.  @typescript-eslint/no-unsafe-member-access
+139:110  Warning: Unsafe member access .schoolName on an `any` value.  @typescript-eslint/no-unsafe-member-access
+147:46  Warning: Unsafe member access .nis on an `any` value.  @typescript-eslint/no-unsafe-member-access
+147:74  Warning: Unsafe member access .nis on an `any` value.  @typescript-eslint/no-unsafe-member-access
+147:96  Warning: Unsafe member access .nis on an `any` value.  @typescript-eslint/no-unsafe-member-access
+151:39  Warning: Unsafe member access .gender on an `any` value.  @typescript-eslint/no-unsafe-member-access
+151:74  Warning: Unsafe member access .gender on an `any` value.  @typescript-eslint/no-unsafe-member-access
+151:108  Warning: Unsafe member access .gender on an `any` value.  @typescript-eslint/no-unsafe-member-access
+159:46  Warning: Unsafe member access .phone on an `any` value.  @typescript-eslint/no-unsafe-member-access
+159:76  Warning: Unsafe member access .phone on an `any` value.  @typescript-eslint/no-unsafe-member-access
+159:100  Warning: Unsafe member access .phone on an `any` value.  @typescript-eslint/no-unsafe-member-access
+166:44  Warning: Unsafe member access .address on an `any` value.  @typescript-eslint/no-unsafe-member-access
+166:76  Warning: Unsafe member access .address on an `any` value.  @typescript-eslint/no-unsafe-member-access
+166:102  Warning: Unsafe member access .address on an `any` value.  @typescript-eslint/no-unsafe-member-access
+215:48  Warning: Unsafe member access .scores on an `any` value.  @typescript-eslint/no-unsafe-member-access
+215:102  Warning: Unsafe member access .scores on an `any` value.  @typescript-eslint/no-unsafe-member-access
+216:48  Warning: Unsafe member access .scores on an `any` value.  @typescript-eslint/no-unsafe-member-access
+216:102  Warning: Unsafe member access .scores on an `any` value.  @typescript-eslint/no-unsafe-member-access
+217:48  Warning: Unsafe member access .scores on an `any` value.  @typescript-eslint/no-unsafe-member-access
+217:102  Warning: Unsafe member access .scores on an `any` value.  @typescript-eslint/no-unsafe-member-access
+218:48  Warning: Unsafe member access .scores on an `any` value.  @typescript-eslint/no-unsafe-member-access
+218:102  Warning: Unsafe member access .scores on an `any` value.  @typescript-eslint/no-unsafe-member-access
+219:48  Warning: Unsafe member access .scores on an `any` value.  @typescript-eslint/no-unsafe-member-access
+219:102  Warning: Unsafe member access .scores on an `any` value.  @typescript-eslint/no-unsafe-member-access
+239:48  Warning: Unsafe member access .scores on an `any` value.  @typescript-eslint/no-unsafe-member-access
+239:100  Warning: Unsafe member access .scores on an `any` value.  @typescript-eslint/no-unsafe-member-access
+240:48  Warning: Unsafe member access .scores on an `any` value.  @typescript-eslint/no-unsafe-member-access
+240:100  Warning: Unsafe member access .scores on an `any` value.  @typescript-eslint/no-unsafe-member-access
+241:48  Warning: Unsafe member access .scores on an `any` value.  @typescript-eslint/no-unsafe-member-access
+241:100  Warning: Unsafe member access .scores on an `any` value.  @typescript-eslint/no-unsafe-member-access
+242:48  Warning: Unsafe member access .scores on an `any` value.  @typescript-eslint/no-unsafe-member-access
+242:100  Warning: Unsafe member access .scores on an `any` value.  @typescript-eslint/no-unsafe-member-access
+243:48  Warning: Unsafe member access .scores on an `any` value.  @typescript-eslint/no-unsafe-member-access
+243:100  Warning: Unsafe member access .scores on an `any` value.  @typescript-eslint/no-unsafe-member-access
+244:48  Warning: Unsafe member access .scores on an `any` value.  @typescript-eslint/no-unsafe-member-access
+244:100  Warning: Unsafe member access .scores on an `any` value.  @typescript-eslint/no-unsafe-member-access
+245:48  Warning: Unsafe member access .scores on an `any` value.  @typescript-eslint/no-unsafe-member-access
+245:100  Warning: Unsafe member access .scores on an `any` value.  @typescript-eslint/no-unsafe-member-access
+
+./src/app/siswa/tugas/[id]/unggah-tugas/page.tsx
+102:31  Warning: Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.  @typescript-eslint/prefer-nullish-coalescing
+232:9  Warning: 'hasContent' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/layout/AppShell.tsx
+7:10  Warning: 'cn' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/students/ReportDetailClient.tsx
+71:13  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/students/StudentFilterTabs.tsx
+4:10  Warning: 'Button' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/tasks/AddTaskDialog.tsx
+26:10  Warning: 'RUBRIC_CATEGORIES' is defined but never used.  @typescript-eslint/no-unused-vars
+63:14  Warning: This assertion is unnecessary since it does not change the type of the expression.  @typescript-eslint/no-unnecessary-type-assertion
+204:188  Warning: Unsafe argument of type `any` assigned to a parameter of type `"Umum" | "RPL" | "TKJ"`.  @typescript-eslint/no-unsafe-argument
+204:193  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+211:50  Warning: Unsafe argument of type `any` assigned to a parameter of type `"Umum" | "RPL" | "TKJ"`.  @typescript-eslint/no-unsafe-argument
+211:55  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+212:53  Warning: Unsafe argument of type `any` assigned to a parameter of type `"Umum" | "RPL" | "TKJ"`.  @typescript-eslint/no-unsafe-argument
+212:58  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/components/ui/textarea.tsx
+5:18  Warning: An interface declaring no members is equivalent to its supertype.  @typescript-eslint/no-empty-object-type
+
+./src/lib/sanitize-html.ts
+107:6  Warning: 'ParseState' is defined but never used.  @typescript-eslint/no-unused-vars
+129:35  Warning: Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.  @typescript-eslint/prefer-nullish-coalescing
+
+./src/server/api/routers/assessments.ts
+1:10  Warning: 'z' is defined but never used.  @typescript-eslint/no-unused-vars
+2:19  Warning: 'sql' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/server/api/routers/attendances.ts
+17:3  Warning: 'placementStatus' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/server/api/routers/calendarEvents.ts
+49:51  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+49:65  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+50:21  Warning: Unsafe member access .user on an `any` value.  @typescript-eslint/no-unsafe-member-access
+51:9  Warning: Unsafe assignment of an `any` value.  @typescript-eslint/no-unsafe-assignment
+51:20  Warning: Unsafe call of a(n) `any` typed value.  @typescript-eslint/no-unsafe-call
+51:27  Warning: Unsafe member access .query on an `any` value.  @typescript-eslint/no-unsafe-member-access
+52:38  Warning: Unsafe argument of type `any` assigned to a parameter of type `string | SQLWrapper`.  @typescript-eslint/no-unsafe-argument
+52:50  Warning: Unsafe member access .user on an `any` value.  @typescript-eslint/no-unsafe-member-access
+55:3  Warning: Unsafe return of a value of type `any`.  @typescript-eslint/no-unsafe-return
+374:13  Warning: Unsafe assignment of an `any` value.  @typescript-eslint/no-unsafe-assignment
+378:40  Warning: Unsafe argument of type `any` assigned to a parameter of type `number | SQLWrapper`.  @typescript-eslint/no-unsafe-argument
+378:43  Warning: Unsafe member access .id on an `any` value.  @typescript-eslint/no-unsafe-member-access
+
+./src/server/api/routers/examples.ts
+12:37  Warning: Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.  @typescript-eslint/prefer-nullish-coalescing
+
+./src/server/api/routers/finalReports.ts
+60:40  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+61:11  Warning: Unsafe member access .session on an `any` value.  @typescript-eslint/no-unsafe-member-access
+62:9  Warning: Unsafe assignment of an `any` value.  @typescript-eslint/no-unsafe-assignment
+62:19  Warning: Unsafe call of a(n) `any` typed value.  @typescript-eslint/no-unsafe-call
+62:23  Warning: Unsafe member access .db on an `any` value.  @typescript-eslint/no-unsafe-member-access
+63:15  Warning: Unsafe member access .mentorId on an `any` value.  @typescript-eslint/no-unsafe-member-access
+66:33  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+67:9  Warning: Unsafe assignment of an `any` value.  @typescript-eslint/no-unsafe-assignment
+67:20  Warning: Unsafe call of a(n) `any` typed value.  @typescript-eslint/no-unsafe-call
+67:24  Warning: Unsafe member access .db on an `any` value.  @typescript-eslint/no-unsafe-member-access
+67:91  Warning: Unsafe argument of type `any` assigned to a parameter of type `string | SQLWrapper`.  @typescript-eslint/no-unsafe-argument
+67:95  Warning: Unsafe member access .session on an `any` value.  @typescript-eslint/no-unsafe-member-access
+68:3  Warning: Unsafe return of a value of type `any`.  @typescript-eslint/no-unsafe-return
+68:14  Warning: Unsafe member access .id on an `any` value.  @typescript-eslint/no-unsafe-member-access
+
+./src/server/api/routers/reports.ts
+56:51  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+56:65  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+57:21  Warning: Unsafe member access .user on an `any` value.  @typescript-eslint/no-unsafe-member-access
+58:9  Warning: Unsafe assignment of an `any` value.  @typescript-eslint/no-unsafe-assignment
+58:20  Warning: Unsafe call of a(n) `any` typed value.  @typescript-eslint/no-unsafe-call
+58:27  Warning: Unsafe member access .query on an `any` value.  @typescript-eslint/no-unsafe-member-access
+59:38  Warning: Unsafe argument of type `any` assigned to a parameter of type `string | SQLWrapper`.  @typescript-eslint/no-unsafe-argument
+59:50  Warning: Unsafe member access .user on an `any` value.  @typescript-eslint/no-unsafe-member-access
+62:3  Warning: Unsafe return of a value of type `any`.  @typescript-eslint/no-unsafe-return
+324:13  Warning: Unsafe assignment of an `any` value.  @typescript-eslint/no-unsafe-assignment
+330:33  Warning: Unsafe argument of type `any` assigned to a parameter of type `number | SQLWrapper`.  @typescript-eslint/no-unsafe-argument
+330:36  Warning: Unsafe member access .id on an `any` value.  @typescript-eslint/no-unsafe-member-access
+385:13  Warning: Unsafe assignment of an `any` value.  @typescript-eslint/no-unsafe-assignment
+411:30  Warning: Unsafe member access .id on an `any` value.  @typescript-eslint/no-unsafe-member-access
+460:13  Warning: Unsafe assignment of an `any` value.  @typescript-eslint/no-unsafe-assignment
+462:40  Warning: Unsafe argument of type `any` assigned to a parameter of type `number | SQLWrapper`.  @typescript-eslint/no-unsafe-argument
+462:43  Warning: Unsafe member access .id on an `any` value.  @typescript-eslint/no-unsafe-member-access
+
+./src/server/api/routers/students.ts
+239:9  Warning: Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.  @typescript-eslint/prefer-nullish-coalescing
+392:13  Warning: Unsafe assignment of an `any` value.  @typescript-eslint/no-unsafe-assignment
+392:33  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules
+   Collecting page data ...
+   Generating static pages (0/36) ...
+   Generating static pages (9/36) 
+   Generating static pages (18/36) 
+   Generating static pages (27/36) 
+ ??? Generating static pages (36/36)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                     Size  First Load JS
+??? ?? /                                          141 B         102 kB
+??? ??? /_not-found                                999 B         103 kB
+??? ?? /admin/aktivitas                         5.54 kB         183 kB
+??? ?? /admin/aktivitas/[id]/edit               4.92 kB         181 kB
+??? ?? /admin/aktivitas/tambah                  4.64 kB         181 kB
+??? ?? /admin/dashboard                           987 B         103 kB
+??? ?? /admin/kalender                          4.91 kB         145 kB
+??? ?? /admin/kehadiran                         5.35 kB         145 kB
+??? ?? /admin/laporan                           5.13 kB         186 kB
+??? ?? /admin/mentor                            3.79 kB         177 kB
+??? ?? /admin/mentor/[id]                        4.4 kB         147 kB
+??? ?? /admin/mentor/tambah                     5.08 kB         145 kB
+??? ?? /admin/rapor-akhir                       4.18 kB         178 kB
+??? ?? /admin/rapor-akhir/[id]                  6.48 kB         146 kB
+??? ?? /admin/siswa                             3.89 kB         178 kB
+??? ?? /admin/siswa/[id]                        5.29 kB         148 kB
+??? ?? /admin/siswa/[id]/laporan/[reportId]     3.87 kB         114 kB
+??? ?? /admin/siswa/tambah                      3.86 kB         144 kB
+??? ?? /api/auth/[...all]                         141 B         102 kB
+??? ?? /api/panel                                 141 B         102 kB
+??? ?? /api/rapor-akhir/pdf                       141 B         102 kB
+??? ?? /api/trpc/[trpc]                           141 B         102 kB
+??? ??? /dashboard                               4.91 kB         145 kB
+??? ??? /examples                                 4.1 kB         144 kB
+??? ?? /mentor/aktivitas                        4.75 kB         184 kB
+??? ?? /mentor/aktivitas/[id]                   6.69 kB         152 kB
+??? ?? /mentor/dashboard                        3.45 kB         127 kB
+??? ?? /mentor/Informasi dan Edit Daftar Siswa    206 B         194 kB
+??? ?? /mentor/kalender                         7.11 kB         187 kB
+??? ?? /mentor/kehadiran                        4.56 kB         178 kB
+??? ?? /mentor/kehadiran/[date]                 4.77 kB         179 kB
+??? ?? /mentor/laporan                          4.12 kB         178 kB
+??? ?? /mentor/laporan/[id]                     6.57 kB         146 kB
+??? ?? /mentor/rapor-akhir                      4.13 kB         178 kB
+??? ?? /mentor/rapor-akhir/[id]                 6.49 kB         146 kB
+??? ?? /mentor/siswa                            1.38 kB         195 kB
+??? ?? /mentor/siswa/[id]                       5.98 kB         180 kB
+??? ?? /mentor/siswa/[id]/laporan/[reportId]    5.62 kB         153 kB
+??? ?? /mentor/tugas                            6.44 kB         199 kB
+??? ?? /mentor/tugas/[id]/monitoring             3.5 kB         135 kB
+??? ??? /sign-in                                 5.32 kB         130 kB
+??? ?? /siswa/aktivitas                         4.82 kB         184 kB
+??? ?? /siswa/aktivitas/[id]                    5.38 kB         150 kB
+??? ?? /siswa/biodata                            4.8 kB         175 kB
+??? ?? /siswa/dashboard                         7.38 kB         161 kB
+??? ?? /siswa/kalender                          4.71 kB         144 kB
+??? ?? /siswa/laporan                           4.22 kB         178 kB
+??? ?? /siswa/laporan/[id]                      5.66 kB         145 kB
+??? ?? /siswa/log-absensi                        2.3 kB         142 kB
+??? ?? /siswa/rapor-akhir                       5.44 kB         145 kB
+??? ?? /siswa/tugas                             3.71 kB         177 kB
+??? ?? /siswa/tugas/[id]                        5.91 kB         149 kB
+??? ?? /siswa/tugas/[id]/unggah-tugas            5.3 kB         151 kB
++ First Load JS shared by all                 102 kB
+  ??? chunks/1255-9233d9c7340d763a.js          45.4 kB
+  ??? chunks/4bd1b696-182b6b13bdad92e3.js      54.2 kB
+  ??? other shared chunks (total)              1.98 kB
+
+
+???  (Static)   prerendered as static content
+??  (Dynamic)  server-rendered on demand
+

@@ -88,7 +88,7 @@ export default function ActivityTaskCard({ item, actions }: ActivityTaskCardProp
 
       <div className="flex items-center justify-between mt-2">
         <div className="flex items-center gap-2">
-          {item.kind === "event" && item.attachments && item.attachments.length > 0 && (
+          {item.kind === "event" && item.attachments && item.attachments.length > 0 && item.attachments[0]?.url && (
             <Link href={item.attachments[0].url} target="_blank">
               <Button variant="outline" size="sm" className="rounded-full">Lihat File</Button>
             </Link>
