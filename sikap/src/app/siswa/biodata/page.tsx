@@ -42,10 +42,12 @@ export default function BiodataSiswaPage() {
   const [nama, setNama] = useState("")
   const [namaError, setNamaError] = useState<string | null>(null)
   const namaInputRef = useRef<HTMLInputElement>(null)
+  const [email, setEmail] = useState("")
   const [nis, setNis] = useState("")
   const [tempatLahir, setTempatLahir] = useState("")
   const [dob, setDob] = useState<string>("")
   const [gender, setGender] = useState<"Laki-laki" | "Perempuan">("Laki-laki")
+  const [kelas, setKelas] = useState("")
   const [semester, setSemester] = useState("")
   const [kompetensi, setKompetensi] = useState<
     "Teknik Komputer dan Jaringan" | "Rekayasa Perangkat Lunak"
@@ -72,6 +74,7 @@ export default function BiodataSiswaPage() {
   useEffect(() => {
     if (profileQuery.data) {
       setNama(profileQuery.data.name ?? "")
+      setEmail(profileQuery.data.email ?? "")
       setNis(profileQuery.data.nis ?? "")
       setTempatLahir(profileQuery.data.birthPlace ?? "")
       // Use extractDateString to handle birthDate as plain YYYY-MM-DD string
@@ -82,6 +85,7 @@ export default function BiodataSiswaPage() {
       setSemester(
         profileQuery.data.semester ? String(profileQuery.data.semester) : ""
       )
+      setKelas(profileQuery.data.cohort ?? "")
       setKompetensi(
         (profileQuery.data.major as
           | "Teknik Komputer dan Jaringan"
@@ -98,15 +102,17 @@ export default function BiodataSiswaPage() {
   // deteksi perubahan dari loaded data
   const isDirty =
     nama !== (profileQuery.data?.name ?? "") ||
+    email !== (profileQuery.data?.email ?? "") ||
     nis !== (profileQuery.data?.nis ?? "") ||
     tempatLahir !== (profileQuery.data?.birthPlace ?? "") ||
     dob !== extractDateString(profileQuery.data?.birthDate) ||
     gender !== ((profileQuery.data?.gender as "Laki-laki" | "Perempuan") ?? "Laki-laki") ||
+    kelas !== (profileQuery.data?.cohort ?? "") ||
     semester !== (profileQuery.data?.semester ? String(profileQuery.data.semester) : "") ||
     kompetensi !==
-      ((profileQuery.data?.major as
-        | "Teknik Komputer dan Jaringan"
-        | "Rekayasa Perangkat Lunak") ?? "Teknik Komputer dan Jaringan") ||
+    ((profileQuery.data?.major as
+      | "Teknik Komputer dan Jaringan"
+      | "Rekayasa Perangkat Lunak") ?? "Teknik Komputer dan Jaringan") ||
     asalSekolah !== (profileQuery.data?.school ?? "") ||
     alamat !== (profileQuery.data?.address ?? "") ||
     noTelp !== (profileQuery.data?.phone ?? "")
@@ -115,6 +121,7 @@ export default function BiodataSiswaPage() {
     // Reset to loaded profile data
     if (profileQuery.data) {
       setNama(profileQuery.data.name ?? "")
+      setEmail(profileQuery.data.email ?? "")
       setNis(profileQuery.data.nis ?? "")
       setTempatLahir(profileQuery.data.birthPlace ?? "")
       // Use extractDateString to handle birthDate as plain YYYY-MM-DD string
@@ -125,6 +132,7 @@ export default function BiodataSiswaPage() {
       setSemester(
         profileQuery.data.semester ? String(profileQuery.data.semester) : ""
       )
+      setKelas(profileQuery.data.cohort ?? "")
       setKompetensi(
         (profileQuery.data.major as
           | "Teknik Komputer dan Jaringan"
@@ -135,10 +143,12 @@ export default function BiodataSiswaPage() {
       setNoTelp(profileQuery.data.phone ?? "")
     } else {
       setNama("")
+      setEmail("")
       setNis("")
       setTempatLahir("")
       setDob("")
       setGender("Laki-laki")
+      setKelas("")
       setSemester("")
       setKompetensi("Teknik Komputer dan Jaringan")
       setAsalSekolah("")
@@ -151,7 +161,7 @@ export default function BiodataSiswaPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     // Validate that name is not empty
     if (!nama.trim()) {
       setNamaError("Nama tidak boleh kosong")
@@ -159,7 +169,7 @@ export default function BiodataSiswaPage() {
       return
     }
     setNamaError(null)
-    
+
     // Convert dob string to Date for API contract (server expects Date type)
     // Using UTC midnight to avoid local timezone shifts
     let birthDateValue: Date | undefined
@@ -168,13 +178,15 @@ export default function BiodataSiswaPage() {
       const [year, month, day] = dob.split("-").map(Number)
       birthDateValue = new Date(Date.UTC(year!, month! - 1, day))
     }
-    
+
     updateMutation.mutate({
       name: nama.trim(),
+      email: email.trim(),
       nis: nis || undefined,
       birthPlace: tempatLahir || undefined,
       birthDate: birthDateValue,
       gender: gender || undefined,
+      cohort: kelas || undefined,
       semester: semester ? Number(semester) : undefined,
       school: asalSekolah || undefined,
       major: kompetensi || undefined,
@@ -216,7 +228,7 @@ export default function BiodataSiswaPage() {
   return (
     <div className="min-h-screen bg-muted/30 p-0 m-0">
       <div className="w-full max-w-none p-5 m-0 pr-4 sm:pr-6 lg:pr-10 pl-4 sm:pl-6 lg:pl-10">
-        
+
         {/* Header */}
         <div className="space-y-1">
           <h1 className="text-2xl sm:text-3xl font-semibold">Biodata</h1>
@@ -314,16 +326,16 @@ export default function BiodataSiswaPage() {
                 </Select>
               </div>
 
-              {/* Semester */}
+              {/* Kelas */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">Semester</label>
+                <label className="text-sm font-medium">Kelas</label>
                 <Input
-                  value={semester}
+                  value={kelas}
                   onChange={(e) =>
-                    setSemester(e.target.value.replace(/[^\d]/g, ""))
+                    setKelas(e.target.value.replace(/[^\d]/g, ""))
                   }
                   inputMode="numeric"
-                  placeholder="6"
+                  placeholder="12"
                   className="h-10 px-4"
                   disabled={updateMutation.isPending}
                 />
@@ -338,8 +350,8 @@ export default function BiodataSiswaPage() {
                   onValueChange={(v) =>
                     setKompetensi(
                       v as
-                        | "Teknik Komputer dan Jaringan"
-                        | "Rekayasa Perangkat Lunak"
+                      | "Teknik Komputer dan Jaringan"
+                      | "Rekayasa Perangkat Lunak"
                     )
                   }
                   disabled={updateMutation.isPending}
@@ -358,6 +370,21 @@ export default function BiodataSiswaPage() {
                 </Select>
               </div>
 
+              {/* Semester */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Semester</label>
+                <Input
+                  value={semester}
+                  onChange={(e) =>
+                    setSemester(e.target.value.replace(/[^\d]/g, ""))
+                  }
+                  inputMode="numeric"
+                  placeholder="6"
+                  className="h-10 px-4"
+                  disabled={updateMutation.isPending}
+                />
+              </div>
+
               {/* Asal sekolah */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Asal Sekolah</label>
@@ -365,6 +392,19 @@ export default function BiodataSiswaPage() {
                   value={asalSekolah}
                   onChange={(e) => setAsalSekolah(e.target.value)}
                   placeholder="SMK 1 Tasikmalaya"
+                  className="h-10 px-4"
+                  disabled={updateMutation.isPending}
+                />
+              </div>
+
+              {/* Email */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Email</label>
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="siswa@example.com"
                   className="h-10 px-4"
                   disabled={updateMutation.isPending}
                 />

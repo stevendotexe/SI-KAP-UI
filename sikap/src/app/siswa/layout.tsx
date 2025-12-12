@@ -13,10 +13,12 @@ export default async function SiswaLayout({
     redirect("/sign-in");
   }
 
-  // Optional: Check if user is actually a student
-  // if (session.user.role !== "student") {
-  //   redirect("/unauthorized");
-  // }
+
+  // Check if user is actually a student
+  if (session.user.role !== "student") {
+    redirect("/unauthorized");
+  }
+
 
   return (
     <AppShell

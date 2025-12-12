@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { LogIn, LogOut, RefreshCcw, FileText } from "lucide-react"
-import { useRef, useState, useEffect, useMemo } from "react"
+import { useRef, useState, useEffect,} from "react"
 import {
     Dialog,
     DialogContent,
@@ -15,7 +15,7 @@ import {
     useQuery,
 } from "@tanstack/react-query"
 import { api } from "@/trpc/react"
-import { Spinner } from "@/components/ui/spinner"
+
 
 // Review status constant aligned with backend enum
 const REVIEW_STATUS = {
@@ -51,25 +51,16 @@ function useReverseGeocode(lat?: number, lon?: number) {
 }
 
 export default function DashboardPage() {
-    // Compute week range (Monday to Sunday of current week)
-    const weekRange = useMemo(() => {
-        const now = new Date()
-        const dayOfWeek = now.getDay()
-        // Sunday is 0, Monday is 1, etc. We want Monday as start
-        const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
-        const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday)
-        startOfWeek.setHours(0, 0, 0, 0)
-        const endOfWeek = new Date(startOfWeek)
-        endOfWeek.setDate(startOfWeek.getDate() + 6)
-        endOfWeek.setHours(23, 59, 59, 999)
-        return { from: startOfWeek, to: endOfWeek }
-    }, [])
+
 
     // tRPC queries for dashboard stats
     const tasksQuery = api.tasks.listAssigned.useQuery({ limit: 200 })
     const reportsQuery = api.reports.listMine.useQuery({
         limit: 200,
     })
+
+    // Fetch student profile for displaying user ID
+    const studentProfile = api.students.me.useQuery()
 
     // Fetch today's attendance to persist state across refreshes
     const todayAttendance = api.attendances.getTodayLog.useQuery()
@@ -154,7 +145,7 @@ export default function DashboardPage() {
             const log = todayAttendance.data
             if (log.checkInAt) {
                 setIsMasukSaved(true)
-                setMasukAt(new Intl.DateTimeFormat("en-GB", {
+                setMasukAt(new Intl.DateTimeFormat("id-ID", {
                     hour: "2-digit",
                     minute: "2-digit",
                     second: "2-digit",
@@ -172,7 +163,7 @@ export default function DashboardPage() {
             }
             if (log.checkOutAt) {
                 setIsKeluarSaved(true)
-                setKeluarAt(new Intl.DateTimeFormat("en-GB", {
+                setKeluarAt(new Intl.DateTimeFormat("id-ID", {
                     hour: "2-digit",
                     minute: "2-digit",
                     second: "2-digit",
@@ -185,7 +176,7 @@ export default function DashboardPage() {
 
 
     const formatTs = () =>
-        new Intl.DateTimeFormat("en-GB", {
+        new Intl.DateTimeFormat("id-ID", {
             hour: "2-digit",
             minute: "2-digit",
             second: "2-digit",
@@ -300,7 +291,7 @@ export default function DashboardPage() {
     }
 
     // State for attendance mutation error
-    const [attendanceError, setAttendanceError] = useState<string | null>(null)
+
 
     // tRPC mutations for attendance
     const checkInMutation = api.attendances.recordCheckIn.useMutation()
@@ -309,7 +300,6 @@ export default function DashboardPage() {
     const handleCatatMasuk = async () => {
         const ts = formatTs()
         setMasukAt(ts)
-        setAttendanceError(null)
         try {
             await checkInMutation.mutateAsync({
                 timestamp: new Date(),
@@ -320,7 +310,6 @@ export default function DashboardPage() {
             setIsMasukSaved(true)
         } catch (err) {
             const message = err instanceof Error ? err.message : "Terjadi kesalahan saat menyimpan presensi masuk"
-            setAttendanceError(message)
             alert(message)
         }
     }
@@ -328,7 +317,6 @@ export default function DashboardPage() {
     const handleCatatKeluar = async () => {
         const ts = formatTs()
         setKeluarAt(ts)
-        setAttendanceError(null)
         try {
             await checkOutMutation.mutateAsync({
                 timestamp: new Date(),
@@ -339,7 +327,6 @@ export default function DashboardPage() {
             setIsKeluarSaved(true)
         } catch (err) {
             const message = err instanceof Error ? err.message : "Terjadi kesalahan saat menyimpan presensi keluar"
-            setAttendanceError(message)
             alert(message)
         }
     }
@@ -385,8 +372,10 @@ export default function DashboardPage() {
             <div className="w-full max-w-none p-0 m-0">
                 <main className="space-y-6 p-5 pr-4 sm:pr-6 lg:pr-10 pl-4 sm:pl-6 lg:pl-10">
                     <section className="p-0">
-                        <h1 className="text-2xl sm:text-3xl font-semibold">Selamat datang, Siswa!</h1>
-                        <p className="text-muted-foreground mt-1">ID Siswa: 010101</p>
+                        <h1 className="text-2xl sm:text-3xl font-semibold">Selamat datang, {studentProfile.data?.name ?? "Siswa"}!</h1>
+                        <p className="text-muted-foreground mt-1">
+                            ID Siswa: {studentProfile.isLoading ? "Memuat..." : studentProfile.data?.userId ?? "N/A"}
+                        </p>
                         <div className="mt-1 flex flex-col gap-6">
                             {/* NOTE: Attendance form posts to /api/attendance endpoint. Backend implementation may be required. */}
                             <div className="order-1 md:order-2">
@@ -400,7 +389,7 @@ export default function DashboardPage() {
                                         </div>
                                         <div className="text-sm mt-4 sm:mt-0" suppressHydrationWarning>
                                             {now
-                                                ? new Intl.DateTimeFormat("en-GB", {
+                                                ? new Intl.DateTimeFormat("id-ID", {
                                                     weekday: "long",
                                                     day: "numeric",
                                                     month: "long",
@@ -410,7 +399,7 @@ export default function DashboardPage() {
                                             <br />
                                             <span className="text-muted-foreground">
                                                 {now
-                                                    ? new Intl.DateTimeFormat("en-GB", {
+                                                    ? new Intl.DateTimeFormat("id-ID", {
                                                         hour: "2-digit",
                                                         minute: "2-digit",
                                                         second: "2-digit",

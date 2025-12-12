@@ -4,7 +4,6 @@ import { useState } from "react";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 import Footer from "./Footer";
-import { cn } from "@/lib/utils";
 
 export type AppShellProps = {
   children: React.ReactNode;

@@ -38,6 +38,8 @@ export default function DetailTugasSiswaPage() {
   // Fetch task detail with tRPC
   const { data, isLoading, error } = api.tasks.detail.useQuery({
     taskId,
+  }, {
+    enabled: !isNaN(taskId),
   });
 
   // Helper function to format dates
@@ -265,15 +267,14 @@ export default function DetailTugasSiswaPage() {
                   )}
 
                   {/* File attachments */}
-                  <div>
-                    <div className="mb-2 text-sm font-semibold">Lampiran</div>
-                    {data.submission.files &&
-                    data.submission.files.length > 0 ? (
+                  {data.submission.files && data.submission.files.length > 0 && (
+                    <div>
+                      <div className="mb-2 text-sm font-semibold">Lampiran</div>
                       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                         {data.submission.files.map((file) => (
                           <a
                             key={file.id}
-                            href={`https://sikap-storage.rplupiproject.com${file.url}`}
+                            href={file.url}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="hover:bg-accent flex items-center gap-3 rounded-lg border p-3 transition-colors"
@@ -296,12 +297,8 @@ export default function DetailTugasSiswaPage() {
                           </a>
                         ))}
                       </div>
-                    ) : (
-                      <p className="text-muted-foreground text-sm">
-                        Tidak ada lampiran
-                      </p>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </section>

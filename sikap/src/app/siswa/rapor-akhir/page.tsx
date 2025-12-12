@@ -1,54 +1,22 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { FileDown } from "lucide-react"
 import { api } from "@/trpc/react"
-import { useMemo } from "react"
-
-/**
- * TODO: Backend Integration Required
- * 
- * This page currently displays static final report data. To integrate with backend:
- * 
- * Required Backend Endpoint:
- * - `api.finalReports.myReport.useQuery()` (student-specific procedure)
- *   - Should return final report for logged-in student's active placement
- *   - Returns: {
- *       student: { name, nis, birthPlace, birthDate, gender, semester, school, major, address, phone },
- *       scores: {
- *         personality: Array<{ name, score }>,
- *         technical: Array<{ name, score }>
- *       },
- *       totalScore: number,
- *       averageScore: number
- *     }
- * 
- * Current Limitation:
- * - `finalReports.detail` in `sikap/src/server/api/routers/finalReports.ts` uses
- *   `adminOrMentorProcedure`, blocking student access
- * - No student-facing final report procedures exist
- * 
- * Integration Steps (when endpoint available):
- * 1. Import: `import { api } from "@/trpc/react"` and `import { Spinner } from "@/components/ui/spinner"`
- * 2. Query: `const { data, isLoading, error } = api.finalReports.myReport.useQuery()`
- * 3. Replace hardcoded student identity fields (lines 56-96) with `data?.student` fields
- * 4. Replace hardcoded scores (lines 136-175) with mapped `data?.scores.personality` and `data?.scores.technical`
- * 5. Replace total/average (lines 183-189) with `data?.totalScore` and `data?.averageScore`
- * 6. Add loading state before card: `{isLoading && <Spinner />}`
- * 7. Add error state: `{error && <div>Error loading final report</div>}`
- * 8. Format dates: `new Date(data.student.birthDate).toLocaleDateString('id-ID')`
- * 9. Conditionally render card only when `data` exists
- */
+import { useState } from "react"
 
 export default function RaporAkhirPage() {
-  const handleDownload = async () => {
-    const element = document.getElementById("pdf-content")
+  const [activeTab, setActiveTab] = useState("daftar-nilai")
+
+  const handleDownload = async (contentId: string, filename: string) => {
+    const element = document.getElementById(contentId)
     if (!element) return alert("Element PNG tidak ditemukan!")
     try {
       const { toPng } = await import("html-to-image")
       const dataUrl = await toPng(element, { pixelRatio: 2, backgroundColor: "#ffffff", cacheBust: true })
       const link = document.createElement("a")
-      link.download = "Rapor_Akhir_Praktik_Kerja_Lapangan.png"
+      link.download = filename
       link.href = dataUrl
       link.click()
     } catch (e) {
@@ -57,39 +25,39 @@ export default function RaporAkhirPage() {
     }
   }
 
-  const spRouter = (api as any)?.studentProfile
-  const reportsRouter = (api as any)?.reports
+  // TODO: Enable these queries when the backend endpoints are ready
+  // For now, we disable them to prevent console errors
+  const { data: profile, isLoading: loadingProfile } = api.students.me.useQuery(undefined, {
+    enabled: false,
+    retry: 0
+  })
 
-  // NONAKTIFKAN QUERY: hindari console error studentProfile.getMine dan reports.finalScore
-  const { data: profile, isLoading: loadingProfile } =
-    spRouter?.getMine?.useQuery(undefined, { retry: 0, enabled: false }) ??
-    { data: undefined, isLoading: false }
+  const { data: final, isLoading: loadingFinal } = api.finalReports.myReport.useQuery(undefined, {
+    enabled: false,
+    retry: 0
+  })
 
-  const { data: final, isLoading: loadingFinal } =
-    reportsRouter?.finalScore?.useQuery(undefined, { retry: 0, enabled: false }) ??
-    { data: undefined, isLoading: false }
+  const place = typeof profile?.birthPlace === "string" && profile.birthPlace.length ? profile.birthPlace : "Bandung"
+  const bdRaw = profile?.birthDate
+  const bd = bdRaw ? new Date(String(bdRaw)) : undefined
+  const birthDateStr =
+    bd && !isNaN(bd.getTime())
+      ? new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "long", year: "numeric" }).format(bd)
+      : "12 September 2005"
 
-  // Format tanggal lahir
-  const ttl = useMemo(() => {
-    const place = typeof profile?.birthPlace === "string" && profile.birthPlace.length ? profile.birthPlace : "Bandung"
-    const bdRaw = profile?.birthDate
-    const bd = bdRaw ? new Date(String(bdRaw)) : undefined
-    const dateStr =
-      bd && !isNaN(bd.getTime())
-        ? new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "long", year: "numeric" }).format(bd)
-        : "12 September 2005"
-    return `${place}, ${dateStr}`
-  }, [profile])
-
-  // Kompetensi label
   const kompetensi =
     typeof profile?.skillCompetency === "string" && profile.skillCompetency.length
       ? profile.skillCompetency
-      : "Teknik Komputer & jaringan"
+      : "Teknik Komputer dan Jaringan"
 
-  // Nilai total & rata-rata (safe)
-  const totalNilai = typeof final?.total === "number" ? String(final.total) : "1105"
+  const totalNilai = typeof final?.total === "number" ? String(final.total) : "1.102"
   const rataRata = typeof final?.avg === "number" ? String(Math.round(final.avg)) : "92"
+
+  const currentDate = new Date().toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  })
 
   return (
     <div className="min-h-screen bg-muted/30 p-0 m-0">
@@ -102,169 +70,334 @@ export default function RaporAkhirPage() {
                 {loadingProfile || loadingFinal ? "Memuat..." : "Laporan akhir kerja Anda"}
               </p>
             </div>
-            <Button variant="destructive" className="h-9 px-4" onClick={handleDownload}>
+            <Button
+              variant="destructive"
+              className="h-9 px-4"
+              onClick={() => {
+                if (activeTab === "daftar-nilai") {
+                  void handleDownload("daftar-nilai-content", "Daftar_Nilai_PKL.png")
+                } else {
+                  void handleDownload("sertifikat-content", "Sertifikat_PKL.png")
+                }
+              }}
+            >
               <FileDown className="size-4" />
               <span className="ml-2">Cetak PNG</span>
             </Button>
           </div>
 
-          {/* Card */}
-          <section className="mt-4">
-            <div id="pdf-content" className="rounded-2xl border bg-card p-6 shadow-sm">
-              {/* Judul di tengah */}
-              <div className="text-center font-semibold">Rapor Akhir Praktik Kerja Lapangan</div>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full max-w-md grid-cols-2">
+              <TabsTrigger value="daftar-nilai">Daftar Nilai</TabsTrigger>
+              <TabsTrigger value="sertifikat">Sertifikat</TabsTrigger>
+            </TabsList>
 
-              {/* MOCK DATA: Replace with api.finalReports.myReport.useQuery() when backend endpoint is available */}
-              {/* A. Identitas Siswa */}
-              <div className="mt-6">
-                <div className="font-semibold">A. Identitas Siswa</div>
+            {/* Tab 1: Daftar Nilai */}
+            <TabsContent value="daftar-nilai" className="mt-4">
+              <section>
+                <div id="daftar-nilai-content" className="bg-white p-8 sm:p-12 relative">
+                  {/* Decorative corner borders */}
+                  <div className="absolute top-0 left-0 w-32 h-32 border-l-4 border-t-4 border-blue-500"></div>
+                  <div className="absolute top-0 right-0 w-32 h-32 border-r-4 border-t-4 border-blue-500"></div>
+                  <div className="absolute bottom-0 left-0 w-32 h-32 border-l-4 border-b-4 border-blue-500"></div>
+                  <div className="absolute bottom-0 right-0 w-32 h-32 border-r-4 border-b-4 border-blue-500"></div>
 
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-x-20 gap-y-3 text-sm">
-                  {/* Kiri */}
-                  <div className="space-y-3">
-                    <div>
-                      <div className="font-medium">Nama</div>
-                      <div>{(typeof profile?.name === "string" && profile.name.length) ? profile.name : "Rafif Zharif"}</div>
-                    </div>
-                    <div>
-                      <div className="font-medium">Tempat, tanggal lahir</div>
-                      <div>{ttl}</div>
-                    </div>
-                    <div>
-                      <div className="font-medium">Semester</div>
-                      <div>{(typeof profile?.semester === "number") ? String(profile.semester) : "6"}</div>
-                    </div>
-                    <div>
-                      <div className="font-medium">Asal Sekolah</div>
-                      <div>{(typeof profile?.schoolName === "string" && profile.schoolName.length) ? profile.schoolName : "SMK 1 Tasikmalaya"}</div>
-                    </div>
-                  </div>
+                  {/* Main border */}
+                  <div className="border-2 border-gray-300 p-6 sm:p-8">
+                    {/* Header with logos */}
+                    <div className="grid grid-cols-3 gap-4 items-center mb-6">
+                      {/* Left - Logo SMK placeholder */}
+                      <div className="flex justify-start">
+                        <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center text-xs text-gray-500">
+                          Logo SMK
+                        </div>
+                      </div>
 
-                  {/* Kanan */}
-                  <div className="space-y-3">
-                    <div>
-                      <div className="font-medium">NIS</div>
-                      <div>{(typeof profile?.nis === "string" && profile.nis.length) ? profile.nis : "234658594"}</div>
-                    </div>
-                    <div>
-                      <div className="font-medium">Jenis kelamin</div>
-                      <div>{(profile?.gender === "Perempuan" || profile?.gender === "Laki-laki") ? profile.gender : "Laki-laki"}</div>
-                    </div>
-                    <div>
-                      <div className="font-medium">Kompetensi Keahlian</div>
-                      <div>{kompetensi}</div>
-                    </div>
-                    <div>
-                      <div className="font-medium">No telp</div>
-                      <div>{(typeof profile?.phone === "string" && profile.phone.length) ? profile.phone : "0812344556677"}</div>
-                    </div>
-                  </div>
+                      {/* Center title */}
+                      <div className="text-center">
+                        <h1 className="text-2xl sm:text-3xl font-bold underline decoration-2 underline-offset-4">
+                          DAFTAR NILAI
+                        </h1>
+                        <p className="text-sm mt-2">Hasil Praktik Kerja Industri di :</p>
+                        <p className="text-sm font-semibold">Pusat Laptop Tasik (CV. AZZAHRA PUTRI)</p>
+                        <p className="text-sm">Tahun Pelajaran 2025/2026</p>
+                      </div>
 
-                  {/* Alamat full width */}
-                  <div className="md:col-span-2 mt-2">
-                    <div className="font-medium">Alamat</div>
-                    <div>{(typeof profile?.address === "string" && profile.address.length) ? profile.address : "Jl Pendidikan No. 20"}</div>
+                      {/* Right - Company Logo */}
+                      <div className="flex justify-end">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src="/images/logo.png"
+                          alt="Logo"
+                          className="h-44 w-auto object-contain"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Student Information */}
+                    <div className="mb-6 text-sm">
+                      <div className="grid grid-cols-1 gap-2">
+                        <div className="flex">
+                          <span className="w-56 font-medium">Nama Siswa</span>
+                          <span className="mr-2">:</span>
+                          <span>{(typeof profile?.name === "string" && profile.name.length) ? profile.name : "EGI ADITIA"}</span>
+                        </div>
+                        <div className="flex">
+                          <span className="w-56 font-medium">Nomor Induk Siswa Nasional</span>
+                          <span className="mr-2">:</span>
+                          <span>{(typeof profile?.nis === "string" && profile.nis.length) ? profile.nis : "2324312076"}</span>
+                        </div>
+                        <div className="flex">
+                          <span className="w-56 font-medium">Program Keahlian</span>
+                          <span className="mr-2">:</span>
+                          <span>{kompetensi}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Scores Table */}
+                    <div className="mb-8 overflow-x-auto">
+                      <table className="w-full border-2 border-gray-800 text-sm min-w-[640px]">
+                        <thead>
+                          <tr className="bg-gray-200">
+                            <th className="border-2 border-gray-800 px-3 py-2 text-center w-16">NO</th>
+                            <th className="border-2 border-gray-800 px-3 py-2 text-center">KOMPETENSI YANG DILATIHKAN</th>
+                            <th className="border-2 border-gray-800 px-3 py-2 text-center" colSpan={2}>NILAI</th>
+                          </tr>
+                          <tr className="bg-gray-100">
+                            <th className="border-2 border-gray-800 px-3 py-2"></th>
+                            <th className="border-2 border-gray-800 px-3 py-2"></th>
+                            <th className="border-2 border-gray-800 px-3 py-2 text-center w-24">ANGKA</th>
+                            <th className="border-2 border-gray-800 px-3 py-2 text-center w-40">HURUF</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {/* Kepribadian Section */}
+                          <tr>
+                            <td className="border-2 border-gray-800 px-3 py-3 align-top text-center font-semibold">A</td>
+                            <td className="border-2 border-gray-800 px-3 py-3">
+                              <div className="font-semibold mb-2">KEPRIBADIAN</div>
+                              <ol className="list-decimal ml-5 space-y-1">
+                                <li>Disiplin</li>
+                                <li>Kerja sama</li>
+                                <li>Inisiatif</li>
+                                <li>Kerajinan</li>
+                                <li>Tanggung jawab</li>
+                              </ol>
+                            </td>
+                            <td className="border-2 border-gray-800 px-3 py-3 align-top text-center">
+                              <div className="space-y-1">
+                                <div>92</div>
+                                <div>91</div>
+                                <div>92</div>
+                                <div>93</div>
+                                <div>91</div>
+                              </div>
+                            </td>
+                            <td className="border-2 border-gray-800 px-3 py-3 align-top">
+                              <div className="space-y-1">
+                                <div>Sembilan Puluh Dua</div>
+                                <div>Sembilan Puluh Satu</div>
+                                <div>Sembilan Puluh Dua</div>
+                                <div>Sembilan Puluh Tiga</div>
+                                <div>Sembilan Puluh Satu</div>
+                              </div>
+                            </td>
+                          </tr>
+
+                          {/* Kompetensi Kejuruan Section */}
+                          <tr>
+                            <td className="border-2 border-gray-800 px-3 py-3 align-top text-center font-semibold">B</td>
+                            <td className="border-2 border-gray-800 px-3 py-3">
+                              <div className="font-semibold mb-2">KOMPETENSI KEJURUAN</div>
+                              <ol className="list-decimal ml-5 space-y-1">
+                                <li>Penerapan K3LH</li>
+                                <li>Merakit Komputer</li>
+                                <li>Menginstalasi sistem operasi dan driver komputer dan aplikasi peralatan</li>
+                                <li>Perakitan dan komputer</li>
+                                <li>Perbaikan peripheral peralatan</li>
+                                <li>Menginstal hardware dan software jaringan</li>
+                                <li>Perbaikan dan peralatan hardware dan software jaringan</li>
+                              </ol>
+                            </td>
+                            <td className="border-2 border-gray-800 px-3 py-3 align-top text-center">
+                              <div className="space-y-1">
+                                <div>92</div>
+                                <div>93</div>
+                                <div>91</div>
+                                <div>93</div>
+                                <div>91</div>
+                                <div>93</div>
+                                <div>92</div>
+                              </div>
+                            </td>
+                            <td className="border-2 border-gray-800 px-3 py-3 align-top">
+                              <div className="space-y-1">
+                                <div>Sembilan Puluh Dua</div>
+                                <div>Sembilan Puluh Tiga</div>
+                                <div>Sembilan Puluh Satu</div>
+                                <div>Sembilan Puluh Tiga</div>
+                                <div>Sembilan Puluh Satu</div>
+                                <div>Sembilan Puluh Tiga</div>
+                                <div>Sembilan Puluh Dua</div>
+                              </div>
+                            </td>
+                          </tr>
+
+                          {/* Total */}
+                          <tr>
+                            <td className="border-2 border-gray-800 px-3 py-2 text-center font-semibold" colSpan={2}>
+                              JUMLAH
+                            </td>
+                            <td className="border-2 border-gray-800 px-3 py-2 text-center font-semibold">
+                              {totalNilai}
+                            </td>
+                            <td className="border-2 border-gray-800 px-3 py-2 font-semibold">
+                              Seribu Seratus Dua
+                            </td>
+                          </tr>
+
+                          {/* Average */}
+                          <tr>
+                            <td className="border-2 border-gray-800 px-3 py-2 text-center font-semibold" colSpan={2}>
+                              RATA-RATA
+                            </td>
+                            <td className="border-2 border-gray-800 px-3 py-2 text-center font-semibold">
+                              {rataRata}
+                            </td>
+                            <td className="border-2 border-gray-800 px-3 py-2 font-semibold">
+                              Sembilan Puluh Dua
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Footer with signature */}
+                    <div className="grid grid-cols-2 gap-8 mt-8">
+                      {/* Left: Empty space */}
+                      <div className="flex justify-center items-center">
+                        {/* Removed trophy decoration */}
+                      </div>
+
+                      {/* Right: Signature area */}
+                      <div className="text-sm">
+                        <div className="text-right mb-12">
+                          <p>Tasikmalaya, {currentDate}</p>
+                          <p className="font-semibold mt-1">Pembimbing</p>
+                        </div>
+                        <div className="text-right mt-16">
+                          <p className="font-semibold underline">Yang Bersangkutan, A.Md</p>
+                          <p className="text-xs mt-1">CV. AZZAHRA PUTRI</p>
+                          <p className="text-xs italic">Pusat Laptop & IT Solution</p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </section>
+            </TabsContent>
 
-              {/* MOCK SCORES: Replace with data?.scores.personality and data?.scores.technical when backend endpoint is available */}
-              {/* B. Penilaian */}
-              <div className="mt-6">
-                <div className="font-semibold">B. Penilaian</div>
+            {/* Tab 2: Sertifikat */}
+            <TabsContent value="sertifikat" className="mt-4">
+              <section>
+                <div id="sertifikat-content" className="bg-white p-8 sm:p-12 relative">
+                  {/* Decorative corner borders */}
+                  <div className="absolute top-0 left-0 w-32 h-32 border-l-4 border-t-4 border-blue-500"></div>
+                  <div className="absolute top-0 right-0 w-32 h-32 border-r-4 border-t-4 border-blue-500"></div>
+                  <div className="absolute bottom-0 left-0 w-32 h-32 border-l-4 border-b-4 border-blue-500"></div>
+                  <div className="absolute bottom-0 right-0 w-32 h-32 border-r-4 border-b-4 border-blue-500"></div>
 
-                <div className="mt-3 rounded-xl border no-scroll">
-                  <style>{`
-                    #pdf-content .no-scroll {
-                      overflow: visible;
-                      position: relative;
-                    }
-                    #pdf-content .no-scroll::-webkit-scrollbar {
-                      display: none;
-                    }
-                    #pdf-content .no-scroll {
-                      -ms-overflow-style: none;
-                      scrollbar-width: none;
-                    }
-                  `}</style>
-                  <table className="min-w-full text-xs">
-                    <thead className="bg-secondary">
-                      <tr>
-                        <th className="border border-border px-3 py-2 w-20 text-left">No</th>
-                        <th className="border border-border px-3 py-2 text-left">
-                          Kompetensi yang dilatihkan
-                        </th>
-                        <th className="border border-border px-3 py-2 w-28 text-left">Nilai</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {/* Bagian 1 */}
-                      <tr>
-                        <td className="border border-border px-3 py-2 align-top">1</td>
-                        <td className="border border-border px-3 py-2">
-                          <div className="font-medium">Kepribadian</div>
-                          <ol className="list-decimal ml-4 mt-1 space-y-0.5">
-                            <li>Disiplin</li>
-                            <li>Kerja sama</li>
-                            <li>Inisiatif</li>
-                            <li>Kerajinan</li>
-                            <li>Tanggung jawab</li>
-                          </ol>
-                        </td>
-                        <td className="border border-border px-3 py-2 align-top">
-                          <div>{(typeof final?.scores?.personality?.[0] === "number") ? String(final.scores.personality[0]) : "91"}</div>
-                          <div>{(typeof final?.scores?.personality?.[1] === "number") ? String(final.scores.personality[1]) : "91"}</div>
-                          <div>{(typeof final?.scores?.personality?.[2] === "number") ? String(final.scores.personality[2]) : "92"}</div>
-                          <div>{(typeof final?.scores?.personality?.[3] === "number") ? String(final.scores.personality[3]) : "92"}</div>
-                          <div>{(typeof final?.scores?.personality?.[4] === "number") ? String(final.scores.personality[4]) : "94"}</div>
-                        </td>
-                      </tr>
+                  {/* Main border */}
+                  <div className="border-2 border-gray-300 p-6 sm:p-8">
+                    {/* Header with logos */}
+                    <div className="grid grid-cols-3 gap-4 items-center mb-6">
+                      {/* Left logo */}
+                      <div className="flex justify-start">
+                        <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center text-xs text-gray-500">
+                          Logo SMK
+                        </div>
+                      </div>
 
-                      {/* Bagian 2 */}
-                      <tr>
-                        <td className="border border-border px-3 py-2 align-top">2</td>
-                        <td className="border border-border px-3 py-2">
-                          <div className="font-medium">Kompetensi kejuruan</div>
-                          <ol className="list-decimal ml-4 mt-1 space-y-0.5">
-                            <li>Penerapan K3LH</li>
-                            <li>Merakit Komputer</li>
-                            <li>Menginstalasi sistem operasi</li>
-                            <li>Perakitan komputer</li>
-                            <li>Perbaikan peripheral</li>
-                            <li>Menginstal software jaringan</li>
-                            <li>Perbaikan software jaringan</li>
-                          </ol>
-                        </td>
-                        <td className="border border-border px-3 py-2 align-top">
-                          <div>{(typeof final?.scores?.technical?.[0] === "number") ? String(final.scores.technical[0]) : "92"}</div>
-                          <div>{(typeof final?.scores?.technical?.[1] === "number") ? String(final.scores.technical[1]) : "93"}</div>
-                          <div>{(typeof final?.scores?.technical?.[2] === "number") ? String(final.scores.technical[2]) : "91"}</div>
-                          <div>{(typeof final?.scores?.technical?.[3] === "number") ? String(final.scores.technical[3]) : "93"}</div>
-                          <div>{(typeof final?.scores?.technical?.[4] === "number") ? String(final.scores.technical[4]) : "90"}</div>
-                          <div>{(typeof final?.scores?.technical?.[5] === "number") ? String(final.scores.technical[5]) : "93"}</div>
-                          <div>{(typeof final?.scores?.technical?.[6] === "number") ? String(final.scores.technical[6]) : "93"}</div>
-                        </td>
-                      </tr>
+                      {/* Center title */}
+                      <div className="text-center">
+                        <h1 className="text-2xl sm:text-3xl font-bold underline decoration-2 underline-offset-4">
+                          SERTIFIKAT
+                        </h1>
+                        <p className="text-sm mt-2">Nomor : 024/PUSAT-LAPTOP/PKL/10/2025</p>
+                        <p className="text-sm mt-1">Pusat Laptop Tasik (CV. AZZAHRA PUTRI) menerangkan bahwa :</p>
+                      </div>
 
-                      {/* Total & Rata-Rata */}
-                      <tr>
-                        <td className="border border-border px-3 py-2 font-medium" colSpan={2}>
-                          Total Nilai
-                        </td>
-                        <td className="border border-border px-3 py-2">{totalNilai}</td>
-                      </tr>
-                      <tr>
-                        <td className="border border-border px-3 py-2 font-medium" colSpan={2}>
-                          Rata-Rata
-                        </td>
-                        <td className="border border-border px-3 py-2">{rataRata}</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                      {/* Right logo */}
+                      <div className="flex justify-end">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src="/images/logo.png"
+                          alt="Logo"
+                          className="h-44 w-auto object-contain"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Student Name - Large */}
+                    <div className="text-center my-8">
+                      <h2 className="text-3xl sm:text-4xl font-bold italic">
+                        {(typeof profile?.name === "string" && profile.name.length) ? profile.name : "Egi Aditia"}
+                      </h2>
+                      <p className="text-sm mt-2">Siswa Tingkat XII (Dua Belas) SMKN Parungponteng</p>
+                    </div>
+
+                    {/* Certificate Details */}
+                    <div className="mb-6 text-sm space-y-2">
+                      <div className="flex">
+                        <span className="w-56 font-medium">Bidang Keahlian</span>
+                        <span className="mr-2">:</span>
+                        <span>Teknologi Informasi</span>
+                      </div>
+                      <div className="flex">
+                        <span className="w-56 font-medium">Program Keahlian</span>
+                        <span className="mr-2">:</span>
+                        <span>Teknik Jaringan Komputer dan Telekomunikasi</span>
+                      </div>
+                      <div className="flex">
+                        <span className="w-56 font-medium">Konsentrasi Keahlian</span>
+                        <span className="mr-2">:</span>
+                        <span>Teknik Komputer dan Jaringan</span>
+                      </div>
+                      <div className="flex">
+                        <span className="w-56 font-medium">Nomor Induk Siswa Nasional</span>
+                        <span className="mr-2">:</span>
+                        <span>{(typeof profile?.nis === "string" && profile.nis.length) ? profile.nis : "2324312076"}</span>
+                      </div>
+                    </div>
+
+                    {/* Certificate Statement */}
+                    <div className="my-8 text-center text-sm">
+                      <p>Telah melaksanakan implementasi mata pelajaran Praktik Kerja Industri (PKL) di Pusat Laptop Tasik</p>
+                      <p className="mt-1">selama 3 bulan, mulai tanggal 1 Juli 2025 s.d. 30 September 2025, dengan predikat:</p>
+                    </div>
+
+                    {/* Predicate */}
+                    <div className="text-center my-8">
+                      <h3 className="text-3xl font-bold">BAIK</h3>
+                    </div>
+
+
+                    {/* Signature */}
+                    <div className="mt-12 flex justify-end">
+                      <div className="text-sm text-center">
+                        <p>Tasikmalaya, {currentDate}</p>
+                        <p className="font-semibold mt-1">Pembimbing</p>
+                        <div className="h-20"></div>
+                        <p className="font-semibold underline">Yadi Herdiaman, A.Md</p>
+                        <p className="text-xs mt-1">CV. AZZAHRA PUTRI</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          </section>
+              </section>
+            </TabsContent>
+          </Tabs>
         </main>
       </div>
     </div>

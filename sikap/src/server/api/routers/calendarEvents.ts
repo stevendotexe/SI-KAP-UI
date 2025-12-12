@@ -47,11 +47,18 @@ const docs = {
 
 
 async function requireStudentPlacement(ctx: { db: any; session: any }) {
-  if (!ctx.session?.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+  if (!ctx.session?.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "User not authenticated" });
+
+  // Check role first
+  const role = ctx.session.user.role;
+  if (role !== "student") {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Only students can access this endpoint" });
+  }
+
   const sp = await ctx.db.query.studentProfile.findFirst({
     where: eq(studentProfile.userId, ctx.session.user.id),
   });
-  if (!sp) throw new TRPCError({ code: "FORBIDDEN" });
+  if (!sp) throw new TRPCError({ code: "FORBIDDEN", message: "Student profile not found" });
   return sp;
 }
 const creatorUser = alias(user, "creator_user");

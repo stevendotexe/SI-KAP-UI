@@ -25,7 +25,7 @@ export default function LaporanSiswaPage() {
   const { data: reportsData, isLoading: isLoadingReports, error: errorReports } = api.reports.listMine.useQuery({
     search: q || undefined,
     status: selectedStatus ?? undefined,
-    type: selectedType === "task" ? undefined : (selectedType as any ?? undefined),
+    type: selectedType === "task" || selectedType === null ? undefined : selectedType,
     limit: 50,
     offset: 0,
   })
@@ -41,7 +41,7 @@ export default function LaporanSiswaPage() {
   })
 
   const isLoading = isLoadingReports || isLoadingTasks
-  const error = errorReports || errorTasks
+  const error = errorReports ?? errorTasks
 
   // Merge and sort data
   const mergedItems = [
@@ -57,10 +57,7 @@ export default function LaporanSiswaPage() {
       itemType: "task" as const,
       originalStatus: t.status
     })) ?? [])
-  ].sort((a, b) => {
-    // Sort logic could be improved based on dates if available
-    return 0
-  })
+  ].sort(() => 0)
 
   // Filter merged items based on client-side filters if needed (e.g. if API filters don't cover everything perfectly)
   const filteredItems = mergedItems.filter(item => {
@@ -310,7 +307,7 @@ export default function LaporanSiswaPage() {
                         </span>
                       )}
                     </div>
-                    {(item.periodStart || item.periodEnd) && (
+                    {(item.periodStart ?? item.periodEnd) && (
                       <p className="text-gray-600 text-sm">
                         Periode: {formatDate(item.periodStart)} -{" "}
                         {formatDate(item.periodEnd)}

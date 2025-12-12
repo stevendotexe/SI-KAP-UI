@@ -38,9 +38,11 @@ export default function SiswaAktivitasPage() {
     const [search, setSearch] = useState("");
     const [filterType, setFilterType] = useState<string>("all");
 
-    const { data, isLoading, error } = api.calendarEvents.listForStudent.useQuery({
-        type: filterType === "all" ? undefined : (filterType as "in_class" | "field_trip" | "meet_greet" | "meeting" | "deadline" | "milestone"),
-    });
+    const { data, isLoading, error } = api.calendarEvents.listForStudent.useQuery(
+        filterType === "all"
+            ? {}
+            : { type: filterType as "in_class" | "field_trip" | "meet_greet" | "meeting" | "deadline" | "milestone" }
+    );
 
     const events = data?.items ?? [];
 
@@ -50,8 +52,8 @@ export default function SiswaAktivitasPage() {
         const searchLower = search.toLowerCase();
         return (
             event.title.toLowerCase().includes(searchLower) ||
-            (event.description && event.description.toLowerCase().includes(searchLower)) ||
-            (event.organizerName && event.organizerName.toLowerCase().includes(searchLower))
+            (event.description?.toLowerCase().includes(searchLower) ?? false) ||
+            (event.organizerName?.toLowerCase().includes(searchLower) ?? false)
         );
     });
 
@@ -123,8 +125,7 @@ export default function SiswaAktivitasPage() {
                             >
                                 {/* Color bar */}
                                 <div
-                                    className="h-2"
-                                    style={{ backgroundColor: event.colorHex || "#6b7280" }}
+                                    style={{ backgroundColor: event.colorHex ?? "#6b7280" }}
                                 />
 
                                 {/* Card content */}
@@ -137,16 +138,16 @@ export default function SiswaAktivitasPage() {
                                     {/* Type badge */}
                                     <div className="mb-3">
                                         <span
-                                            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${typeColors[event.type] || "bg-gray-100 text-gray-700 border-gray-200"
+                                            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${typeColors[event.type] ?? "bg-gray-100 text-gray-700 border-gray-200"
                                                 }`}
                                         >
-                                            {typeLabels[event.type] || event.type}
+                                            {typeLabels[event.type] ?? event.type}
                                         </span>
                                     </div>
 
                                     {/* Description */}
                                     <p className="text-sm text-gray-600 mb-4 line-clamp-2">
-                                        {event.description || "Tidak ada deskripsi"}
+                                        {event.description ?? "Tidak ada deskripsi"}
                                     </p>
 
                                     {/* Date */}

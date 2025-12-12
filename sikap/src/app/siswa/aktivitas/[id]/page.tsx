@@ -4,7 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { api } from "@/trpc/react";
 import { Spinner } from "@/components/ui/spinner";
-import { ArrowLeft, Calendar, Clock, MapPin, Building2, FileText } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, MapPin, Building2 } from "lucide-react";
 import Image from "next/image";
 
 const typeColors = {
@@ -89,7 +89,7 @@ export default function SiswaAktivitasDetailPage() {
                     {/* Color bar */}
                     <div
                         className="h-2"
-                        style={{ backgroundColor: currentEvent.colorHex || "#6b7280" }}
+                        style={{ backgroundColor: currentEvent.colorHex ?? "#6b7280" }}
                     />
 
                     <div className="p-8">
@@ -99,10 +99,10 @@ export default function SiswaAktivitasDetailPage() {
                                 {currentEvent.title}
                             </h2>
                             <span
-                                className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${typeColors[currentEvent.type] || "bg-gray-100 text-gray-700 border-gray-200"
+                                className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${typeColors[currentEvent.type] ?? "bg-gray-100 text-gray-700 border-gray-200"
                                     }`}
                             >
-                                {typeLabels[currentEvent.type] || currentEvent.type}
+                                {typeLabels[currentEvent.type] ?? currentEvent.type}
                             </span>
                         </div>
 

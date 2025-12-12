@@ -514,6 +514,7 @@ export const studentsRouter = createTRPCRouter({
         cohort: z.string().optional(),
         address: z.string().optional(),
         phone: z.string().optional(),
+        email: z.string().email().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -539,8 +540,11 @@ export const studentsRouter = createTRPCRouter({
         })
         .where(eq(studentProfile.id, sp.id));
 
-      if (input.name) {
-        await ctx.db.update(user).set({ name: input.name }).where(eq(user.id, ctx.session.user.id));
+      if (input.name || input.email) {
+        await ctx.db.update(user).set({
+          name: input.name,
+          email: input.email
+        }).where(eq(user.id, ctx.session.user.id));
       }
 
       const updated = await ctx.db.query.studentProfile.findFirst({

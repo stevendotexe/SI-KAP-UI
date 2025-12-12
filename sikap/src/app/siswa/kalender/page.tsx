@@ -32,25 +32,30 @@ const WEEKDAYS_ID = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sab
 
 function buildWeeks(year: number, month: number) {
   const first = new Date(year, month, 1)
-  const offset = first.getFullYear() === 1970 ? 4 : first.getDay() // 0=Sun
+  const offset = first.getDay() // 0=Sunday, 1=Monday, etc.
   const start = 1 - offset
   const cells: DayCell[] = []
   for (let i = 0; i < 42; i++) {
     const d = new Date(year, month, start + i)
-    cells.push({ date: d, inMonth: d.getMonth() === month, day: d.getDate() })
+    const inMonth = d.getMonth() === month
+    cells.push({ date: d, inMonth, day: d.getDate() })
   }
   const weeks: DayCell[][] = []
   for (let i = 0; i < 6; i++) weeks.push(cells.slice(i * 7, i * 7 + 7))
   return weeks
 }
 
-// Helper to convert API color hex to Tailwind class  
+// Helper to get color class for events
+const EVENT_COLORS = [
+  "bg-blue-500",
+  "bg-green-500",
+  "bg-purple-500",
+  "bg-orange-500",
+  "bg-pink-500",
+]
+
 function getColorClass(colorHex: string | null, index: number): string {
-  if (colorHex) {
-    // For now, just use chart colors. In the future, could map hex to Tailwind colors
-    return `bg-chart-${(index % 5) + 1}`
-  }
-  return `bg-chart-${(index % 5) + 1}`
+  return EVENT_COLORS[index % EVENT_COLORS.length]!
 }
 
 export default function CalendarPage() {
@@ -83,36 +88,6 @@ export default function CalendarPage() {
       }
     })
   }, [data])
-
-  // Compute event segments per week for overlay
-  function getWeekSegments(week: DayCell[]) {
-    const minDay = Math.min(...week.filter(w => w.inMonth).map(w => w.day))
-    const maxDay = Math.max(...week.filter(w => w.inMonth).map(w => w.day))
-    if (!isFinite(minDay) || !isFinite(maxDay)) return []
-
-    return events
-      .map(evt => {
-        const segStartDay = Math.max(evt.startDay, minDay)
-        const segEndDay = Math.min(evt.endDay, maxDay)
-        if (segStartDay > segEndDay) return null
-
-        const startIdx = week.findIndex(c => c.inMonth && c.day === segStartDay)
-        const endIdx = week.findIndex(c => c.inMonth && c.day === segEndDay)
-        if (startIdx < 0 || endIdx < 0) return null
-
-        const span = endIdx - startIdx + 1
-        const leftPct = (startIdx / 7) * 100
-        const widthPct = (span / 7) * 100
-
-        return {
-          leftPct,
-          widthPct,
-          label: evt.label,
-          colorClass: evt.colorClass,
-        }
-      })
-      .filter(Boolean) as { leftPct: number; widthPct: number; label: string; colorClass: string }[]
-  }
 
   return (
     <div className="min-h-screen bg-muted/30 p-0 m-0">
@@ -203,37 +178,34 @@ export default function CalendarPage() {
             {/* Weeks */}
             <div className="mt-0">
               {weeks.map((week, wi) => {
-                const segments = getWeekSegments(week)
                 return (
-                  <div key={wi} className="relative">
-                    {/* day cells */}
-                    <div className="grid grid-cols-7">
-                      {week.map((c, ci) => (
+                  <div key={wi} className="grid grid-cols-7">
+                    {week.map((c, ci) => {
+                      // Find events for this day
+                      const dayEvents = c.inMonth
+                        ? events.filter(evt => c.day >= evt.startDay && c.day <= evt.endDay)
+                        : []
+
+                      return (
                         <div
                           key={ci}
-                          className={`h-28 border ${c.inMonth ? "bg-card" : "bg-muted/40"}`}
+                          className={`h-28 border overflow-hidden ${c.inMonth ? "bg-card" : "bg-muted/40"}`}
                         >
                           <div className="px-2 pt-2 text-xs text-muted-foreground">{c.day}</div>
+                          {/* Events for this day */}
+                          <div className="px-1 pt-1 space-y-1 overflow-hidden">
+                            {dayEvents.map((evt, ei) => (
+                              <div
+                                key={ei}
+                                className={`${evt.colorClass} text-white text-xs px-2 py-0.5 rounded truncate`}
+                              >
+                                {evt.label}
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      ))}
-                    </div>
-
-                    {/* event overlays */}
-                    {segments.map((s, si) => (
-                      <div
-                        key={si}
-                        className={`absolute z-10 pointer-events-none h-7 ${s.colorClass} rounded-full flex items-center justify-center text-xs font-medium text-primary-foreground`}
-                        style={{
-                          top: 34,
-                          left: `${s.leftPct}%`,
-                          width: `${s.widthPct}%`,
-                          paddingLeft: 12,
-                          paddingRight: 12,
-                        }}
-                      >
-                        {s.label}
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )
               })}
