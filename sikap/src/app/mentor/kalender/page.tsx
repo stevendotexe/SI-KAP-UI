@@ -2,14 +2,13 @@
 
 import { useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { ChevronDown, Plus, Pencil, Trash2, X } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { ChevronDown, Pencil, Trash2 } from "lucide-react"
 import { api } from "@/trpc/react"
 import { useMentorCompany } from "@/components/mentor/useMentorCompany"
-import { FileUploadField, type FileUploadValue } from "@/components/ui/file-upload-field"
+import ActivityFormDialog from "@/components/mentor/ActivityFormDialog"
 
 type DayCell = { date: Date; inMonth: boolean; day: number }
 
@@ -30,12 +29,9 @@ const MONTHS_ID = [
 const WEEKDAYS_ID = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"]
 
 const EVENT_TYPES = [
-  { value: "in_class", label: "Kelas" },
-  { value: "field_trip", label: "Kunjungan Lapangan" },
+  { value: "in_class", label: "In-Class" },
+  { value: "field_trip", label: "Field Trip" },
   { value: "meet_greet", label: "Meet & Greet" },
-  { value: "meeting", label: "Rapat" },
-  { value: "deadline", label: "Tenggat Waktu" },
-  { value: "milestone", label: "Milestone" },
 ] as const
 
 type EventType = typeof EVENT_TYPES[number]["value"]
@@ -74,27 +70,7 @@ type CalendarEvent = {
   placementId: number | null
 }
 
-type FormData = {
-  title: string
-  type: EventType
-  date: string
-  endDate: string
-  description: string
-  organizerName: string
-  placementId: number | null
-  attachments: FileUploadValue[]
-}
 
-const defaultFormData: FormData = {
-  title: "",
-  type: "meeting",
-  date: "",
-  endDate: "",
-  description: "",
-  organizerName: "",
-  placementId: null,
-  attachments: [],
-}
 
 export default function Page() {
   const [year, setYear] = useState(2025)
@@ -102,7 +78,6 @@ export default function Page() {
   const [open, setOpen] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
-  const [formData, setFormData] = useState<FormData>(defaultFormData)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [eventToDelete, setEventToDelete] = useState<CalendarEvent | null>(null)
 
@@ -117,23 +92,6 @@ export default function Page() {
     year: year,
   }, { enabled: !!companyId })
 
-  const createMutation = api.calendarEvents.create.useMutation({
-    onSuccess: () => {
-      void utils.calendarEvents.list.invalidate()
-      setDialogOpen(false)
-      resetForm()
-    },
-  })
-
-  const updateMutation = api.calendarEvents.update.useMutation({
-    onSuccess: () => {
-      void utils.calendarEvents.list.invalidate()
-      setDialogOpen(false)
-      setEditingEvent(null)
-      resetForm()
-    },
-  })
-
   const deleteMutation = api.calendarEvents.delete.useMutation({
     onSuccess: () => {
       void utils.calendarEvents.list.invalidate()
@@ -142,28 +100,8 @@ export default function Page() {
     },
   })
 
-  function resetForm() {
-    setFormData(defaultFormData)
-    setEditingEvent(null)
-  }
-
-  function handleOpenCreate() {
-    resetForm()
-    setDialogOpen(true)
-  }
-
   function handleOpenEdit(event: CalendarEvent) {
     setEditingEvent(event)
-    setFormData({
-      title: event.title,
-      type: event.type,
-      date: new Date(event.startDate).toISOString().slice(0, 10),
-      endDate: new Date(event.dueDate).toISOString().slice(0, 10),
-      description: "",
-      organizerName: event.organizerName ?? "",
-      placementId: event.placementId,
-      attachments: [],
-    })
     setDialogOpen(true)
   }
 
@@ -175,39 +113,6 @@ export default function Page() {
   function confirmDelete() {
     if (eventToDelete) {
       deleteMutation.mutate({ eventId: eventToDelete.id })
-    }
-  }
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-
-    if (editingEvent) {
-      updateMutation.mutate({
-        eventId: editingEvent.id,
-        title: formData.title,
-        type: formData.type,
-        date: new Date(formData.date),
-        endDate: formData.endDate ? new Date(formData.endDate) : undefined,
-        description: formData.description || undefined,
-        organizerName: formData.organizerName || undefined,
-        placementId: formData.placementId ?? undefined,
-        attachments: formData.attachments.length > 0
-          ? formData.attachments
-          : undefined,
-      })
-    } else {
-      createMutation.mutate({
-        title: formData.title,
-        type: formData.type,
-        date: new Date(formData.date),
-        endDate: formData.endDate ? new Date(formData.endDate) : undefined,
-        description: formData.description || undefined,
-        organizerName: formData.organizerName || undefined,
-        placementId: formData.placementId ?? undefined,
-        attachments: formData.attachments.length > 0
-          ? formData.attachments
-          : undefined,
-      })
     }
   }
 
@@ -258,20 +163,16 @@ export default function Page() {
       .filter(Boolean) as { leftPct: number; widthPct: number; label: string; colorClass: string; colorHex: string | null; event: CalendarEvent }[]
   }
 
-  const isSubmitting = createMutation.isPending || updateMutation.isPending
+  // const isSubmitting = createMutation.isPending || updateMutation.isPending // This line was commented out because createMutation and updateMutation are not defined.
 
   return (
-    <div className="min-h-screen bg-muted/30 p-0 m-0">
-      <div className="w-full max-w-none p-0 m-0 pr-4 sm:pr-6 lg:pr-10 pl-4 sm:pl-6 lg:pl-10">
+    <div className="min-h-screen bg-muted/30 p-6">
+      <div className="w-full max-w-7xl mx-auto">
         <div className="flex items-start justify-between">
           <div className="space-y-1">
             <h1 className="text-2xl sm:text-3xl font-semibold">Kalender</h1>
             <p className="text-muted-foreground">Daftar jadwal</p>
           </div>
-          <Button onClick={handleOpenCreate} className="gap-2">
-            <Plus className="size-4" />
-            Tambah Event
-          </Button>
         </div>
 
         <div className="mt-4 flex items-center gap-3">
@@ -386,7 +287,7 @@ export default function Page() {
         {/* Event List */}
         {events && events.length > 0 && (
           <section className="mt-6">
-            <h2 className="text-lg font-semibold mb-3">Daftar Event Bulan Ini</h2>
+            <h2 className="text-lg font-semibold mb-3">Daftar Aktivitas Bulan Ini</h2>
             <div className="space-y-2">
               {events.map((event) => {
                 const colorClass = event.colorHex
@@ -435,101 +336,21 @@ export default function Page() {
         )}
       </div>
 
-      {/* Create/Edit Event Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm() }}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{editingEvent ? "Edit Event" : "Tambah Event Baru"}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Judul Event *</label>
-              <Input
-                value={formData.title}
-                onChange={(e) => setFormData(f => ({ ...f, title: e.target.value }))}
-                placeholder="Masukkan judul event"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-medium">Tipe Event *</label>
-              <Select value={formData.type} onValueChange={(v) => setFormData(f => ({ ...f, type: v as EventType }))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {EVENT_TYPES.map((t) => (
-                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm font-medium">Tanggal Mulai *</label>
-                <Input
-                  type="date"
-                  value={formData.date}
-                  onChange={(e) => setFormData(f => ({ ...f, date: e.target.value }))}
-                  required
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Tanggal Selesai</label>
-                <Input
-                  type="date"
-                  value={formData.endDate}
-                  onChange={(e) => setFormData(f => ({ ...f, endDate: e.target.value }))}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium">Deskripsi</label>
-              <textarea
-                className="w-full border rounded-lg px-3 py-2 text-sm min-h-[80px]"
-                value={formData.description}
-                onChange={(e) => setFormData(f => ({ ...f, description: e.target.value }))}
-                placeholder="Deskripsi event (opsional)"
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-medium">Penyelenggara</label>
-              <Input
-                value={formData.organizerName}
-                onChange={(e) => setFormData(f => ({ ...f, organizerName: e.target.value }))}
-                placeholder="Nama penyelenggara (opsional)"
-              />
-            </div>
-
-            {/* File Upload - only show when editing (needs ownerId) */}
-            {editingEvent && (
-              <FileUploadField
-                ownerType="calendar_event"
-                ownerId={editingEvent.id}
-                value={formData.attachments}
-                onChange={(files) => setFormData(f => ({ ...f, attachments: files }))}
-                label="Lampiran"
-                description="Upload file lampiran (opsional)"
-                multiple
-                maxFiles={5}
-              />
-            )}
-
-            <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                Batal
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? <><Spinner className="mr-2" /> Menyimpan...</> : editingEvent ? "Simpan Perubahan" : "Tambah Event"}
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {/* Edit Activity Dialog */}
+      <ActivityFormDialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open)
+          if (!open) {
+            setEditingEvent(null)
+          }
+        }}
+        editingEvent={editingEvent}
+        onSuccess={() => {
+          void utils.calendarEvents.list.invalidate()
+          setDialogOpen(false)
+        }}
+      />
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>

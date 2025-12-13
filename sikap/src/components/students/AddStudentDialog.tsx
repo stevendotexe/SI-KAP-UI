@@ -24,6 +24,7 @@ export default function AddStudentDialog() {
     telepon: "",
     email: "",
     password: "",
+    jenisKelamin: "",
   })
   const [errors, setErrors] = React.useState<Record<string, string>>({})
 
@@ -40,6 +41,7 @@ export default function AddStudentDialog() {
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Format email tidak valid"
     if (form.telepon && !/^[0-9+\-() ]{6,}$/.test(form.telepon)) e.telepon = "Format nomor tidak valid"
     if (!form.password || form.password.length < 8) e.password = "Minimal 8 karakter"
+    if (!form.jenisKelamin) e.jenisKelamin = "Wajib diisi"
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -67,6 +69,7 @@ export default function AddStudentDialog() {
         telepon: "",
         email: "",
         password: "",
+        jenisKelamin: "",
       })
     },
     onError: (err) => {
@@ -89,6 +92,7 @@ export default function AddStudentDialog() {
       birthDate: new Date(form.tanggalLahir),
       birthPlace: form.tempatLahir,
       semester: Number(form.semester),
+      gender: form.jenisKelamin,
     })
   }
 
@@ -267,6 +271,22 @@ export default function AddStudentDialog() {
                   {errors.password && <span className="text-destructive text-sm">{errors.password}</span>}
                 </FieldContent>
               </Field>
+
+              <Field orientation="vertical">
+                <FieldTitle>Jenis Kelamin</FieldTitle>
+                <FieldContent>
+                  <Select value={form.jenisKelamin} onValueChange={(v) => update("jenisKelamin", v)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih Jenis Kelamin" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Laki-laki">Laki-laki</SelectItem>
+                      <SelectItem value="Perempuan">Perempuan</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors.jenisKelamin && <span className="text-destructive text-sm">{errors.jenisKelamin}</span>}
+                </FieldContent>
+              </Field>
             </div>
           </FieldGroup>
         </FieldSet>
@@ -277,8 +297,8 @@ export default function AddStudentDialog() {
             {createStudent.isPending ? "Menyimpan..." : "Tambahkan"}
           </Button>
         </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </DialogContent >
+    </Dialog >
   )
 }
 

@@ -15,24 +15,31 @@ type Info = {
   selesai: string
   mesh: string
   alamat: string
+  nis: string
+  tmplahir: string
+  tgl: string
+  gender: string
+  semester: string
+  kelas: string
+  phone: string
 }
 
 export default function StudentInfo({ info }: { info: Info }) {
   const getInitialState = (i: Info) => ({
     name: i.name,
-    nis: "",
-    birthPlace: "",
-    birthDate: "",
-    gender: "",
-    semester: "",
+    nis: i.nis === "-" ? "" : i.nis,
+    birthPlace: i.tmplahir === "-" ? "" : i.tmplahir,
+    birthDate: i.tgl === "-" ? "" : i.tgl,
+    gender: i.gender === "-" ? "" : i.gender,
+    semester: i.semester === "-" ? "" : i.semester,
     school: i.sekolah === "-" ? "" : i.sekolah,
-    cohort: "",
+    cohort: i.kelas === "-" ? "" : i.kelas,
     address: i.alamat === "-" ? "" : i.alamat,
-    phone: "",
+    phone: i.phone === "-" ? "" : i.phone,
     email: i.email,
     major: (i.jurusan ?? "").toUpperCase() === "RPL" || (i.jurusan ?? "").toUpperCase() === "TKJ" ? (i.jurusan!) : "",
-    startDate: i.mulai || "",
-    endDate: i.selesai || "",
+    startDate: i.mulai === "-" ? "" : i.mulai,
+    endDate: i.selesai === "-" ? "" : i.selesai,
   })
 
   const [form, setForm] = useState(getInitialState(info))
@@ -102,8 +109,8 @@ export default function StudentInfo({ info }: { info: Info }) {
           <Select value={form.gender} onValueChange={(v) => update("gender", v)}>
             <SelectTrigger className="rounded-lg"><SelectValue placeholder="Pilih" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="laki-laki">Laki-laki</SelectItem>
-              <SelectItem value="perempuan">Perempuan</SelectItem>
+              <SelectItem value="Laki-laki">Laki-laki</SelectItem>
+              <SelectItem value="Perempuan">Perempuan</SelectItem>
             </SelectContent>
           </Select>
         </div>

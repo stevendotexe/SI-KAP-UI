@@ -278,6 +278,10 @@ export const studentsRouter = createTRPCRouter({
           mentorName,
           nis: sp.nis ?? null,
           address: sp.address ?? null,
+          birthPlace: sp.birthPlace ?? null,
+          birthDate: sp.birthDate ? new Date(sp.birthDate).toISOString().slice(0, 10) : null,
+          gender: sp.gender ?? null,
+          semester: sp.semester ?? null,
           startDate: activePlacement?.startDate ? new Date(activePlacement.startDate).toISOString().slice(0, 10) : null,
           endDate: activePlacement?.endDate ? new Date(activePlacement.endDate).toISOString().slice(0, 10) : null,
         },
@@ -355,6 +359,7 @@ export const studentsRouter = createTRPCRouter({
         birthDate: z.date().optional(),
         address: z.string().optional(),
         semester: z.number().optional(),
+        gender: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -375,6 +380,7 @@ export const studentsRouter = createTRPCRouter({
         birthDate: input.birthDate ? input.birthDate.toISOString().slice(0, 10) : null,
         address: input.address ?? null,
         semester: input.semester ?? null,
+        gender: input.gender ?? null,
       });
       const sp = await ctx.db.query.studentProfile.findFirst({ where: eq(studentProfile.userId, u.id) });
 

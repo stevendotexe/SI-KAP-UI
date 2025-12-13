@@ -7,7 +7,24 @@ import StudentReportTable, { type Report, type StudentTask } from "@/components/
 import StudentInfo from "@/components/students/StudentInfo"
 
 type SeriesPoint = { period: string; count: number }
-type Info = { userId: string; name: string; email: string; sekolah: string; jurusan?: string; mulai: string; selesai: string; mesh: string; alamat: string }
+type Info = {
+  userId: string;
+  name: string;
+  email: string;
+  sekolah: string;
+  jurusan?: string;
+  mulai: string;
+  selesai: string;
+  mesh: string;
+  alamat: string;
+  nis: string;
+  tmplahir: string;
+  tgl: string;
+  gender: string;
+  semester: string;
+  kelas: string;
+  phone: string;
+}
 
 export default function ClientSection({ scoreSeries, attendanceSeries, reports, tasks = [], info }: { scoreSeries: SeriesPoint[]; attendanceSeries: SeriesPoint[]; reports: Report[]; tasks?: StudentTask[]; info: Info }) {
   const [mode, setMode] = React.useState<"laporan" | "informasi">("laporan")

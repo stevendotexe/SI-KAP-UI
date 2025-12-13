@@ -119,6 +119,13 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     selesai: formatDate(profile.endDate),
     mesh: attendance.percent >= 80 ? "Masuk" : "Kurang",
     alamat: profile.address ?? "-",
+    nis: profile.nis ?? "-",
+    tmplahir: profile.birthPlace ?? "-",
+    tgl: formatDate(profile.birthDate),
+    gender: profile.gender ?? "-",
+    semester: profile.semester ? String(profile.semester) : "-",
+    kelas: profile.cohort ?? "-",
+    phone: profile.phone ?? "-",
   }
 
   return (

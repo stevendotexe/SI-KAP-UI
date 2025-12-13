@@ -144,6 +144,7 @@ export const calendarEventsRouter = createTRPCRouter({
       return rows.map((r) => ({
         id: r.id,
         title: r.title,
+        description: r.description ?? null,
         type: r.type,
         startDate: r.startDate,
         dueDate: r.dueDate ?? r.startDate,
