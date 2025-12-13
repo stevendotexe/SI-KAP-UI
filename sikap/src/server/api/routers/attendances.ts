@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { alias } from "drizzle-orm/pg-core";
-import { and, eq, gte, lte, sql } from "drizzle-orm";
+import { and, eq, gte, lte, sql, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 import {
@@ -254,7 +254,7 @@ export const attendancesRouter = createTRPCRouter({
             count: sql<number>`count(*)`,
           })
           .from(attendanceLog)
-          .where(sql`${attendanceLog.placementId} = ANY(${placementIds})`)
+          .where(inArray(attendanceLog.placementId, placementIds))
           .groupBy(attendanceLog.placementId, attendanceLog.status);
 
         for (const row of countersRows) {

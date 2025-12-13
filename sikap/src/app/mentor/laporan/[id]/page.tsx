@@ -6,9 +6,11 @@ import { api } from "@/trpc/react"
 import { Spinner } from "@/components/ui/spinner"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
 import BackButton from "@/components/students/BackButton"
 import { formatFileSize } from "@/lib/file-utils"
 import { FileText, Image as ImageIcon, File as FileIcon, Download, CheckCircle2, Clock, ClipboardList } from "lucide-react"
+import { SafeHTML } from "@/components/ui/SafeHTML"
 
 // Format date to Indonesian locale
 function formatDate(date: Date | string | null): string {
@@ -52,6 +54,7 @@ function StatusBadge({ status }: { status: string }) {
 // Review form component for task submission
 function ReviewForm({ taskId, onSuccess }: { taskId: number; onSuccess: () => void }) {
   const [notes, setNotes] = React.useState("")
+  const [score, setScore] = React.useState("")
   const [error, setError] = React.useState<string | null>(null)
 
   const reviewMutation = api.tasks.review.useMutation({
@@ -67,15 +70,44 @@ function ReviewForm({ taskId, onSuccess }: { taskId: number; onSuccess: () => vo
     e.preventDefault()
     setError(null)
 
+    // Validate score
+    const scoreNum = parseInt(score, 10)
+    if (!score || isNaN(scoreNum)) {
+      setError("Skor wajib diisi")
+      return
+    }
+    if (scoreNum < 1 || scoreNum > 100) {
+      setError("Skor harus antara 1-100")
+      return
+    }
+
     reviewMutation.mutate({
       taskId,
       status: "approved",
+      score: scoreNum,
       notes: notes.trim() || undefined,
     })
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label htmlFor="score" className="block text-sm font-medium mb-2">
+          Skor (1-100) <span className="text-destructive">*</span>
+        </label>
+        <Input
+          id="score"
+          type="number"
+          min="1"
+          max="100"
+          value={score}
+          onChange={(e) => setScore(e.target.value)}
+          placeholder="Masukkan skor 1-100"
+          className="rounded"
+          required
+        />
+      </div>
+
       <div>
         <label htmlFor="notes" className="block text-sm font-medium mb-2">Catatan Review (opsional)</label>
         <Textarea
@@ -162,9 +194,10 @@ export default function Page() {
             {/* Task Description */}
             <div className="bg-card border rounded-xl shadow-sm p-4">
               <h2 className="text-sm font-medium text-muted-foreground mb-3">Deskripsi Tugas</h2>
-              <div className="text-sm whitespace-pre-wrap bg-muted/50 rounded-lg p-4">
-                {data.description || "Tidak ada deskripsi."}
-              </div>
+              <SafeHTML
+                html={data.description || "Tidak ada deskripsi."}
+                className="text-sm bg-muted/50 rounded-lg p-4 prose prose-sm max-w-none"
+              />
             </div>
 
             {/* Task Attachments (from mentor) */}
@@ -267,9 +300,27 @@ export default function Page() {
             {data.status === "approved" && (
               <div className="bg-card border rounded-xl shadow-sm p-4">
                 <h2 className="text-sm font-medium text-muted-foreground mb-3">Review Mentor</h2>
-                <div className="text-sm">
-                  <CheckCircle2 className="inline-block size-4 text-green-600 mr-1" />
-                  Tugas ini telah disetujui.
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="size-5 text-green-600" />
+                    <span className="text-sm font-medium">Tugas ini telah disetujui</span>
+                  </div>
+
+                  {data.score && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">Skor:</span>
+                      <span className="text-lg font-bold text-primary">{data.score}/100</span>
+                    </div>
+                  )}
+
+                  {data.reviewNotes && (
+                    <div>
+                      <div className="text-xs text-muted-foreground mb-1">Catatan Review:</div>
+                      <div className="text-sm bg-muted/50 rounded-lg p-3 whitespace-pre-wrap">
+                        {data.reviewNotes}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

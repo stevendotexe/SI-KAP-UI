@@ -248,9 +248,12 @@ export default function MentorAktivitasPage() {
                                     {activity.organizerName && (
                                         <div className="flex items-center gap-3 text-sm text-gray-700 pt-3 mb-4 border-t border-gray-100">
                                             <Image
-                                                src={`https://via.placeholder.com/80x80/e5e7eb/374151?text=${encodeURIComponent(
-                                                    activity.organizerName.substring(0, 2)
-                                                )}`}
+                                                src={
+                                                    activity.organizerLogoUrl ??
+                                                    `https://via.placeholder.com/80x80/e5e7eb/374151?text=${encodeURIComponent(
+                                                        activity.organizerName.substring(0, 2)
+                                                    )}`
+                                                }
                                                 alt={activity.organizerName}
                                                 width={40}
                                                 height={40}
@@ -264,7 +267,7 @@ export default function MentorAktivitasPage() {
                                     )}
 
                                     {/* Detail button */}
-                                    {/* <Link href={`/mentor/aktivitas/${activity.id}`}>
+                                    <Link href={`/mentor/aktivitas/${activity.id}`}>
                                         <Button
                                             variant="outline"
                                             className="w-full rounded-lg border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors"
@@ -272,9 +275,7 @@ export default function MentorAktivitasPage() {
                                             <FileText className="w-4 h-4 mr-2" />
                                             Lihat Detail
                                         </Button>
-                                    </Link> */}
-                                    {/* Temporarily commented out detail link as it was not part of the requested changes and might be redundant with edit, or can be kept if detail page exists. Keeping consistent with user requirement to just add edit/delete here. Actually let's keep it but maybe it is less important now. Let's keep it for now. */}
-                                    {/* Note: I will comment it out if it interferes with the card layout or if user didn't ask for it to change, but user asked for edit/delete. I added edit/delete to top right. Keeping detail button at bottom is fine. */}
+                                    </Link>
                                 </div>
                             </div>
                         ))}

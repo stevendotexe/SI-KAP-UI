@@ -116,7 +116,7 @@ export const finalReportsRouter = createTRPCRouter({
         .from(placement)
         .innerJoin(studentProfile, eq(placement.studentId, studentProfile.id))
         .innerJoin(user, eq(studentProfile.userId, user.id))
-        .innerJoin(finalReport, eq(finalReport.placementId, placement.id))
+        .leftJoin(finalReport, eq(finalReport.placementId, placement.id))
         .leftJoin(finalReportScore, eq(finalReportScore.finalReportId, finalReport.id))
         .where(where)
         .groupBy(
@@ -132,11 +132,11 @@ export const finalReportsRouter = createTRPCRouter({
         .offset(input.offset);
 
       const countRows = await ctx.db
-        .select({ total: sql<number>`count(distinct ${finalReport.id})` })
+        .select({ total: sql<number>`count(distinct ${placement.id})` })
         .from(placement)
         .innerJoin(studentProfile, eq(placement.studentId, studentProfile.id))
         .innerJoin(user, eq(studentProfile.userId, user.id))
-        .innerJoin(finalReport, eq(finalReport.placementId, placement.id))
+        .leftJoin(finalReport, eq(finalReport.placementId, placement.id))
         .where(where);
 
       return {
@@ -145,6 +145,7 @@ export const finalReportsRouter = createTRPCRouter({
           const cnt = Number(r.count ?? 0);
           return {
             id: r.id,
+            placementId: r.placementId, // Use placementId as unique key since id (finalReportId) can be null
             studentName: r.studentName ?? "",
             studentCode: r.studentCode ?? "",
             school: r.school ?? null,

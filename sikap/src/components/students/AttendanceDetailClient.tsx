@@ -45,16 +45,17 @@ export default function AttendanceDetailClient({ date }: { date: string }) {
   const [q, setQ] = React.useState("")
   const [status, setStatus] = React.useState("Semua Status")
 
-  // Parse date string to Date object for API
+  // Parse date string for display
   const dateObj = React.useMemo(() => {
     const d = new Date(date)
     return isNaN(d.getTime()) ? new Date() : d
   }, [date])
 
-  const isValidDate = !isNaN(dateObj.getTime())
+  // Use the date prop directly as string (YYYY-MM-DD format) for API
+  const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(date)
 
   const { data, isLoading, isError, refetch } = api.attendances.detail.useQuery({
-    date: dateObj,
+    date: new Date(date + 'T00:00:00Z'), // Convert to Date object with UTC timezone
     status: mapStatusFilterToApi(status),
     search: q || undefined,
     limit: 200,

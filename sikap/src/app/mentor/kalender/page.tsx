@@ -118,13 +118,14 @@ export default function Page() {
 
   // Get events for a specific week to render on calendar
   function getWeekSegments(week: DayCell[]) {
-    if (!events || events.length === 0) return []
+    if (!events || events.length === 0) return { segments: [], maxSlot: 0 }
 
     const minDay = Math.min(...week.filter(w => w.inMonth).map(w => w.day))
     const maxDay = Math.max(...week.filter(w => w.inMonth).map(w => w.day))
-    if (!isFinite(minDay) || !isFinite(maxDay)) return []
+    if (!isFinite(minDay) || !isFinite(maxDay)) return { segments: [], maxSlot: 0 }
 
-    return events
+    // 1. Convert events to raw segments
+    const rawSegments = events
       .map(evt => {
         const startDate = new Date(evt.startDate)
         const endDate = new Date(evt.dueDate)
@@ -143,27 +144,58 @@ export default function Page() {
         const endIdx = week.findIndex(c => c.inMonth && c.day === segEndDay)
         if (startIdx < 0 || endIdx < 0) return null
 
-        const span = endIdx - startIdx + 1
-        const leftPct = (startIdx / 7) * 100
-        const widthPct = (span / 7) * 100
-
-        const colorClass = evt.colorHex
-          ? ""
-          : EVENT_COLORS[evt.type] ?? "bg-chart-4"
-
         return {
-          leftPct,
-          widthPct,
+          startIdx, // 0-6
+          endIdx,   // 0-6
+          span: endIdx - startIdx + 1,
+          leftPct: (startIdx / 7) * 100,
+          widthPct: ((endIdx - startIdx + 1) / 7) * 100,
           label: evt.title,
-          colorClass,
+          colorClass: evt.colorHex ? "" : EVENT_COLORS[evt.type] ?? "bg-chart-4",
           colorHex: evt.colorHex,
           event: evt,
         }
       })
-      .filter(Boolean) as { leftPct: number; widthPct: number; label: string; colorClass: string; colorHex: string | null; event: CalendarEvent }[]
+      .filter((s): s is NonNullable<typeof s> => !!s)
+      .sort((a, b) => {
+        // Sort by start index, then span (longer first)
+        if (a.startIdx !== b.startIdx) return a.startIdx - b.startIdx
+        return b.span - a.span
+      })
+
+    // 2. Assign slots to prevent overlap
+    const slots: number[][] = Array(7).fill([]).map(() => []) // 7 days in a week
+    const segmentsWithSlot: (typeof rawSegments[0] & { slot: number })[] = []
+    let maxSlot = -1
+
+    for (const seg of rawSegments) {
+      // Find first available slot for this segment's duration
+      let slot = 0
+      while (true) {
+        let fit = true
+        for (let i = seg.startIdx; i <= seg.endIdx; i++) {
+          if (slots[i][slot]) {
+            fit = false
+            break
+          }
+        }
+        if (fit) break
+        slot++
+      }
+
+      // Mark slot as occupied
+      for (let i = seg.startIdx; i <= seg.endIdx; i++) {
+        slots[i][slot] = 1
+      }
+
+      if (slot > maxSlot) maxSlot = slot
+      segmentsWithSlot.push({ ...seg, slot })
+    }
+
+    return { segments: segmentsWithSlot, maxSlot }
   }
 
-  // const isSubmitting = createMutation.isPending || updateMutation.isPending // This line was commented out because createMutation and updateMutation are not defined.
+  // const isSubmitting = createMutation.isPending || updateMutation.isPending
 
   return (
     <div className="min-h-screen bg-muted/30 p-6">
@@ -248,12 +280,21 @@ export default function Page() {
 
             <div className="mt-0">
               {weeks.map((week, wi) => {
-                const segments = getWeekSegments(week)
+                const { segments, maxSlot } = getWeekSegments(week)
+                // Calculate dynamic height based on max overlapping events
+                // Base 7rem (28) + extra space per additional slot
+                const heightStyle = maxSlot > 2 ? { height: `${(maxSlot + 2) * 2.5}rem` } : undefined
+
                 return (
                   <div key={wi} className="relative">
                     <div className="grid grid-cols-7">
                       {week.map((c, ci) => (
-                        <div key={ci} className={`h-28 border ${c.inMonth ? "bg-card" : "bg-muted/40"}`}>
+                        // Use min-h-28 to ensure consistent grid, but allow expansion
+                        <div
+                          key={ci}
+                          className={`min-h-28 border ${c.inMonth ? "bg-card" : "bg-muted/40"}`}
+                          style={heightStyle}
+                        >
                           <div className="px-2 pt-2 text-xs text-muted-foreground">{c.day}</div>
                         </div>
                       ))}
@@ -264,7 +305,7 @@ export default function Page() {
                         key={si}
                         className={`absolute z-10 h-7 ${s.colorClass} rounded-full flex items-center justify-center text-xs font-medium text-primary-foreground cursor-pointer hover:opacity-90 transition-opacity`}
                         style={{
-                          top: 34,
+                          top: 34 + (s.slot * 32), // Dynamic top: Base 34 + 32px per slot
                           left: `${s.leftPct}%`,
                           width: `${s.widthPct}%`,
                           paddingLeft: 12,

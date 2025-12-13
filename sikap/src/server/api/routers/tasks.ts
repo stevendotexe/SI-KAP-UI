@@ -258,6 +258,8 @@ export const tasksRouter = createTRPCRouter({
         description: t.description ?? null,
         dueDate: t.dueDate ?? null,
         status: t.status,
+        score: t.score ?? null,
+        reviewNotes: t.reviewNotes ?? null,
         attachments: taskAttachments.map((f) => ({
           id: f.id,
           url: f.url,
@@ -810,6 +812,7 @@ export const tasksRouter = createTRPCRouter({
       z.object({
         taskId: z.number(),
         status: z.enum(["approved", "rejected"]),
+        score: z.number().int().min(1).max(100),
         notes: z.string().optional(),
       }),
     )
@@ -845,7 +848,8 @@ export const tasksRouter = createTRPCRouter({
         .update(task)
         .set({
           status: input.status,
-          submissionNote: input.notes ? `${t.submissionNote ?? ""}\n\n[Review]: ${input.notes}` : t.submissionNote,
+          score: input.score,
+          reviewNotes: input.notes ?? null,
         })
         .where(eq(task.id, input.taskId));
 

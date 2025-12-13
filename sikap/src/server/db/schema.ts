@@ -370,6 +370,8 @@ export const task = createTable(
     updatedAt: d.timestamp({ withTimezone: true }).$onUpdate(() => new Date()),
     submissionNote: d.text(),
     submittedAt: d.timestamp({ withTimezone: true }),
+    score: d.integer(), // Skor 1-100 dari review mentor
+    reviewNotes: d.text(), // Catatan review dari mentor
     targetMajor: d.text(),
   }),
   (t) => [

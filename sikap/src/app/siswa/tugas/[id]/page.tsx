@@ -8,6 +8,7 @@ import { ChevronLeft, FileText, Image as ImageIcon } from "lucide-react";
 import { formatFileSize } from "@/lib/file-utils";
 import Link from "next/link";
 import { getTaskStatusBadgeConfig } from "@/components/tasks/task-status-badge";
+import { SafeHTML } from "@/components/ui/SafeHTML";
 
 export default function DetailTugasSiswaPage() {
   const params = useParams();
@@ -166,9 +167,10 @@ export default function DetailTugasSiswaPage() {
         <section className="mt-6">
           <div className="bg-card rounded-[20px] border p-6 shadow-sm sm:p-8">
             <h3 className="font-semibold">Deskripsi Tugas</h3>
-            <p className="text-foreground/90 mt-2 text-sm leading-relaxed sm:text-base">
-              {data.description ?? "Tidak ada deskripsi"}
-            </p>
+            <SafeHTML
+              html={data.description ?? "Tidak ada deskripsi"}
+              className="text-foreground/90 mt-2 text-sm leading-relaxed sm:text-base prose prose-sm max-w-none"
+            />
 
             {/* Task Attachments */}
             {data.attachments && data.attachments.length > 0 && (
@@ -268,7 +270,7 @@ export default function DetailTugasSiswaPage() {
                   <div>
                     <div className="mb-2 text-sm font-semibold">Lampiran</div>
                     {data.submission.files &&
-                    data.submission.files.length > 0 ? (
+                      data.submission.files.length > 0 ? (
                       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                         {data.submission.files.map((file) => (
                           <a

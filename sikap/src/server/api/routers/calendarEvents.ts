@@ -116,6 +116,7 @@ export const calendarEventsRouter = createTRPCRouter({
           startDate: calendarEvent.scheduledAt,
           dueDate: calendarEvent.endDate,
           organizerName: calendarEvent.organizerName,
+          organizerLogoUrl: calendarEvent.organizerLogoUrl,
           colorHex: calendarEvent.colorHex,
           placementId: placement.id,
         })
@@ -149,6 +150,7 @@ export const calendarEventsRouter = createTRPCRouter({
         startDate: r.startDate,
         dueDate: r.dueDate ?? r.startDate,
         organizerName: r.organizerName ?? null,
+        organizerLogoUrl: r.organizerLogoUrl ?? null,
         colorHex: r.colorHex ?? null,
         placementId: r.placementId ?? null,
       }));
@@ -219,13 +221,15 @@ export const calendarEventsRouter = createTRPCRouter({
             email: ev.createdByEmail ?? null,
           }
           : null,
-        attachments: files.map((f) => ({
-          id: f.id,
-          url: f.url,
-          filename: f.filename ?? null,
-          mimeType: f.mimeType ?? null,
-          sizeBytes: f.sizeBytes ?? null,
-        })),
+        attachments: files
+          .filter((f) => f.url !== ev.organizerLogoUrl)
+          .map((f) => ({
+            id: f.id,
+            url: f.url,
+            filename: f.filename ?? null,
+            mimeType: f.mimeType ?? null,
+            sizeBytes: f.sizeBytes ?? null,
+          })),
       };
     }),
 

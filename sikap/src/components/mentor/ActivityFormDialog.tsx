@@ -26,6 +26,7 @@ export type CalendarEvent = {
     startDate: Date
     dueDate: Date
     organizerName: string | null
+    organizerLogoUrl: string | null
     colorHex: string | null
     placementId: number | null
     description: string | null
@@ -39,6 +40,7 @@ type FormData = {
     endDate: string
     description: string
     organizerName: string
+    organizerLogo: FileUploadValue[]
     placementId: number | null
     attachments: FileUploadValue[]
     colorHex: string
@@ -52,6 +54,7 @@ const defaultFormData: FormData = {
     endDate: "",
     description: "",
     organizerName: "",
+    organizerLogo: [],
     placementId: null,
     attachments: [],
     colorHex: "#3b82f6", // Default Blue
@@ -76,10 +79,11 @@ export default function ActivityFormDialog({ open, onOpenChange, editingEvent, o
                     title: editingEvent.title,
                     type: editingEvent.type as ActivityType,
                     date: start.toISOString().slice(0, 10),
-                    time: start.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", hour12: false }).slice(0, 5),
+                    time: `${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}`,
                     endDate: editingEvent.dueDate ? new Date(editingEvent.dueDate).toISOString().slice(0, 10) : "",
                     description: editingEvent.description ?? "",
                     organizerName: editingEvent.organizerName ?? "",
+                    organizerLogo: editingEvent.organizerLogoUrl ? [{ url: editingEvent.organizerLogoUrl }] : [],
                     placementId: editingEvent.placementId,
                     attachments: [],
                     colorHex: editingEvent.colorHex ?? "#3b82f6",
@@ -114,10 +118,18 @@ export default function ActivityFormDialog({ open, onOpenChange, editingEvent, o
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
 
+        if (!formData.date) {
+            toast.error("Tanggal mulai wajib diisi")
+            return
+        }
+
         const dateTimeStr = `${formData.date}T${formData.time}:00`
         const scheduledAt = new Date(dateTimeStr)
-        // If date + time is invalid, fallback?
-        // Assuming inputs are required/valid.
+
+        if (isNaN(scheduledAt.getTime())) {
+            toast.error("Format tanggal atau waktu tidak valid")
+            return
+        }
 
         const data = {
             title: formData.title,
@@ -126,6 +138,7 @@ export default function ActivityFormDialog({ open, onOpenChange, editingEvent, o
             endDate: formData.endDate ? new Date(formData.endDate) : undefined,
             description: formData.description || undefined,
             organizerName: formData.organizerName || undefined,
+            organizerLogoUrl: formData.organizerLogo.length > 0 ? formData.organizerLogo[0]?.url : undefined,
             placementId: formData.placementId ?? undefined,
             colorHex: formData.colorHex || undefined,
             attachments: formData.attachments.length > 0 ? formData.attachments : undefined,
@@ -235,6 +248,17 @@ export default function ActivityFormDialog({ open, onOpenChange, editingEvent, o
                             placeholder="Nama penyelenggara (opsional)"
                         />
                     </div>
+
+                    <FileUploadField
+                        ownerType="calendar_event"
+                        ownerId={editingEvent?.id ?? null}
+                        value={formData.organizerLogo}
+                        onChange={(files) => setFormData(f => ({ ...f, organizerLogo: files }))}
+                        label="Logo Penyelenggara"
+                        description="Upload logo penyelenggara (opsional)"
+                        accept="image/*"
+                        maxFiles={1}
+                    />
 
                     <FileUploadField
                         ownerType="calendar_event"
