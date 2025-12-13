@@ -34,6 +34,15 @@ const typeLabels = {
     milestone: "Milestone",
 };
 
+const defaultColors: Record<string, string> = {
+    in_class: "#3b82f6",
+    field_trip: "#10b981",
+    meet_greet: "#f59e0b",
+    meeting: "#8b5cf6",
+    deadline: "#ef4444",
+    milestone: "#ec4899",
+};
+
 export default function SiswaAktivitasPage() {
     const [search, setSearch] = useState("");
     const [filterType, setFilterType] = useState<string>("all");
@@ -125,7 +134,8 @@ export default function SiswaAktivitasPage() {
                             >
                                 {/* Color bar */}
                                 <div
-                                    style={{ backgroundColor: event.colorHex ?? "#6b7280" }}
+                                    className="h-2"
+                                    style={{ backgroundColor: event.colorHex ?? defaultColors[event.type] ?? "#6b7280" }}
                                 />
 
                                 {/* Card content */}

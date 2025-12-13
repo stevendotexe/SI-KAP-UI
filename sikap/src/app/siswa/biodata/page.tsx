@@ -38,6 +38,23 @@ function extractDateString(birthDate: unknown): string {
   return ""
 }
 
+// Helper: convert old full names to abbreviations for backward compatibility
+function normalizeMajor(major: string | null | undefined): "TKJ" | "RPL" {
+  if (!major) return "TKJ"
+
+  // If already abbreviated, return as-is
+  if (major === "RPL" || major === "TKJ") {
+    return major
+  }
+
+  // Convert old full names to abbreviations
+  if (major === "Rekayasa Perangkat Lunak") return "RPL"
+  if (major === "Teknik Komputer dan Jaringan") return "TKJ"
+
+  // Default fallback
+  return "TKJ"
+}
+
 export default function BiodataSiswaPage() {
   const [nama, setNama] = useState("")
   const [namaError, setNamaError] = useState<string | null>(null)
@@ -50,8 +67,8 @@ export default function BiodataSiswaPage() {
   const [kelas, setKelas] = useState("")
   const [semester, setSemester] = useState("")
   const [kompetensi, setKompetensi] = useState<
-    "Teknik Komputer dan Jaringan" | "Rekayasa Perangkat Lunak"
-  >("Teknik Komputer dan Jaringan")
+    "TKJ" | "RPL"
+  >("TKJ")
   const [asalSekolah, setAsalSekolah] = useState("")
   const [alamat, setAlamat] = useState("")
   const [noTelp, setNoTelp] = useState("")
@@ -73,6 +90,8 @@ export default function BiodataSiswaPage() {
   // Populate form fields from query data
   useEffect(() => {
     if (profileQuery.data) {
+      const normalizedMajor = normalizeMajor(profileQuery.data.major)
+
       setNama(profileQuery.data.name ?? "")
       setEmail(profileQuery.data.email ?? "")
       setNis(profileQuery.data.nis ?? "")
@@ -86,11 +105,7 @@ export default function BiodataSiswaPage() {
         profileQuery.data.semester ? String(profileQuery.data.semester) : ""
       )
       setKelas(profileQuery.data.cohort ?? "")
-      setKompetensi(
-        (profileQuery.data.major as
-          | "Teknik Komputer dan Jaringan"
-          | "Rekayasa Perangkat Lunak") ?? "Teknik Komputer dan Jaringan"
-      )
+      setKompetensi(normalizedMajor)
       setAsalSekolah(profileQuery.data.school ?? "")
       setAlamat(profileQuery.data.address ?? "")
       setNoTelp(profileQuery.data.phone ?? "")
@@ -109,10 +124,7 @@ export default function BiodataSiswaPage() {
     gender !== ((profileQuery.data?.gender as "Laki-laki" | "Perempuan") ?? "Laki-laki") ||
     kelas !== (profileQuery.data?.cohort ?? "") ||
     semester !== (profileQuery.data?.semester ? String(profileQuery.data.semester) : "") ||
-    kompetensi !==
-    ((profileQuery.data?.major as
-      | "Teknik Komputer dan Jaringan"
-      | "Rekayasa Perangkat Lunak") ?? "Teknik Komputer dan Jaringan") ||
+    kompetensi !== normalizeMajor(profileQuery.data?.major) ||
     asalSekolah !== (profileQuery.data?.school ?? "") ||
     alamat !== (profileQuery.data?.address ?? "") ||
     noTelp !== (profileQuery.data?.phone ?? "")
@@ -133,11 +145,7 @@ export default function BiodataSiswaPage() {
         profileQuery.data.semester ? String(profileQuery.data.semester) : ""
       )
       setKelas(profileQuery.data.cohort ?? "")
-      setKompetensi(
-        (profileQuery.data.major as
-          | "Teknik Komputer dan Jaringan"
-          | "Rekayasa Perangkat Lunak") ?? "Teknik Komputer dan Jaringan"
-      )
+      setKompetensi(normalizeMajor(profileQuery.data.major))
       setAsalSekolah(profileQuery.data.school ?? "")
       setAlamat(profileQuery.data.address ?? "")
       setNoTelp(profileQuery.data.phone ?? "")
@@ -150,7 +158,7 @@ export default function BiodataSiswaPage() {
       setGender("Laki-laki")
       setKelas("")
       setSemester("")
-      setKompetensi("Teknik Komputer dan Jaringan")
+      setKompetensi("TKJ")
       setAsalSekolah("")
       setAlamat("")
       setNoTelp("")
@@ -341,30 +349,29 @@ export default function BiodataSiswaPage() {
                 />
               </div>
 
-              {/* Kompetensi */}
+              {/* Jurusan */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">Kompetensi Keahlian</label>
+                <label className="text-sm font-medium">Jurusan</label>
 
                 <Select
                   value={kompetensi}
-                  onValueChange={(v) =>
-                    setKompetensi(
-                      v as
-                      | "Teknik Komputer dan Jaringan"
-                      | "Rekayasa Perangkat Lunak"
-                    )
-                  }
+                  onValueChange={(v) => {
+                    // Only update if value is not empty
+                    if (v && (v === "TKJ" || v === "RPL")) {
+                      setKompetensi(v as "TKJ" | "RPL")
+                    }
+                  }}
                   disabled={updateMutation.isPending}
                 >
                   <SelectTrigger className="w-full h-10 rounded-full border bg-background px-4 text-sm text-muted-foreground">
-                    <SelectValue placeholder="Pilih kompetensi" />
+                    <SelectValue placeholder="Pilih jurusan" />
                   </SelectTrigger>
                   <SelectContent align="start" className="rounded-xl">
-                    <SelectItem value="Teknik Komputer dan Jaringan">
-                      Teknik Komputer dan Jaringan
+                    <SelectItem value="TKJ">
+                      TKJ
                     </SelectItem>
-                    <SelectItem value="Rekayasa Perangkat Lunak">
-                      Rekayasa Perangkat Lunak
+                    <SelectItem value="RPL">
+                      RPL
                     </SelectItem>
                   </SelectContent>
                 </Select>
