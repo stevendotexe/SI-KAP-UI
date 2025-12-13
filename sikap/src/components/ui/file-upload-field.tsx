@@ -336,7 +336,8 @@ export function FileUploadField({
 
           // Notify parent of new files
           if (onChange && uploadedFiles.length > 0) {
-            onChange([...(value ?? []), ...uploadedFiles]);
+            // If multiple is false, replace existing files; otherwise append
+            onChange(multiple ? [...(value ?? []), ...uploadedFiles] : uploadedFiles);
           }
         }
       } catch (err) {
