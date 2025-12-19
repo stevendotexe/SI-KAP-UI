@@ -60,6 +60,13 @@ const studentRole = ac.newRole({
 });
 
 export const auth = betterAuth({
+  user: {
+    additionalFields: {
+      code: {
+        type: "string",
+      },
+    },
+  },
   plugins: [
     admin({
       ac,

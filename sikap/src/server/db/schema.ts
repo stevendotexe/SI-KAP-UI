@@ -73,6 +73,7 @@ export const eventType = pgEnum("event_type", [
  */
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
+  code: text("code").notNull().unique(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   role: userRole("role").notNull().default("student"),
@@ -562,16 +563,19 @@ export const finalReportScore = createTable("final_report_score", (d) => ({
   score: d.numeric({ precision: 5, scale: 2 }),
 }));
 
-export const finalReportScoreRelations = relations(finalReportScore, ({ one }) => ({
-  finalReport: one(finalReport, {
-    fields: [finalReportScore.finalReportId],
-    references: [finalReport.id],
+export const finalReportScoreRelations = relations(
+  finalReportScore,
+  ({ one }) => ({
+    finalReport: one(finalReport, {
+      fields: [finalReportScore.finalReportId],
+      references: [finalReport.id],
+    }),
+    competency: one(competencyTemplate, {
+      fields: [finalReportScore.competencyTemplateId],
+      references: [competencyTemplate.id],
+    }),
   }),
-  competency: one(competencyTemplate, {
-    fields: [finalReportScore.competencyTemplateId],
-    references: [competencyTemplate.id],
-  }),
-}));
+);
 
 /**
  * Assessment
@@ -629,28 +633,34 @@ export const assessmentItemRelations = relations(assessmentItem, ({ one }) => ({
 /**
  * TaskCompetencyImpact
  */
-export const taskCompetencyImpact = createTable("task_competency_impact", (d) => ({
-  id: d.integer().primaryKey().generatedByDefaultAsIdentity(),
-  taskId: d
-    .integer()
-    .notNull()
-    .references(() => task.id, { onDelete: "cascade" }),
-  competencyTemplateId: d
-    .integer()
-    .notNull()
-    .references(() => competencyTemplate.id, { onDelete: "cascade" }),
-}));
+export const taskCompetencyImpact = createTable(
+  "task_competency_impact",
+  (d) => ({
+    id: d.integer().primaryKey().generatedByDefaultAsIdentity(),
+    taskId: d
+      .integer()
+      .notNull()
+      .references(() => task.id, { onDelete: "cascade" }),
+    competencyTemplateId: d
+      .integer()
+      .notNull()
+      .references(() => competencyTemplate.id, { onDelete: "cascade" }),
+  }),
+);
 
-export const taskCompetencyImpactRelations = relations(taskCompetencyImpact, ({ one }) => ({
-  task: one(task, {
-    fields: [taskCompetencyImpact.taskId],
-    references: [task.id],
+export const taskCompetencyImpactRelations = relations(
+  taskCompetencyImpact,
+  ({ one }) => ({
+    task: one(task, {
+      fields: [taskCompetencyImpact.taskId],
+      references: [task.id],
+    }),
+    competency: one(competencyTemplate, {
+      fields: [taskCompetencyImpact.competencyTemplateId],
+      references: [competencyTemplate.id],
+    }),
   }),
-  competency: one(competencyTemplate, {
-    fields: [taskCompetencyImpact.competencyTemplateId],
-    references: [competencyTemplate.id],
-  }),
-}));
+);
 
 /**
  * Attachment
@@ -782,7 +792,8 @@ export type CompetencyTemplateInsert = typeof competencyTemplate.$inferInsert;
 export type FinalReportScore = typeof finalReportScore.$inferSelect;
 export type FinalReportScoreInsert = typeof finalReportScore.$inferInsert;
 export type TaskCompetencyImpact = typeof taskCompetencyImpact.$inferSelect;
-export type TaskCompetencyImpactInsert = typeof taskCompetencyImpact.$inferInsert;
+export type TaskCompetencyImpactInsert =
+  typeof taskCompetencyImpact.$inferInsert;
 export type Notification = typeof notification.$inferSelect;
 export type NotificationInsert = typeof notification.$inferInsert;
 export type CalendarEvent = typeof calendarEvent.$inferSelect;

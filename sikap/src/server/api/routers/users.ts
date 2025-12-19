@@ -8,6 +8,7 @@ import {
 } from "@/server/api/trpc";
 import { auth } from "@/server/better-auth";
 import { user, userRole } from "@/server/db/schema";
+import { generateUserCode } from "@/server/db/utils";
 
 const docs = {
   list: {
@@ -82,13 +83,17 @@ export const usersRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      const role = input.role ?? "student";
+      const code = await generateUserCode(role);
+
       await auth.api.createUser({
         body: {
           email: input.email,
           password: input.password,
           name: input.name,
-          role: input.role ?? "student",
-        },
+          role: role,
+          code: code,
+        } as any,
         headers: ctx.headers,
       });
       const created = await ctx.db.query.user.findFirst({
@@ -115,7 +120,7 @@ export const usersRouter = createTRPCRouter({
           data: {
             name: input.name,
             email: input.email,
-            role: input.role,
+            role: input.role as any,
           },
         },
         headers: ctx.headers,
@@ -144,7 +149,7 @@ export const usersRouter = createTRPCRouter({
         body: {
           userId: input.userId,
           data: {
-            role: input.role,
+            role: input.role as any,
           },
         },
         headers: ctx.headers,
