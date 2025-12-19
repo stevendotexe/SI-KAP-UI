@@ -115,7 +115,7 @@ export default function RaporAkhirPage() {
 
                       {/* Center title */}
                       <div className="text-center">
-                        <h1 className="text-2xl sm:text-3xl font-bold underline decoration-2 underline-offset-4">
+                        <h1 className="text-lg sm:text-3xl font-bold underline decoration-2 underline-offset-4 whitespace-nowrap">
                           DAFTAR NILAI
                         </h1>
                         <p className="text-sm mt-2">Hasil Praktik Kerja Industri di :</p>
@@ -129,6 +129,8 @@ export default function RaporAkhirPage() {
                         <img
                           src="/images/logo.png"
                           alt="Logo"
+                          width={176}
+                          height={176}
                           className="h-44 w-auto object-contain"
                         />
                       </div>
@@ -136,20 +138,20 @@ export default function RaporAkhirPage() {
 
                     {/* Student Information */}
                     <div className="mb-6 text-sm">
-                      <div className="grid grid-cols-1 gap-2">
-                        <div className="flex">
-                          <span className="w-56 font-medium">Nama Siswa</span>
-                          <span className="mr-2">:</span>
+                      <div className="grid gap-2">
+                        <div className="grid grid-cols-[auto_auto_1fr] gap-x-2">
+                          <span className="font-medium">Nama Siswa</span>
+                          <span>:</span>
                           <span>{(typeof profile?.name === "string" && profile.name.length) ? profile.name : "EGI ADITIA"}</span>
                         </div>
-                        <div className="flex">
-                          <span className="w-56 font-medium">Nomor Induk Siswa Nasional</span>
-                          <span className="mr-2">:</span>
+                        <div className="grid grid-cols-[auto_auto_1fr] gap-x-2">
+                          <span className="font-medium">Nomor Induk Siswa</span>
+                          <span>:</span>
                           <span>{(typeof profile?.nis === "string" && profile.nis.length) ? profile.nis : "2324312076"}</span>
                         </div>
-                        <div className="flex">
-                          <span className="w-56 font-medium">Program Keahlian</span>
-                          <span className="mr-2">:</span>
+                        <div className="grid grid-cols-[auto_auto_1fr] gap-x-2">
+                          <span className="font-medium">Program Keahlian</span>
+                          <span>:</span>
                           <span>{kompetensi}</span>
                         </div>
                       </div>
@@ -311,30 +313,33 @@ export default function RaporAkhirPage() {
                   {/* Main border */}
                   <div className="border-2 border-gray-300 p-6 sm:p-8">
                     {/* Header with logos */}
-                    <div className="grid grid-cols-3 gap-4 items-center mb-6">
+                    <div className="grid grid-cols-3 gap-1 sm:gap-4 items-center mb-6">
                       {/* Left logo */}
-                      <div className="flex justify-start">
-                        <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center text-xs text-gray-500">
+                      <div className="flex justify-start overflow-hidden">
+                        <div className="w-12 h-12 sm:w-20 sm:h-20 bg-gray-200 rounded-full flex items-center justify-center text-[10px] sm:text-xs text-gray-500 flex-shrink-0">
                           Logo SMK
                         </div>
                       </div>
 
                       {/* Center title */}
-                      <div className="text-center">
-                        <h1 className="text-2xl sm:text-3xl font-bold underline decoration-2 underline-offset-4">
+                      <div className="text-center min-w-0">
+                        <h1 className="text-lg sm:text-3xl font-bold underline decoration-2 underline-offset-4 whitespace-nowrap">
                           SERTIFIKAT
                         </h1>
-                        <p className="text-sm mt-2">Nomor : 024/PUSAT-LAPTOP/PKL/10/2025</p>
-                        <p className="text-sm mt-1">Pusat Laptop Tasik (CV. AZZAHRA PUTRI) menerangkan bahwa :</p>
+                        <p className="text-xs sm:text-sm mt-2">Nomor : 024/PUSAT-LAPTOP/PKL/10/2025</p>
+                        <p className="text-xs sm:text-sm mt-1">Pusat Laptop Tasik (CV. AZZAHRA PUTRI)</p>
+                        <p className="text-xs sm:text-sm">menerangkan bahwa :</p>
                       </div>
 
                       {/* Right logo */}
-                      <div className="flex justify-end">
+                      <div className="flex justify-end overflow-hidden">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src="/images/logo.png"
                           alt="Logo"
-                          className="h-44 w-auto object-contain"
+                          width={176}
+                          height={176}
+                          className="h-12 sm:h-44 w-auto object-contain flex-shrink-0"
                         />
                       </div>
                     </div>
@@ -365,7 +370,7 @@ export default function RaporAkhirPage() {
                         <span>Teknik Komputer dan Jaringan</span>
                       </div>
                       <div className="flex">
-                        <span className="w-56 font-medium">Nomor Induk Siswa Nasional</span>
+                        <span className="w-56 font-medium">Nomor Induk Siswa</span>
                         <span className="mr-2">:</span>
                         <span>{(typeof profile?.nis === "string" && profile.nis.length) ? profile.nis : "2324312076"}</span>
                       </div>
