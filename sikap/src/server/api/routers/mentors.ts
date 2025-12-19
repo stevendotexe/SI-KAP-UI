@@ -251,7 +251,7 @@ export const mentorsRouter = createTRPCRouter({
           name: input.name,
           role: "mentor",
           code: code,
-        } as any,
+        },
         headers: ctx.headers,
       });
       const u = await ctx.db.query.user.findFirst({

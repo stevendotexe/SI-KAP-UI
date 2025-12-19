@@ -71,7 +71,7 @@ async function main() {
           password,
           name,
           code,
-        } as any,
+        },
       });
 
       let userId: string;
@@ -172,10 +172,30 @@ async function main() {
   }
 
   // Students from reports-data
-  console.log("👨‍🎓 Creating student profiles from static data...");
+  console.log("👨‍🎓 Creating student profiles...");
   const studentProfiles = [];
 
-  await createUser("Student Utama", "student@sikap.com", "student");
+  // Create Default Student "Student Utama"
+  const studentUtamaUser = await createUser(
+    "Student Utama",
+    "student@sikap.com",
+    "student",
+  );
+  const [studentUtamaProfile] = await db
+    .insert(schema.studentProfile)
+    .values({
+      userId: studentUtamaUser.id,
+      school: "SMK Negeri 1 Jakarta",
+      major: "RPL",
+      cohort: "2025",
+      phone: "08123456789",
+      active: true,
+    })
+    .returning();
+  studentProfiles.push(studentUtamaProfile);
+
+  // Sync profiles for static students from reports-data
+  console.log("👨‍🎓 Creating student profiles from static data...");
   for (const s of STUDENTS) {
     const email = `${s.student.toLowerCase().replace(/\s+/g, ".")}@example.com`;
     const u = await createUser(s.student, email, "student");
@@ -241,7 +261,7 @@ async function main() {
           title: tData.title,
           description: tData.description,
           dueDate: tData.deadline,
-          status: status as any,
+          status: status,
           createdById: sp.userId,
         })
         .returning();

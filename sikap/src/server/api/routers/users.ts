@@ -93,7 +93,8 @@ export const usersRouter = createTRPCRouter({
           name: input.name,
           role: role,
           code: code,
-        } as any,
+        },
+
         headers: ctx.headers,
       });
       const created = await ctx.db.query.user.findFirst({
@@ -120,7 +121,7 @@ export const usersRouter = createTRPCRouter({
           data: {
             name: input.name,
             email: input.email,
-            role: input.role as any,
+            role: input.role,
           },
         },
         headers: ctx.headers,
@@ -149,7 +150,7 @@ export const usersRouter = createTRPCRouter({
         body: {
           userId: input.userId,
           data: {
-            role: input.role as any,
+            role: input.role,
           },
         },
         headers: ctx.headers,
