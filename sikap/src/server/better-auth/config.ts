@@ -29,7 +29,7 @@ const adminRole = ac.newRole({
   assessment: ["create", "read", "update", "delete"],
   task: ["create", "read", "update", "delete", "review"],
   report: ["create", "read", "update", "review"],
-  studentProfile: ["read", "create", "update", "delete"],
+  studentProfile: ["read", "create", "update"],
   mentorProfile: ["read", "update"],
   calendarEvent: ["create", "read", "update", "delete"],
   analytics: ["read"],
