@@ -91,6 +91,7 @@ export const studentsRouter = createTRPCRouter({
           name: user.name,
           school: studentProfile.school,
           cohort: studentProfile.cohort,
+          code: user.code,
           year: sql<
             number | null
           >`date_part('year', ${placement.startDate}::timestamp)`,
@@ -109,7 +110,7 @@ export const studentsRouter = createTRPCRouter({
               ? sql`date_part('year', ${placement.startDate}::timestamp) = ${input.year}`
               : undefined,
             input.search
-              ? sql`(lower(${user.name}) like ${"%" + input.search.toLowerCase() + "%"} or ${user.id} = ${input.search})`
+              ? sql`(lower(${user.name}) like ${"%" + input.search.toLowerCase() + "%"} or ${user.code} like ${"%" + input.search + "%"})`
               : undefined,
           ),
         )
@@ -146,6 +147,7 @@ export const studentsRouter = createTRPCRouter({
           year: r.year ?? null,
           status: r.status ? String(r.status) : "active", // Default to "active" if no placement
           nis: r.nis ?? null,
+          code: r.code ?? null,
         })),
         pagination: {
           total: Number(total),
@@ -317,6 +319,7 @@ export const studentsRouter = createTRPCRouter({
         profile: {
           id: sp.id,
           userId: sp.userId,
+          code: sp.user.code,
           name: sp.user?.name ?? "",
           email: sp.user?.email ?? "",
           school: sp.school ?? null,
@@ -326,6 +329,12 @@ export const studentsRouter = createTRPCRouter({
           active: sp.active,
           mentorName,
           nis: sp.nis ?? null,
+          semester: sp.semester ?? null,
+          birthPlace: sp.birthPlace ?? null,
+          birthDate: sp.birthDate
+            ? new Date(sp.birthDate).toISOString().slice(0, 10)
+            : null,
+          gender: sp.gender ?? null,
           address: sp.address ?? null,
           startDate: activePlacement?.startDate
             ? new Date(activePlacement.startDate).toISOString().slice(0, 10)
