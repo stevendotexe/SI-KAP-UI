@@ -109,27 +109,11 @@ export default async function Page({
     status: t.status as any,
   }));
 
-  // Use score history from API (weekly averages)
-  const scoreSeries: SeriesPoint[] =
-    studentData.scoreHistory && studentData.scoreHistory.length > 0
-      ? studentData.scoreHistory
-      : [
-          { period: "W1", count: 0 },
-          { period: "W2", count: 0 },
-          { period: "W3", count: 0 },
-          { period: "W4", count: 0 },
-        ];
+  // Use score history from API (weekly averages) - empty if no data
+  const scoreSeries: SeriesPoint[] = studentData.scoreHistory ?? [];
 
-  // Use attendance history from API (weekly percentages)
-  const attendanceSeries: SeriesPoint[] =
-    studentData.attendanceHistory && studentData.attendanceHistory.length > 0
-      ? studentData.attendanceHistory
-      : [
-          { period: "W1", count: attendance.percent },
-          { period: "W2", count: attendance.percent },
-          { period: "W3", count: attendance.percent },
-          { period: "W4", count: attendance.percent },
-        ];
+  // Use attendance history from API (weekly percentages) - empty if no data
+  const attendanceSeries: SeriesPoint[] = studentData.attendanceHistory ?? [];
 
   // Map info object
   const info = {
