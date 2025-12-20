@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { alias } from "drizzle-orm/pg-core";
-import { and, eq, gte, lte, sql } from "drizzle-orm";
+import { and, eq, gte, lte, sql, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 import {
@@ -105,7 +105,9 @@ export const attendancesRouter = createTRPCRouter({
         .where(baseWhere);
       const totalDays = totalDaysRows[0]?.total ?? 0;
 
-      const summaryDate = (input.summaryDate ?? new Date()).toISOString().slice(0, 10);
+      const summaryDate = (input.summaryDate ?? new Date())
+        .toISOString()
+        .slice(0, 10);
       const [summaryRow] = await ctx.db
         .select({
           present: sql<number>`sum(case when ${attendanceLog.status} in ('present','late') then 1 else 0 end)`,
@@ -122,11 +124,12 @@ export const attendancesRouter = createTRPCRouter({
           ),
         );
 
-      const formatRow = (r: typeof rows[number]) => {
+      const formatRow = (r: (typeof rows)[number]) => {
         const present = Number(r.present ?? 0);
         const absent = Number(r.absent ?? 0);
         const total = Number(r.total ?? 0);
-        const attendancePercent = total === 0 ? 0 : Math.round((present / total) * 100);
+        const attendancePercent =
+          total === 0 ? 0 : Math.round((present / total) * 100);
         return {
           date: r.date,
           presentCount: present,
@@ -139,21 +142,32 @@ export const attendancesRouter = createTRPCRouter({
       return {
         summary: summaryRow
           ? (() => {
-            const present = Number(summaryRow.present ?? 0);
-            const absent = Number(summaryRow.absent ?? 0);
-            const total = Number(summaryRow.total ?? 0);
-            const attendancePercent = total === 0 ? 0 : Math.round((present / total) * 100);
-            return {
+              const present = Number(summaryRow.present ?? 0);
+              const absent = Number(summaryRow.absent ?? 0);
+              const total = Number(summaryRow.total ?? 0);
+              const attendancePercent =
+                total === 0 ? 0 : Math.round((present / total) * 100);
+              return {
+                date: summaryDate,
+                presentCount: present,
+                absentCount: absent,
+                total,
+                attendancePercent,
+              };
+            })()
+          : {
               date: summaryDate,
-              presentCount: present,
-              absentCount: absent,
-              total,
-              attendancePercent,
-            };
-          })()
-          : { date: summaryDate, presentCount: 0, absentCount: 0, total: 0, attendancePercent: 0 },
+              presentCount: 0,
+              absentCount: 0,
+              total: 0,
+              attendancePercent: 0,
+            },
         items: rows.map(formatRow),
-        pagination: { total: Number(totalDays ?? 0), limit: input.limit, offset: input.offset },
+        pagination: {
+          total: Number(totalDays ?? 0),
+          limit: input.limit,
+          offset: input.offset,
+        },
         lastUpdated: new Date().toISOString(),
       };
     }),
@@ -191,7 +205,10 @@ export const attendancesRouter = createTRPCRouter({
           mentorFilterId = mp.id;
         } else {
           // Mentor without profile - allow access but show all data (unfiltered)
-          console.warn("[attendances.detail] Mentor has no profile, showing unfiltered data", { userId: ctx.session.user.id });
+          console.warn(
+            "[attendances.detail] Mentor has no profile, showing unfiltered data",
+            { userId: ctx.session.user.id },
+          );
         }
       }
 
@@ -216,9 +233,12 @@ export const attendancesRouter = createTRPCRouter({
           studentId: studentProfile.id,
           studentUserId: studentProfile.userId,
           studentName: studentUser.name,
+          studentCode: studentUser.code,
           studentSchool: studentProfile.school,
           mentorId: mentorProfile.id,
           mentorName: mentorUser.name,
+          verifiedAt: attendanceLog.verifiedAt,
+          verifiedByMentorId: attendanceLog.verifiedByMentorId,
         })
         .from(attendanceLog)
         .innerJoin(placement, eq(attendanceLog.placementId, placement.id))
@@ -244,7 +264,10 @@ export const attendancesRouter = createTRPCRouter({
 
       // Get per-student attendance counters for each placement
       const placementIds = [...new Set(rows.map((r) => r.placementId))];
-      const countersMap = new Map<number, { hadir: number; tidakHadir: number; izin: number; terlambat: number }>();
+      const countersMap = new Map<
+        number,
+        { hadir: number; tidakHadir: number; izin: number; terlambat: number }
+      >();
 
       if (placementIds.length > 0) {
         const countersRows = await ctx.db
@@ -254,12 +277,17 @@ export const attendancesRouter = createTRPCRouter({
             count: sql<number>`count(*)`,
           })
           .from(attendanceLog)
-          .where(sql`${attendanceLog.placementId} = ANY(${placementIds})`)
+          .where(inArray(attendanceLog.placementId, placementIds))
           .groupBy(attendanceLog.placementId, attendanceLog.status);
 
         for (const row of countersRows) {
           if (!countersMap.has(row.placementId)) {
-            countersMap.set(row.placementId, { hadir: 0, tidakHadir: 0, izin: 0, terlambat: 0 });
+            countersMap.set(row.placementId, {
+              hadir: 0,
+              tidakHadir: 0,
+              izin: 0,
+              terlambat: 0,
+            });
           }
           const counters = countersMap.get(row.placementId)!;
           const count = Number(row.count ?? 0);
@@ -281,14 +309,27 @@ export const attendancesRouter = createTRPCRouter({
           student: {
             id: r.studentId,
             userId: r.studentUserId,
-            code: r.studentUserId,
+            code: r.studentCode,
             name: r.studentName ?? "",
             school: r.studentSchool ?? "",
           },
-          mentor: r.mentorId ? { id: r.mentorId, name: r.mentorName ?? null } : null,
-          counters: countersMap.get(r.placementId) ?? { hadir: 0, tidakHadir: 0, izin: 0, terlambat: 0 },
+          mentor: r.mentorId
+            ? { id: r.mentorId, name: r.mentorName ?? null }
+            : null,
+          verifiedAt: r.verifiedAt ? r.verifiedAt.toISOString() : null,
+          verifiedByMentorId: r.verifiedByMentorId,
+          counters: countersMap.get(r.placementId) ?? {
+            hadir: 0,
+            tidakHadir: 0,
+            izin: 0,
+            terlambat: 0,
+          },
         })),
-        pagination: { total: Number(total ?? 0), limit: input.limit, offset: input.offset },
+        pagination: {
+          total: Number(total ?? 0),
+          limit: input.limit,
+          offset: input.offset,
+        },
         lastUpdated: new Date().toISOString(),
       };
     }),
@@ -303,7 +344,10 @@ export const attendancesRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       // Verify user is a student
       if (ctx.session.user.role !== "student") {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Only students can access their attendance log" });
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only students can access their attendance log",
+        });
       }
 
       // Get student profile
@@ -312,7 +356,10 @@ export const attendancesRouter = createTRPCRouter({
       });
 
       if (!student) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Student profile not found" });
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Student profile not found",
+        });
       }
 
       // Get active placement
@@ -325,7 +372,10 @@ export const attendancesRouter = createTRPCRouter({
 
       if (!activePlacement) {
         // If no active placement, return empty list
-        return { items: [], pagination: { total: 0, limit: input.limit, offset: input.offset } };
+        return {
+          items: [],
+          pagination: { total: 0, limit: input.limit, offset: input.offset },
+        };
       }
 
       // Query attendance logs
@@ -353,52 +403,61 @@ export const attendancesRouter = createTRPCRouter({
 
       return {
         items: rows,
-        pagination: { total: Number(total), limit: input.limit, offset: input.offset },
+        pagination: {
+          total: Number(total),
+          limit: input.limit,
+          offset: input.offset,
+        },
       };
     }),
 
-  getTodayLog: protectedProcedure
-    .query(async ({ ctx }) => {
-      // Verify user is a student
-      if (ctx.session.user.role !== "student") {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Only students can access their attendance log" });
-      }
-
-      // Get student profile
-      const student = await ctx.db.query.studentProfile.findFirst({
-        where: eq(studentProfile.userId, ctx.session.user.id),
+  getTodayLog: protectedProcedure.query(async ({ ctx }) => {
+    // Verify user is a student
+    if (ctx.session.user.role !== "student") {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Only students can access their attendance log",
       });
+    }
 
-      if (!student) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Student profile not found" });
-      }
+    // Get student profile
+    const student = await ctx.db.query.studentProfile.findFirst({
+      where: eq(studentProfile.userId, ctx.session.user.id),
+    });
 
-      // Get active placement
-      const activePlacement = await ctx.db.query.placement.findFirst({
-        where: and(
-          eq(placement.studentId, student.id),
-          eq(placement.status, "active"),
-        ),
+    if (!student) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Student profile not found",
       });
+    }
 
-      if (!activePlacement) {
-        // If no active placement, return null
-        return null;
-      }
+    // Get active placement
+    const activePlacement = await ctx.db.query.placement.findFirst({
+      where: and(
+        eq(placement.studentId, student.id),
+        eq(placement.status, "active"),
+      ),
+    });
 
-      // Get today's date in YYYY-MM-DD format
-      const today = new Date().toISOString().slice(0, 10);
+    if (!activePlacement) {
+      // If no active placement, return null
+      return null;
+    }
 
-      // Query today's attendance log
-      const todayLog = await ctx.db.query.attendanceLog.findFirst({
-        where: and(
-          eq(attendanceLog.placementId, activePlacement.id),
-          eq(attendanceLog.date, today),
-        ),
-      });
+    // Get today's date in YYYY-MM-DD format
+    const today = new Date().toISOString().slice(0, 10);
 
-      return todayLog ?? null;
-    }),
+    // Query today's attendance log
+    const todayLog = await ctx.db.query.attendanceLog.findFirst({
+      where: and(
+        eq(attendanceLog.placementId, activePlacement.id),
+        eq(attendanceLog.date, today),
+      ),
+    });
+
+    return todayLog ?? null;
+  }),
 
   recordCheckIn: protectedProcedure
     .input(
@@ -412,7 +471,10 @@ export const attendancesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       // Verify user is a student
       if (ctx.session.user.role !== "student") {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Only students can record attendance" });
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only students can record attendance",
+        });
       }
 
       // Get student profile
@@ -421,7 +483,10 @@ export const attendancesRouter = createTRPCRouter({
       });
 
       if (!student) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Student profile not found" });
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Student profile not found",
+        });
       }
 
       // Get active placement
@@ -496,7 +561,10 @@ export const attendancesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       // Verify user is a student
       if (ctx.session.user.role !== "student") {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Only students can record attendance" });
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only students can record attendance",
+        });
       }
 
       // Get student profile
@@ -505,7 +573,10 @@ export const attendancesRouter = createTRPCRouter({
       });
 
       if (!student) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Student profile not found" });
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Student profile not found",
+        });
       }
 
       // Get active placement
@@ -591,13 +662,17 @@ export const attendancesRouter = createTRPCRouter({
       }
 
       // Build where clause - convert dates to string format for comparison
-      const fromStr = range.from ? range.from.toISOString().slice(0, 10) : undefined;
+      const fromStr = range.from
+        ? range.from.toISOString().slice(0, 10)
+        : undefined;
       const toStr = range.to ? range.to.toISOString().slice(0, 10) : undefined;
 
       const where = and(
         fromStr ? gte(attendanceLog.date, fromStr) : undefined,
         toStr ? lte(attendanceLog.date, toStr) : undefined,
-        effectiveCompanyId ? eq(placement.companyId, effectiveCompanyId) : undefined,
+        effectiveCompanyId
+          ? eq(placement.companyId, effectiveCompanyId)
+          : undefined,
         mentorFilterId ? eq(placement.mentorId, mentorFilterId) : undefined,
         input.search
           ? sql`lower(${studentUser.name}) like ${`%${input.search.toLowerCase()}%`}`
@@ -618,19 +693,27 @@ export const attendancesRouter = createTRPCRouter({
         .innerJoin(studentProfile, eq(placement.studentId, studentProfile.id))
         .innerJoin(studentUser, eq(studentProfile.userId, studentUser.id))
         .where(where)
-        .groupBy(studentProfile.id, studentUser.name, studentProfile.nis, attendanceLog.status)
+        .groupBy(
+          studentProfile.id,
+          studentUser.name,
+          studentProfile.nis,
+          attendanceLog.status,
+        )
         .orderBy(studentUser.name);
 
       // Transform rows into per-student aggregation
-      const studentMap = new Map<number, {
-        studentId: number;
-        studentName: string;
-        studentNis: string | null;
-        present: number;
-        excused: number;
-        absent: number;
-        late: number;
-      }>();
+      const studentMap = new Map<
+        number,
+        {
+          studentId: number;
+          studentName: string;
+          studentNis: string | null;
+          present: number;
+          excused: number;
+          absent: number;
+          late: number;
+        }
+      >();
 
       for (const row of rows) {
         if (!studentMap.has(row.studentId)) {
@@ -657,7 +740,10 @@ export const attendancesRouter = createTRPCRouter({
 
       // Convert to array and apply pagination
       const allStudents = Array.from(studentMap.values());
-      const paginatedStudents = allStudents.slice(input.offset, input.offset + input.limit);
+      const paginatedStudents = allStudents.slice(
+        input.offset,
+        input.offset + input.limit,
+      );
 
       return {
         items: paginatedStudents.map((s, idx) => ({
@@ -675,5 +761,108 @@ export const attendancesRouter = createTRPCRouter({
           offset: input.offset,
         },
       };
+    }),
+
+  verify: adminOrMentorProcedure
+    .use(
+      requirePermissions({
+        attendanceLog: ["update"],
+      }),
+    )
+    .input(
+      z.object({
+        id: z.number(),
+        status: z.enum(attendanceStatus.enumValues).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // If mentor, ensure the attendance belongs to their company
+      let mentorProfileId: number | null = null;
+      if (ctx.session.user.role === "mentor") {
+        const mp = await ctx.db.query.mentorProfile.findFirst({
+          where: eq(mentorProfile.userId, ctx.session.user.id),
+        });
+        if (!mp) throw new TRPCError({ code: "FORBIDDEN" });
+        mentorProfileId = mp.id;
+      }
+
+      const log = await ctx.db.query.attendanceLog.findFirst({
+        where: eq(attendanceLog.id, input.id),
+        with: {
+          placement: true,
+        },
+      });
+
+      if (!log) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Attendance log not found",
+        });
+      }
+
+      // Check access
+      if (mentorProfileId && log.placement.mentorId !== mentorProfileId) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You are not authorized to verify this attendance",
+        });
+      }
+
+      const [updated] = await ctx.db
+        .update(attendanceLog)
+        .set({
+          status: input.status ?? log.status,
+          verifiedByMentorId: mentorProfileId,
+          verifiedAt: new Date(),
+        })
+        .where(eq(attendanceLog.id, input.id))
+        .returning();
+
+      return updated;
+    }),
+
+  delete: adminOrMentorProcedure
+    .use(
+      requirePermissions({
+        attendanceLog: ["delete"],
+      }),
+    )
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      // If mentor, ensure the attendance belongs to their company
+      let mentorProfileId: number | null = null;
+      if (ctx.session.user.role === "mentor") {
+        const mp = await ctx.db.query.mentorProfile.findFirst({
+          where: eq(mentorProfile.userId, ctx.session.user.id),
+        });
+        if (!mp) throw new TRPCError({ code: "FORBIDDEN" });
+        mentorProfileId = mp.id;
+      }
+
+      const log = await ctx.db.query.attendanceLog.findFirst({
+        where: eq(attendanceLog.id, input.id),
+        with: {
+          placement: true,
+        },
+      });
+
+      if (!log) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Attendance log not found",
+        });
+      }
+
+      // Check access
+      if (mentorProfileId && log.placement.mentorId !== mentorProfileId) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You are not authorized to delete this attendance",
+        });
+      }
+
+      await ctx.db.delete(attendanceLog).where(eq(attendanceLog.id, input.id));
+
+      return { success: true };
     }),
 });

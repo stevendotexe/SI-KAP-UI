@@ -71,7 +71,7 @@ type CalendarEvent = {
   dueDate: Date
   organizerName: string | null
   colorHex: string | null
-  placementId: number
+  placementId: number | null
 }
 
 type FormData = {
@@ -119,7 +119,7 @@ export default function Page() {
 
   const createMutation = api.calendarEvents.create.useMutation({
     onSuccess: () => {
-      utils.calendarEvents.list.invalidate()
+      void utils.calendarEvents.list.invalidate()
       setDialogOpen(false)
       resetForm()
     },
@@ -127,7 +127,7 @@ export default function Page() {
 
   const updateMutation = api.calendarEvents.update.useMutation({
     onSuccess: () => {
-      utils.calendarEvents.list.invalidate()
+      void utils.calendarEvents.list.invalidate()
       setDialogOpen(false)
       setEditingEvent(null)
       resetForm()
@@ -136,7 +136,7 @@ export default function Page() {
 
   const deleteMutation = api.calendarEvents.delete.useMutation({
     onSuccess: () => {
-      utils.calendarEvents.list.invalidate()
+      void utils.calendarEvents.list.invalidate()
       setDeleteConfirmOpen(false)
       setEventToDelete(null)
     },
@@ -191,7 +191,7 @@ export default function Page() {
         description: formData.description || undefined,
         organizerName: formData.organizerName || undefined,
         placementId: formData.placementId ?? undefined,
-        attachments: formData.attachments.length > 0 
+        attachments: formData.attachments.length > 0
           ? formData.attachments
           : undefined,
       })
@@ -204,7 +204,7 @@ export default function Page() {
         description: formData.description || undefined,
         organizerName: formData.organizerName || undefined,
         placementId: formData.placementId ?? undefined,
-        attachments: formData.attachments.length > 0 
+        attachments: formData.attachments.length > 0
           ? formData.attachments
           : undefined,
       })
@@ -223,7 +223,7 @@ export default function Page() {
       .map(evt => {
         const startDate = new Date(evt.startDate)
         const endDate = new Date(evt.dueDate)
-        
+
         // Check if event is in current month
         if (startDate.getMonth() !== month && endDate.getMonth() !== month) return null
 
@@ -242,14 +242,14 @@ export default function Page() {
         const leftPct = (startIdx / 7) * 100
         const widthPct = (span / 7) * 100
 
-        const colorClass = evt.colorHex 
-          ? "" 
+        const colorClass = evt.colorHex
+          ? ""
           : EVENT_COLORS[evt.type] ?? "bg-chart-4"
 
-        return { 
-          leftPct, 
-          widthPct, 
-          label: evt.title, 
+        return {
+          leftPct,
+          widthPct,
+          label: evt.title,
           colorClass,
           colorHex: evt.colorHex,
           event: evt,
@@ -362,11 +362,11 @@ export default function Page() {
                       <div
                         key={si}
                         className={`absolute z-10 h-7 ${s.colorClass} rounded-full flex items-center justify-center text-xs font-medium text-primary-foreground cursor-pointer hover:opacity-90 transition-opacity`}
-                        style={{ 
-                          top: 34, 
-                          left: `${s.leftPct}%`, 
-                          width: `${s.widthPct}%`, 
-                          paddingLeft: 12, 
+                        style={{
+                          top: 34,
+                          left: `${s.leftPct}%`,
+                          width: `${s.widthPct}%`,
+                          paddingLeft: 12,
                           paddingRight: 12,
                           backgroundColor: s.colorHex ?? undefined,
                         }}
@@ -389,15 +389,15 @@ export default function Page() {
             <h2 className="text-lg font-semibold mb-3">Daftar Event Bulan Ini</h2>
             <div className="space-y-2">
               {events.map((event) => {
-                const colorClass = event.colorHex 
-                  ? "" 
+                const colorClass = event.colorHex
+                  ? ""
                   : EVENT_COLORS[event.type] ?? "bg-chart-4"
                 const typeLabel = EVENT_TYPES.find(t => t.value === event.type)?.label ?? event.type
 
                 return (
                   <div key={event.id} className="bg-card border rounded-xl p-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div 
+                      <div
                         className={`w-3 h-3 rounded-full ${colorClass}`}
                         style={{ backgroundColor: event.colorHex ?? undefined }}
                       />
@@ -418,9 +418,9 @@ export default function Page() {
                       <Button variant="ghost" size="icon-sm" onClick={() => handleOpenEdit(event)}>
                         <Pencil className="size-4" />
                       </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon-sm" 
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
                         className="text-destructive hover:text-destructive"
                         onClick={() => handleDelete(event)}
                       >
@@ -544,9 +544,9 @@ export default function Page() {
             <Button type="button" variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
               Batal
             </Button>
-            <Button 
-              type="button" 
-              variant="destructive" 
+            <Button
+              type="button"
+              variant="destructive"
               onClick={confirmDelete}
               disabled={deleteMutation.isPending}
             >

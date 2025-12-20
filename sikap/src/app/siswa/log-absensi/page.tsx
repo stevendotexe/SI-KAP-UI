@@ -22,7 +22,7 @@ export default function LogAbsensiPage() {
           <div className="mt-4 overflow-x-auto">
             {isLoading ? (
               <div className="flex justify-center py-8">
-                <Spinner size="lg" />
+                <Spinner className="size-8" />
               </div>
             ) : isError ? (
               <div className="text-center py-8 text-destructive">

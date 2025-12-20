@@ -5,6 +5,8 @@ import { auth } from "@/server/better-auth";
 import * as schema from "@/server/db/schema";
 import { faker } from "@faker-js/faker";
 import { eq } from "drizzle-orm";
+import { generateUserCode } from "./utils";
+import { STUDENTS, TASKS } from "@/lib/reports-data";
 
 async function main() {
   console.log("🌱 Seeding database...");
@@ -16,7 +18,6 @@ async function main() {
     try {
       await db.delete(table);
     } catch (error) {
-      // Postgres error code for "undefined_table" is 42P01
       if (
         error &&
         typeof error === "object" &&
@@ -63,12 +64,13 @@ async function main() {
   ) => {
     console.log(`   Creating ${role}: ${email}`);
     try {
-      // Create user using better-auth
+      const code = await generateUserCode(role);
       const res = await auth.api.signUpEmail({
         body: {
           email,
           password,
           name,
+          code,
         },
       });
 
@@ -77,7 +79,6 @@ async function main() {
       if (res?.user) {
         userId = res.user.id;
       } else {
-        // Fallback: check if user exists (maybe created but returned null?)
         const u = await db.query.user.findFirst({
           where: eq(schema.user.email, email),
         });
@@ -85,13 +86,11 @@ async function main() {
         userId = u.id;
       }
 
-      // Update role manually to ensure it's correct
       await db
         .update(schema.user)
         .set({ role })
         .where(eq(schema.user.id, userId));
 
-      // Fetch and return the updated user
       const updatedUser = await db.query.user.findFirst({
         where: eq(schema.user.id, userId),
       });
@@ -105,20 +104,23 @@ async function main() {
   // Create Main Accounts
   await createUser("Admin System", "admin@sikap.com", "admin");
 
-  const mentorUser = await createUser(
-    "Mentor Utama",
-    "mentor@sikap.com",
-    "mentor",
-  );
+  // Mentors
+  console.log("👨‍🏫 Creating mentors...");
+  const mentorUsers = [
+    await createUser("Mentor Utama", "mentor@sikap.com", "mentor"),
+  ];
+  for (let i = 0; i < 4; i++) {
+    mentorUsers.push(
+      await createUser(
+        faker.person.fullName(),
+        faker.internet.email(),
+        "mentor",
+      ),
+    );
+  }
 
-  const studentUser = await createUser(
-    "Siswa Teladan",
-    "student@sikap.com",
-    "student",
-  );
-
-  // 3. Create Companies
-  console.log("🏢 Creating companies...");
+  // Companies & Programs
+  console.log("🏢 Creating companies & programs...");
   const companies = [];
   for (let i = 0; i < 5; i++) {
     const [c] = await db
@@ -136,8 +138,6 @@ async function main() {
     companies.push(c);
   }
 
-  // 4. Create Programs
-  console.log("🎓 Creating programs...");
   const programs = [];
   const programNames = [
     "Magang Merdeka Batch 6",
@@ -150,25 +150,11 @@ async function main() {
       .values({
         name,
         description: faker.lorem.sentence(),
-        startDate: faker.date.past().toISOString().split("T")[0], // Date type
+        startDate: faker.date.past().toISOString().split("T")[0],
         endDate: faker.date.future().toISOString().split("T")[0],
       })
       .returning();
     programs.push(p);
-  }
-
-  // 5. Create Mentor Profiles
-  console.log("👨‍🏫 Creating mentor profiles...");
-  const mentorUsers = [mentorUser];
-  // Create 4 more mentors
-  for (let i = 0; i < 4; i++) {
-    mentorUsers.push(
-      await createUser(
-        faker.person.fullName(),
-        faker.internet.email(),
-        "mentor",
-      ),
-    );
   }
 
   const mentorProfiles = [];
@@ -185,62 +171,63 @@ async function main() {
     mentorProfiles.push(mp);
   }
 
-  // 6. Create Student Profiles
+  // Students from reports-data
   console.log("👨‍🎓 Creating student profiles...");
-  const studentUsers = [studentUser];
-  // Create 9 more students
-  for (let i = 0; i < 9; i++) {
-    studentUsers.push(
-      await createUser(
-        faker.person.fullName(),
-        faker.internet.email(),
-        "student",
-      ),
-    );
-  }
-
   const studentProfiles = [];
-  for (const u of studentUsers) {
+
+  // Create Default Student "Student Utama"
+  const studentUtamaUser = await createUser(
+    "Student Utama",
+    "student@sikap.com",
+    "student",
+  );
+  const [studentUtamaProfile] = await db
+    .insert(schema.studentProfile)
+    .values({
+      userId: studentUtamaUser.id,
+      school: "SMK Negeri 1 Jakarta",
+      major: "RPL",
+      cohort: "2025",
+      phone: "08123456789",
+      active: true,
+    })
+    .returning();
+  studentProfiles.push(studentUtamaProfile);
+
+  // Sync profiles for static students from reports-data
+  console.log("👨‍🎓 Creating student profiles from static data...");
+  for (const s of STUDENTS) {
+    const email = `${s.student.toLowerCase().replace(/\s+/g, ".")}@example.com`;
+    const u = await createUser(s.student, email, "student");
+
     const [sp] = await db
       .insert(schema.studentProfile)
       .values({
         userId: u.id,
-        school: faker.helpers.arrayElement([
-          "Universitas Indonesia",
-          "ITB",
-          "UGM",
-          "Binus",
-          "SMK 1 Jakarta",
-        ]),
-        major: faker.helpers.arrayElement([
-          "Informatika",
-          "Sistem Informasi",
-          "DKV",
-          "Akuntansi",
-        ]),
-        cohort: "2024",
+        school: s.school,
+        major: s.major,
+        cohort: String(s.batch),
         phone: faker.phone.number(),
-        active: true,
+        active: s.state === "Aktif",
       })
       .returning();
     studentProfiles.push(sp);
   }
 
-  // 7. Create Placements
+  // Placements - assign most students to Mentor Utama for dashboard display
   console.log("📍 Creating placements...");
   const placements = [];
-  for (const sp of studentProfiles) {
-    const mentor = faker.helpers.arrayElement(mentorProfiles);
+  const mentorUtamaProfile = mentorProfiles[0]; // First mentor is "Mentor Utama"
+
+  for (let idx = 0; idx < studentProfiles.length; idx++) {
+    const sp = studentProfiles[idx];
+    // Assign 70% of students to Mentor Utama for better dashboard data
+    const mentor =
+      idx < Math.ceil(studentProfiles.length * 0.7)
+        ? mentorUtamaProfile
+        : faker.helpers.arrayElement(mentorProfiles);
     const program = faker.helpers.arrayElement(programs);
-
-    // Ensure mentor has companyId
-    if (!mentor?.companyId) continue;
-
-    // Ensure student has programId
-    if (!program?.id) continue;
-
-    // Ensure student has userId
-    if (!sp?.id) continue;
+    if (!mentor?.companyId || !program?.id || !sp?.id) continue;
 
     const [pl] = await db
       .insert(schema.placement)
@@ -257,109 +244,129 @@ async function main() {
     placements.push(pl);
   }
 
-  // 8. Create Activities for each placement
-  console.log("📝 Creating activities (tasks, attendance, reports)...");
-  for (const pl of placements) {
-    if (
-      !pl?.id ||
-      !pl?.mentorId ||
-      !pl?.companyId ||
-      !pl?.programId ||
-      !pl?.studentId
-    )
-      continue;
-    const studentProfile = studentProfiles.find((s) => s?.id === pl.studentId);
-    if (!studentProfile) continue;
+  // Activities
+  console.log(
+    "📝 Creating activities (tasks, attendance, reports) with realistic status...",
+  );
+  for (let i = 0; i < placements.length; i++) {
+    const pl = placements[i]!;
+    if (!pl?.id || !pl?.studentId) continue;
 
-    // Tasks
-    const numTasks = faker.number.int({ min: 3, max: 8 });
-    for (let i = 0; i < numTasks; i++) {
+    const sp = studentProfiles.find((s) => s?.id === pl.studentId);
+    if (!sp) continue;
+
+    // Tasks from TASKS
+    for (let j = 0; j < TASKS.length; j++) {
+      const tData = TASKS[j]!;
+      const mod = (i + j) % 3;
+      const status = mod === 0 ? "todo" : mod === 1 ? "submitted" : "approved";
+
       const [t] = await db
         .insert(schema.task)
         .values({
           placementId: pl.id,
-          title: faker.lorem.words(3),
-          description: faker.lorem.paragraph(),
-          dueDate: faker.date.future().toISOString().split("T")[0],
-          status: faker.helpers.arrayElement([
-            "todo",
-            "in_progress",
-            "submitted",
-            "approved",
-          ]),
-          createdById: studentProfile.userId,
+          title: tData.title,
+          description: tData.description,
+          dueDate: tData.deadline,
+          status: status,
+          createdById: sp.userId,
         })
         .returning();
 
-      if (!t?.id) continue;
-
-      // Checklist items
-      const numItems = faker.number.int({ min: 1, max: 5 });
-      for (let j = 0; j < numItems; j++) {
+      if (t?.id) {
+        // Sample checklist
         await db.insert(schema.taskChecklistItem).values({
           taskId: t.id,
-          label: faker.lorem.words(4),
-          isCompleted: faker.datatype.boolean(),
-          position: j,
+          label: "Persiapan dokumen pendukung",
+          isCompleted: status === "approved",
+          position: 0,
         });
       }
     }
 
-    // Attendance
-    // Better loop for attendance to avoid unique constraint violation
-    const numDays = faker.number.int({ min: 5, max: 20 });
+    // Attendance - Create 6 months of historical data for better charts
+    const monthsOfData = 6;
     const today = new Date();
-    for (let i = 0; i < numDays; i++) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      const dateStr =
-        d.toISOString().split("T")[0] ??
-        new Date().toISOString().split("T")[0]!;
+    for (let m = 0; m < monthsOfData; m++) {
+      // Create 15-20 attendance entries per month
+      const entriesPerMonth = faker.number.int({ min: 15, max: 20 });
+      for (let k = 0; k < entriesPerMonth; k++) {
+        const d = new Date(today);
+        d.setMonth(d.getMonth() - m);
+        d.setDate(faker.number.int({ min: 1, max: 28 }));
+        const dateStr = d.toISOString().split("T")[0]!;
 
-      const status = faker.helpers.arrayElement([
-        "present",
-        "present",
-        "present",
-        "late",
-        "absent",
-      ]) as "present" | "late" | "absent" | "excused"; // Weighted
-
-      await db.insert(schema.attendanceLog).values({
-        placementId: pl.id,
-        date: dateStr,
-        status,
-        checkInAt:
-          status === "present" || status === "late"
-            ? new Date(d.setHours(8, 0, 0))
-            : null,
-        checkOutAt:
-          status === "present" || status === "late"
-            ? new Date(d.setHours(17, 0, 0))
-            : null,
-        latitude: String(faker.location.latitude()),
-        longitude: String(faker.location.longitude()),
-      });
+        // Check if date already exists to avoid conflicts
+        try {
+          await db.insert(schema.attendanceLog).values({
+            placementId: pl.id,
+            date: dateStr,
+            status: faker.helpers.arrayElement([
+              "present",
+              "present",
+              "present",
+              "late",
+              "absent",
+              "excused",
+            ]),
+            checkInAt: new Date(d.setHours(8, 0, 0)),
+            checkOutAt: new Date(d.setHours(17, 0, 0)),
+            latitude: String(faker.location.latitude()),
+            longitude: String(faker.location.longitude()),
+          });
+        } catch {
+          // Ignore duplicate key errors
+        }
+      }
     }
 
-    // Reports (Daily/Weekly)
-    const numReports = faker.number.int({ min: 2, max: 5 });
-    for (let i = 0; i < numReports; i++) {
+    // Assessments - Create 6 months of score data for better charts
+    for (let m = 0; m < monthsOfData; m++) {
+      const assessmentDate = new Date(today);
+      assessmentDate.setMonth(assessmentDate.getMonth() - m);
+      assessmentDate.setDate(15); // Mid-month
+
+      const [assess] = await db
+        .insert(schema.assessment)
+        .values({
+          placementId: pl.id,
+          evaluatorMentorId: pl.mentorId,
+          totalScore: String(faker.number.int({ min: 70, max: 95 })),
+          comments: faker.lorem.sentence(),
+          createdAt: assessmentDate,
+        })
+        .returning();
+
+      if (assess?.id) {
+        // Add assessment items
+        const criteria = [
+          "Kedisiplinan",
+          "Keterampilan Teknis",
+          "Komunikasi",
+          "Kerja Tim",
+        ];
+        for (let c = 0; c < criteria.length; c++) {
+          await db.insert(schema.assessmentItem).values({
+            assessmentId: assess.id,
+            criterion: criteria[c]!,
+            maxScore: "100",
+            score: String(faker.number.int({ min: 60, max: 100 })),
+            position: c,
+          });
+        }
+      }
+    }
+
+    // Final Report for random students
+    if (faker.datatype.boolean(0.3)) {
       await db.insert(schema.report).values({
         placementId: pl.id,
-        type: faker.helpers.arrayElement(["daily", "weekly"]),
-        title: faker.lorem.sentence(),
+        type: "weekly",
+        title: "Laporan Mingguan Komprehensif",
         content: faker.lorem.paragraphs(2),
-        periodStart: faker.date.recent().toISOString().split("T")[0],
-        periodEnd: faker.date.recent().toISOString().split("T")[0],
         submittedAt: new Date(),
-        reviewStatus: faker.helpers.arrayElement([
-          "pending",
-          "approved",
-          "rejected",
-        ]),
-        score: faker.number
-          .float({ min: 70, max: 100, fractionDigits: 2 })
-          .toString(),
+        reviewStatus: "approved",
+        score: "95.50",
       });
     }
   }

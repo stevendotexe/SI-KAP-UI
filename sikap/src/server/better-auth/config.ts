@@ -10,7 +10,6 @@ const statements = {
   ...defaultStatements,
   ...adminAc.statements,
   placement: ["create", "read", "update"],
-
   attendanceLog: ["create", "read", "verify"],
   assessment: ["create", "read", "update", "delete"],
   task: ["create", "read", "update", "delete", "review"],
@@ -30,7 +29,7 @@ const adminRole = ac.newRole({
   assessment: ["create", "read", "update", "delete"],
   task: ["create", "read", "update", "delete", "review"],
   report: ["create", "read", "update", "review"],
-  studentProfile: ["read"],
+  studentProfile: ["read", "create", "update"],
   mentorProfile: ["read", "update"],
   calendarEvent: ["create", "read", "update", "delete"],
   analytics: ["read"],
@@ -42,7 +41,7 @@ const mentorRole = ac.newRole({
   assessment: ["create", "read", "update"],
   task: ["create", "read", "update", "review"],
   report: ["read", "review"],
-  user: ["create"],
+  user: ["list", "create", "update", "delete"],
   studentProfile: ["create", "read", "update"],
   mentorProfile: ["read", "update"],
   calendarEvent: ["create", "read", "update"],
@@ -60,6 +59,13 @@ const studentRole = ac.newRole({
 });
 
 export const auth = betterAuth({
+  user: {
+    additionalFields: {
+      code: {
+        type: "string",
+      },
+    },
+  },
   plugins: [
     admin({
       ac,

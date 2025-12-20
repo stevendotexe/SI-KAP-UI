@@ -1,62 +1,90 @@
-"use client"
-import React, { useState } from "react"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Button } from "@/components/ui/button"
-import { api } from "@/trpc/react"
+"use client";
+import React, { useState } from "react";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { api } from "@/trpc/react";
 
 type Info = {
-  userId: string
-  name: string
-  email: string
-  sekolah: string
-  jurusan?: string
-  mulai: string
-  selesai: string
-  mesh: string
-  alamat: string
-}
+  userId: string;
+  name: string;
+  email: string;
+  sekolah: string;
+  jurusan?: string;
+  mulai: string;
+  selesai: string;
+  mesh: string;
+  alamat: string;
+  nis: string;
+  tempatLahir: string;
+  tanggalLahir: string;
+  jenisKelamin: string;
+  noHp: string;
+  semester: number;
+  cohort: string;
+};
 
 export default function StudentInfo({ info }: { info: Info }) {
   const getInitialState = (i: Info) => ({
     name: i.name,
-    nis: "",
-    birthPlace: "",
-    birthDate: "",
-    gender: "",
-    semester: "",
+    nis: i.nis,
+    birthPlace: i.tempatLahir,
+    birthDate: i.tanggalLahir,
+    gender: i.jenisKelamin,
+    semester: i.semester,
     school: i.sekolah === "-" ? "" : i.sekolah,
-    cohort: "",
+    cohort: i.cohort,
     address: i.alamat === "-" ? "" : i.alamat,
-    phone: "",
+    phone: i.noHp,
     email: i.email,
-    major: (i.jurusan ?? "").toUpperCase() === "RPL" || (i.jurusan ?? "").toUpperCase() === "TKJ" ? (i.jurusan!) : "",
+    major:
+      (i.jurusan ?? "").toUpperCase() === "RPL" ||
+      (i.jurusan ?? "").toUpperCase() === "TKJ"
+        ? i.jurusan!
+        : "",
     startDate: i.mulai || "",
     endDate: i.selesai || "",
-  })
+  });
 
-  const [form, setForm] = useState(getInitialState(info))
-  const [error, setError] = useState<string>("")
-  const utils = api.useUtils()
+  const [form, setForm] = useState(getInitialState(info));
+  const [error, setError] = useState<string>("");
+  const utils = api.useUtils();
   const updateMutation = api.students.update.useMutation({
-    onSuccess: () => { utils.students.detail.invalidate() },
+    onSuccess: () => {
+      void utils.students.detail.invalidate();
+    },
     onError: (e) => setError(e.message),
-  })
+  });
 
   function update<K extends keyof typeof form>(key: K, value: string) {
-    setForm((f) => ({ ...f, [key]: value }))
+    setForm((f) => ({ ...f, [key]: value }));
   }
 
   function validate(): boolean {
-    if (!form.name.trim()) { setError("Nama wajib diisi"); return false }
-    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) { setError("Email tidak valid"); return false }
-    if (form.phone && !/^[0-9+\-() ]{6,}$/.test(form.phone)) { setError("Nomor telepon tidak valid"); return false }
+    if (!form.name.trim()) {
+      setError("Nama wajib diisi");
+      return false;
+    }
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      setError("Email tidak valid");
+      return false;
+    }
+    if (form.phone && !/^[0-9+\-() ]{6,}$/.test(form.phone)) {
+      setError("Nomor telepon tidak valid");
+      return false;
+    }
     setError("");
-    return true
+    return true;
   }
 
   function save() {
-    if (!validate()) return
+    if (!validate()) return;
     updateMutation.mutate({
       userId: info.userId,
       name: form.name,
@@ -73,34 +101,52 @@ export default function StudentInfo({ info }: { info: Info }) {
       major: form.major || null,
       startDate: form.startDate ? new Date(form.startDate) : null,
       endDate: form.endDate ? new Date(form.endDate) : null,
-    })
+    });
   }
 
   return (
-    <div className="bg-card border rounded-xl shadow-sm p-6">
-      <h2 className="text-lg font-semibold mb-6">Informasi Siswa</h2>
-      {error && <p className="text-destructive text-sm mb-3">{error}</p>}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div className="bg-card rounded-xl border p-6 shadow-sm">
+      <h2 className="mb-6 text-lg font-semibold">Informasi Siswa</h2>
+      {error && <p className="text-destructive mb-3 text-sm">{error}</p>}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <div className="text-sm font-semibold mb-1">Nama</div>
-          <Input value={form.name} onChange={(e) => update("name", e.target.value)} />
+          <div className="mb-1 text-sm font-semibold">Nama</div>
+          <Input
+            value={form.name}
+            onChange={(e) => update("name", e.target.value)}
+          />
         </div>
         <div>
-          <div className="text-sm font-semibold mb-1">NIS</div>
-          <Input value={form.nis} onChange={(e) => update("nis", e.target.value)} />
+          <div className="mb-1 text-sm font-semibold">NIS</div>
+          <Input
+            value={form.nis}
+            onChange={(e) => update("nis", e.target.value)}
+          />
         </div>
         <div>
-          <div className="text-sm font-semibold mb-1">Tempat Lahir</div>
-          <Input value={form.birthPlace} onChange={(e) => update("birthPlace", e.target.value)} />
+          <div className="mb-1 text-sm font-semibold">Tempat Lahir</div>
+          <Input
+            value={form.birthPlace}
+            onChange={(e) => update("birthPlace", e.target.value)}
+          />
         </div>
         <div>
-          <div className="text-sm font-semibold mb-1">Tanggal Lahir</div>
-          <Input type="date" value={form.birthDate} onChange={(e) => update("birthDate", e.target.value)} />
+          <div className="mb-1 text-sm font-semibold">Tanggal Lahir</div>
+          <Input
+            type="date"
+            value={form.birthDate}
+            onChange={(e) => update("birthDate", e.target.value)}
+          />
         </div>
         <div>
-          <div className="text-sm font-semibold mb-1">Jenis Kelamin</div>
-          <Select value={form.gender} onValueChange={(v) => update("gender", v)}>
-            <SelectTrigger className="rounded-lg"><SelectValue placeholder="Pilih" /></SelectTrigger>
+          <div className="mb-1 text-sm font-semibold">Jenis Kelamin</div>
+          <Select
+            value={form.gender}
+            onValueChange={(v) => update("gender", v)}
+          >
+            <SelectTrigger className="rounded-lg">
+              <SelectValue placeholder="Pilih" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="laki-laki">Laki-laki</SelectItem>
               <SelectItem value="perempuan">Perempuan</SelectItem>
@@ -108,52 +154,97 @@ export default function StudentInfo({ info }: { info: Info }) {
           </Select>
         </div>
         <div>
-          <div className="text-sm font-semibold mb-1">Semester</div>
-          <Input type="number" value={form.semester} onChange={(e) => update("semester", e.target.value)} />
+          <div className="mb-1 text-sm font-semibold">Semester</div>
+          <Input
+            type="number"
+            value={form.semester}
+            onChange={(e) => update("semester", e.target.value)}
+          />
         </div>
         <div>
-          <div className="text-sm font-semibold mb-1">Sekolah</div>
-          <Input value={form.school} onChange={(e) => update("school", e.target.value)} />
+          <div className="mb-1 text-sm font-semibold">Sekolah</div>
+          <Input
+            value={form.school}
+            onChange={(e) => update("school", e.target.value)}
+          />
         </div>
         <div>
-          <div className="text-sm font-semibold mb-1">Kelas</div>
-          <Input value={form.cohort} onChange={(e) => update("cohort", e.target.value)} />
+          <div className="mb-1 text-sm font-semibold">Tahun</div>
+          <Input
+            value={form.cohort}
+            onChange={(e) => update("cohort", e.target.value)}
+          />
         </div>
         <div>
-          <div className="text-sm font-semibold mb-1">Jurusan</div>
+          <div className="mb-1 text-sm font-semibold">Kompetensi Keahlian</div>
           <Select value={form.major} onValueChange={(v) => update("major", v)}>
-            <SelectTrigger className="rounded-lg"><SelectValue placeholder="Pilih Jurusan" /></SelectTrigger>
+            <SelectTrigger className="rounded-lg">
+              <SelectValue placeholder="Pilih Kompetensi" />
+            </SelectTrigger>
             <SelectContent>
-              <SelectItem value="RPL">RPL</SelectItem>
-              <SelectItem value="TKJ">TKJ</SelectItem>
+              <SelectItem value="RPL">
+                Rekayasa Perangkat Lunak (RPL)
+              </SelectItem>
+              <SelectItem value="TKJ">
+                Teknik Komputer dan Jaringan (TKJ)
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
         <div>
-          <div className="text-sm font-semibold mb-1">Tanggal Mulai</div>
-          <Input type="date" value={form.startDate} onChange={(e) => update("startDate", e.target.value)} />
+          <div className="mb-1 text-sm font-semibold">Tanggal Mulai</div>
+          <Input
+            type="date"
+            value={form.startDate}
+            onChange={(e) => update("startDate", e.target.value)}
+          />
         </div>
         <div>
-          <div className="text-sm font-semibold mb-1">Tanggal Selesai</div>
-          <Input type="date" value={form.endDate} onChange={(e) => update("endDate", e.target.value)} />
+          <div className="mb-1 text-sm font-semibold">Tanggal Selesai</div>
+          <Input
+            type="date"
+            value={form.endDate}
+            onChange={(e) => update("endDate", e.target.value)}
+          />
         </div>
         <div className="sm:col-span-2">
-          <div className="text-sm font-semibold mb-1">Alamat</div>
-          <Input value={form.address} onChange={(e) => update("address", e.target.value)} />
+          <div className="mb-1 text-sm font-semibold">Alamat</div>
+          <Input
+            value={form.address}
+            onChange={(e) => update("address", e.target.value)}
+          />
         </div>
         <div>
-          <div className="text-sm font-semibold mb-1">No Telp</div>
-          <Input value={form.phone} onChange={(e) => update("phone", e.target.value)} />
+          <div className="mb-1 text-sm font-semibold">No Telp</div>
+          <Input
+            value={form.phone}
+            onChange={(e) => update("phone", e.target.value)}
+          />
         </div>
         <div>
-          <div className="text-sm font-semibold mb-1">Email</div>
-          <Input type="email" value={form.email} onChange={(e) => update("email", e.target.value)} />
+          <div className="mb-1 text-sm font-semibold">Email</div>
+          <Input
+            type="email"
+            value={form.email}
+            onChange={(e) => update("email", e.target.value)}
+          />
         </div>
       </div>
       <div className="mt-4 flex gap-2">
-        <Button variant="destructive" onClick={save} disabled={updateMutation.isPending}>{updateMutation.isPending ? "Menyimpan..." : "Simpan"}</Button>
-        <Button variant="outline" onClick={() => setForm(getInitialState(info))}>Bersihkan</Button>
+        <Button
+          variant="destructive"
+          onClick={save}
+          disabled={updateMutation.isPending}
+        >
+          {updateMutation.isPending ? "Menyimpan..." : "Simpan"}
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => setForm(getInitialState(info))}
+        >
+          Bersihkan
+        </Button>
       </div>
     </div>
-  )
+  );
 }

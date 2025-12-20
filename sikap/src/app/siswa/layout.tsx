@@ -13,12 +13,14 @@ export default async function SiswaLayout({
     redirect("/sign-in");
   }
 
-
-  // Check if user is actually a student
+  // Redirect non-students to their own dashboard
   if (session.user.role !== "student") {
-    redirect("/unauthorized");
+    if (session.user.role === "admin") {
+      redirect("/admin/dashboard");
+    } else {
+      redirect("/mentor/dashboard");
+    }
   }
-
 
   return (
     <AppShell
@@ -30,4 +32,3 @@ export default async function SiswaLayout({
     </AppShell>
   );
 }
-

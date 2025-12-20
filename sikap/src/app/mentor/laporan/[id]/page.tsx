@@ -118,7 +118,7 @@ export default function Page() {
   )
 
   const handleReviewSuccess = React.useCallback(() => {
-    refetch()
+    void refetch()
   }, [refetch])
 
   if (isNaN(taskId)) {

@@ -46,7 +46,7 @@ export default function LaporanSiswaPage() {
   // Merge and sort data
   const mergedItems = [
     ...(reportsData?.items.map(r => ({ ...r, itemType: "report" as const })) ?? []),
-    ...(tasksData?.items.map(t => ({
+    ...(tasksData?.items.filter(t => t.status === "submitted" || t.status === "approved").map(t => ({
       id: t.id,
       title: t.title,
       type: "task",
@@ -55,6 +55,8 @@ export default function LaporanSiswaPage() {
       periodEnd: null,
       reviewStatus: t.status === "submitted" ? "pending" : t.status, // Map task status to report review status
       itemType: "task" as const,
+      submittedAt: t.submittedAt,
+      updatedAt: t.updatedAt,
       originalStatus: t.status
     })) ?? [])
   ].sort(() => 0)
@@ -122,6 +124,16 @@ export default function LaporanSiswaPage() {
       month: "short",
       year: "numeric",
     })
+  }
+
+  const formatSubmissionDate = (date: Date | string | null) => {
+    if (!date) return ""
+    const d = new Date(date)
+    const day = d.getDate().toString().padStart(2, '0')
+    const month = (d.getMonth() + 1).toString().padStart(2, '0')
+    const hours = d.getHours().toString().padStart(2, '0')
+    const mins = d.getMinutes().toString().padStart(2, '0')
+    return `${day}/${month} ${hours}:${mins}`
   }
 
   return (
@@ -297,9 +309,13 @@ export default function LaporanSiswaPage() {
                       {item.title ?? "Tanpa Judul"}
                     </p>
                     <div className="flex items-center gap-2">
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${isTask ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${isTask ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"
                         }`}>
-                        {getTypeLabel(item.type)}
+                        {isTask
+                          ? ((item as any).submittedAt || (item as any).updatedAt
+                            ? `Diserahkan ${formatSubmissionDate((item as any).submittedAt || (item as any).updatedAt)}`
+                            : "Diserahkan")
+                          : getTypeLabel(item.type)}
                       </span>
                       {item.score !== null && (
                         <span className="text-sm text-gray-600">
@@ -332,7 +348,7 @@ export default function LaporanSiswaPage() {
               </article>
             )
           })}
-      </section>
-    </main>
+      </section >
+    </main >
   )
 }

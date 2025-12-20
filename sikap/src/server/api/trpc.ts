@@ -32,9 +32,11 @@ import { db } from "@/server/db";
  *
  * @see https://trpc.io/docs/server/context
  */
-export const createTRPCContext = async (opts: { headers: HeadersInit | ReadonlyHeadersFromNext }) => {
+export const createTRPCContext = async (opts: {
+  headers: HeadersInit | ReadonlyHeadersFromNext;
+}) => {
   // Normalize incoming headers (ReadonlyHeaders from `next/headers()` or HeadersInit)
-  const normalized = new Headers((opts.headers as unknown) as HeadersInit);
+  const normalized = new Headers(opts.headers as unknown as HeadersInit);
 
   const session = await auth.api.getSession({
     headers: normalized,
@@ -152,13 +154,15 @@ export const mentorProcedure = protectedProcedure.use(({ ctx, next }) => {
   return next();
 });
 
-export const adminOrMentorProcedure = protectedProcedure.use(({ ctx, next }) => {
-  const role = ctx.session.user.role;
-  if (role !== "admin" && role !== "mentor") {
-    throw new TRPCError({ code: "FORBIDDEN" });
-  }
-  return next();
-});
+export const adminOrMentorProcedure = protectedProcedure.use(
+  ({ ctx, next }) => {
+    const role = ctx.session.user.role;
+    if (role !== "admin" && role !== "mentor") {
+      throw new TRPCError({ code: "FORBIDDEN" });
+    }
+    return next();
+  },
+);
 
 export const requirePermissions = (permission: Record<string, string[]>) =>
   t.middleware(async ({ ctx, next }) => {
@@ -166,7 +170,7 @@ export const requirePermissions = (permission: Record<string, string[]>) =>
       body: { permission },
       headers: ctx.headers,
     });
-    if (!has) {
+    if (!has.success) {
       throw new TRPCError({ code: "FORBIDDEN" });
     }
     return next();

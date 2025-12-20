@@ -626,7 +626,7 @@ export function FileUploadField({
                     className="rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleDelete(fileState);
+                      void handleDelete(fileState);
                     }}
                     disabled={disabled || isUploading}
                     aria-label={`Hapus ${fileState.filename}`}

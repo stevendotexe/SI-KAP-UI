@@ -9,7 +9,13 @@ import {
   mentorProcedure,
 } from "@/server/api/trpc";
 import { auth } from "@/server/better-auth";
-import { mentorProfile, placement, studentProfile, user } from "@/server/db/schema";
+import {
+  mentorProfile,
+  placement,
+  studentProfile,
+  user,
+} from "@/server/db/schema";
+import { generateUserCode } from "@/server/db/utils";
 
 const docs = {
   me: {
@@ -39,23 +45,25 @@ const docs = {
 };
 
 export const mentorsRouter = createTRPCRouter({
-  me: mentorProcedure
-    .meta(docs.me)
-    .query(async ({ ctx }) => {
-      const mp = await ctx.db.query.mentorProfile.findFirst({
-        where: eq(mentorProfile.userId, ctx.session.user.id),
-        with: { user: true },
+  me: mentorProcedure.meta(docs.me).query(async ({ ctx }) => {
+    const mp = await ctx.db.query.mentorProfile.findFirst({
+      where: eq(mentorProfile.userId, ctx.session.user.id),
+      with: { user: true },
+    });
+    if (!mp)
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Mentor profile not found",
       });
-      if (!mp) throw new TRPCError({ code: "NOT_FOUND", message: "Mentor profile not found" });
-      return {
-        id: mp.id,
-        userId: mp.userId,
-        name: mp.user?.name ?? "",
-        email: mp.user?.email ?? "",
-        active: mp.active,
-        companyId: mp.companyId ?? null,
-      };
-    }),
+    return {
+      id: mp.id,
+      userId: mp.userId,
+      name: mp.user?.name ?? "",
+      email: mp.user?.email ?? "",
+      active: mp.active,
+      companyId: mp.companyId ?? null,
+    };
+  }),
 
   list: adminOrMentorProcedure
     .meta(docs.list)
@@ -77,7 +85,10 @@ export const mentorsRouter = createTRPCRouter({
           where: eq(mentorProfile.userId, ctx.session.user.id),
         });
         if (!mp?.companyId) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Mentor must have a companyId" });
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Mentor must have a companyId",
+          });
         }
         companyId = mp.companyId;
       }
@@ -96,14 +107,24 @@ export const mentorsRouter = createTRPCRouter({
         .leftJoin(placement, eq(placement.mentorId, mentorProfile.id))
         .where(
           and(
-            companyId !== undefined ? eq(mentorProfile.companyId, companyId) : undefined,
-            input.active === undefined ? undefined : eq(mentorProfile.active, input.active),
+            companyId !== undefined
+              ? eq(mentorProfile.companyId, companyId)
+              : undefined,
+            input.active === undefined
+              ? undefined
+              : eq(mentorProfile.active, input.active),
             input.search
               ? sql`(lower(${user.name}) like ${"%" + input.search.toLowerCase() + "%"} or ${user.id} = ${input.search})`
               : undefined,
           ),
         )
-        .groupBy(mentorProfile.id, user.id, user.name, user.email, mentorProfile.active)
+        .groupBy(
+          mentorProfile.id,
+          user.id,
+          user.name,
+          user.email,
+          mentorProfile.active,
+        )
         .limit(input.limit)
         .offset(input.offset);
 
@@ -113,8 +134,12 @@ export const mentorsRouter = createTRPCRouter({
         .innerJoin(user, eq(mentorProfile.userId, user.id))
         .where(
           and(
-            companyId !== undefined ? eq(mentorProfile.companyId, companyId) : undefined,
-            input.active === undefined ? undefined : eq(mentorProfile.active, input.active),
+            companyId !== undefined
+              ? eq(mentorProfile.companyId, companyId)
+              : undefined,
+            input.active === undefined
+              ? undefined
+              : eq(mentorProfile.active, input.active),
             input.search
               ? sql`(lower(${user.name}) like ${"%" + input.search.toLowerCase() + "%"} or ${user.id} = ${input.search})`
               : undefined,
@@ -131,17 +156,30 @@ export const mentorsRouter = createTRPCRouter({
           active: Boolean(r.active),
           studentCount: Number(r.studentCount ?? 0),
         })),
-        pagination: { total: Number(total), limit: input.limit, offset: input.offset },
+        pagination: {
+          total: Number(total),
+          limit: input.limit,
+          offset: input.offset,
+        },
         lastUpdated: new Date().toISOString(),
       };
     }),
 
   detail: adminOrMentorProcedure
     .meta(docs.detail)
-    .use(requirePermissions({ mentorProfile: ["read"], placement: ["read"], studentProfile: ["read"] }))
+    .use(
+      requirePermissions({
+        mentorProfile: ["read"],
+        placement: ["read"],
+        studentProfile: ["read"],
+      }),
+    )
     .input(z.object({ userId: z.string() }))
     .query(async ({ ctx, input }) => {
-      const mp = await ctx.db.query.mentorProfile.findFirst({ where: eq(mentorProfile.userId, input.userId), with: { user: true } });
+      const mp = await ctx.db.query.mentorProfile.findFirst({
+        where: eq(mentorProfile.userId, input.userId),
+        with: { user: true },
+      });
       if (!mp) throw new TRPCError({ code: "NOT_FOUND" });
       const students = await ctx.db
         .select({
@@ -177,7 +215,11 @@ export const mentorsRouter = createTRPCRouter({
           companyId: mp.companyId ?? null,
         },
         students,
-        stats: { studentCount: Number(studentCount ?? 0), startDate: range?.start ?? null, endDate: range?.end ?? null },
+        stats: {
+          studentCount: Number(studentCount ?? 0),
+          startDate: range?.start ?? null,
+          endDate: range?.end ?? null,
+        },
         lastUpdated: new Date().toISOString(),
       };
     }),
@@ -195,19 +237,39 @@ export const mentorsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const existing = await ctx.db.query.user.findFirst({ where: eq(user.email, input.email) });
+      const existing = await ctx.db.query.user.findFirst({
+        where: eq(user.email, input.email),
+      });
       if (existing) throw new TRPCError({ code: "CONFLICT" });
+
+      const code = await generateUserCode("mentor");
+
       await auth.api.createUser({
-        body: { email: input.email, password: input.password, name: input.name, role: "mentor" },
+        body: {
+          email: input.email,
+          password: input.password,
+          name: input.name,
+          role: "mentor",
+          code: code,
+        },
         headers: ctx.headers,
       });
-      const u = await ctx.db.query.user.findFirst({ where: eq(user.email, input.email) });
+      const u = await ctx.db.query.user.findFirst({
+        where: eq(user.email, input.email),
+      });
       if (!u) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const inserted = await ctx.db
         .insert(mentorProfile)
-        .values({ userId: u.id, companyId: input.companyId ?? null, phone: input.phone ?? null })
+        .values({
+          userId: u.id,
+          companyId: input.companyId ?? null,
+          phone: input.phone ?? null,
+        })
         .returning({ id: mentorProfile.id });
-      const mp = await ctx.db.query.mentorProfile.findFirst({ where: eq(mentorProfile.id, inserted[0]?.id ?? -1), with: { user: true } });
+      const mp = await ctx.db.query.mentorProfile.findFirst({
+        where: eq(mentorProfile.id, inserted[0]?.id ?? -1),
+        with: { user: true },
+      });
       return mp ?? null;
     }),
 
@@ -226,7 +288,9 @@ export const mentorsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const mp = await ctx.db.query.mentorProfile.findFirst({ where: eq(mentorProfile.userId, input.userId) });
+      const mp = await ctx.db.query.mentorProfile.findFirst({
+        where: eq(mentorProfile.userId, input.userId),
+      });
       if (!mp) throw new TRPCError({ code: "NOT_FOUND" });
       const updatedRows = await ctx.db
         .update(mentorProfile)
@@ -238,7 +302,9 @@ export const mentorsRouter = createTRPCRouter({
         .where(
           and(
             eq(mentorProfile.id, mp.id),
-            input.currentUpdatedAt ? eq(mentorProfile.updatedAt, input.currentUpdatedAt) : undefined,
+            input.currentUpdatedAt
+              ? eq(mentorProfile.updatedAt, input.currentUpdatedAt)
+              : undefined,
           ),
         )
         .returning({ id: mentorProfile.id });
@@ -246,9 +312,18 @@ export const mentorsRouter = createTRPCRouter({
         throw new TRPCError({ code: "CONFLICT" });
       }
       if (input.name || input.email) {
-        await auth.api.adminUpdateUser({ body: { userId: input.userId, data: { name: input.name, email: input.email } }, headers: ctx.headers });
+        await auth.api.adminUpdateUser({
+          body: {
+            userId: input.userId,
+            data: { name: input.name, email: input.email },
+          },
+          headers: ctx.headers,
+        });
       }
-      const refreshed = await ctx.db.query.mentorProfile.findFirst({ where: eq(mentorProfile.id, mp.id), with: { user: true } });
+      const refreshed = await ctx.db.query.mentorProfile.findFirst({
+        where: eq(mentorProfile.id, mp.id),
+        with: { user: true },
+      });
       return refreshed ?? null;
     }),
 
@@ -257,9 +332,14 @@ export const mentorsRouter = createTRPCRouter({
     .use(requirePermissions({ mentorProfile: ["update"] }))
     .input(z.object({ userId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const mp = await ctx.db.query.mentorProfile.findFirst({ where: eq(mentorProfile.userId, input.userId) });
+      const mp = await ctx.db.query.mentorProfile.findFirst({
+        where: eq(mentorProfile.userId, input.userId),
+      });
       if (!mp) return { ok: false };
-      await ctx.db.update(mentorProfile).set({ active: false }).where(eq(mentorProfile.id, mp.id));
+      await ctx.db
+        .update(mentorProfile)
+        .set({ active: false })
+        .where(eq(mentorProfile.id, mp.id));
       return { ok: true };
     }),
 });

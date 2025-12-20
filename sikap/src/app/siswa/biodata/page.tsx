@@ -1,10 +1,11 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useRef } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { api } from "@/trpc/react"
-import { Spinner } from "@/components/ui/spinner"
+import { useState, useEffect, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { api } from "@/trpc/react";
+import { Spinner } from "@/components/ui/spinner";
+import { Lock } from "lucide-react";
 
 // Select (shadcn new structure)
 import {
@@ -13,210 +14,169 @@ import {
   SelectValue,
   SelectContent,
   SelectItem,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 
 // Helper: safely extract YYYY-MM-DD from birthDate (handles both Date object and string)
 function extractDateString(birthDate: unknown): string {
-  if (!birthDate) return ""
+  if (!birthDate) return "";
   // If it's already a YYYY-MM-DD string, use it directly
   if (typeof birthDate === "string") {
     // Validate it's a proper date string format
-    const dateRegex = /^\d{4}-\d{2}-\d{2}/
+    const dateRegex = /^\d{4}-\d{2}-\d{2}/;
     if (dateRegex.test(birthDate)) {
-      return birthDate.slice(0, 10)
+      return birthDate.slice(0, 10);
     }
   }
   // Fallback: try to parse as Date (for backwards compatibility)
   try {
-    const dateObj = new Date(birthDate as string | number | Date)
+    const dateObj = new Date(birthDate as string | number | Date);
     if (!isNaN(dateObj.getTime())) {
-      return dateObj.toISOString().slice(0, 10)
+      return dateObj.toISOString().slice(0, 10);
     }
   } catch {
     // ignore parse errors
   }
-  return ""
+  return "";
+}
+
+// Helper: convert major code to display name
+function majorToDisplayName(major: string | null | undefined): string {
+  if (!major) return "-";
+  if (major === "RPL") return "Rekayasa Perangkat Lunak (RPL)";
+  if (major === "TKJ") return "Teknik Komputer dan Jaringan (TKJ)";
+  // Legacy support for full names
+  if (major.includes("Rekayasa") || major.includes("RPL"))
+    return "Rekayasa Perangkat Lunak (RPL)";
+  if (major.includes("Teknik") || major.includes("TKJ"))
+    return "Teknik Komputer dan Jaringan (TKJ)";
+  return major;
 }
 
 // Helper: convert old full names to abbreviations for backward compatibility
 function normalizeMajor(major: string | null | undefined): "TKJ" | "RPL" {
-  if (!major) return "TKJ"
+  if (!major) return "TKJ";
 
   // If already abbreviated, return as-is
   if (major === "RPL" || major === "TKJ") {
-    return major
+    return major;
   }
 
   // Convert old full names to abbreviations
-  if (major === "Rekayasa Perangkat Lunak") return "RPL"
-  if (major === "Teknik Komputer dan Jaringan") return "TKJ"
+  if (major === "Rekayasa Perangkat Lunak") return "RPL";
+  if (major === "Teknik Komputer dan Jaringan") return "TKJ";
 
   // Default fallback
-  return "TKJ"
+  return "TKJ";
 }
 
 export default function BiodataSiswaPage() {
-  const [nama, setNama] = useState("")
-  const [namaError, setNamaError] = useState<string | null>(null)
-  const namaInputRef = useRef<HTMLInputElement>(null)
-  const [email, setEmail] = useState("")
-  const [nis, setNis] = useState("")
-  const [tempatLahir, setTempatLahir] = useState("")
-  const [dob, setDob] = useState<string>("")
-  const [gender, setGender] = useState<"Laki-laki" | "Perempuan">("Laki-laki")
-  const [kelas, setKelas] = useState("")
-  const [semester, setSemester] = useState("")
-  const [kompetensi, setKompetensi] = useState<
-    "TKJ" | "RPL"
-  >("TKJ")
-  const [asalSekolah, setAsalSekolah] = useState("")
-  const [alamat, setAlamat] = useState("")
-  const [noTelp, setNoTelp] = useState("")
+  const [nama, setNama] = useState("");
+  const [namaError, setNamaError] = useState<string | null>(null);
+  const namaInputRef = useRef<HTMLInputElement>(null);
+  const [tempatLahir, setTempatLahir] = useState("");
+  const [semester, setSemester] = useState("");
+  const [asalSekolah, setAsalSekolah] = useState("");
+  const [alamat, setAlamat] = useState("");
+  const [noTelp, setNoTelp] = useState("");
 
   // tRPC query for fetching profile
-  const profileQuery = api.students.me.useQuery()
+  const profileQuery = api.students.me.useQuery();
 
   // tRPC mutation for updating profile
   const updateMutation = api.students.updateProfile.useMutation({
     onSuccess: () => {
-      alert("Profil berhasil diperbarui!")
-      void profileQuery.refetch()
+      alert("Profil berhasil diperbarui!");
+      void profileQuery.refetch();
     },
     onError: (err) => {
-      alert(`Gagal memperbarui profil: ${err.message}`)
+      alert(`Gagal memperbarui profil: ${err.message}`);
     },
-  })
+  });
 
   // Populate form fields from query data
   useEffect(() => {
     if (profileQuery.data) {
-      const normalizedMajor = normalizeMajor(profileQuery.data.major)
-
-      setNama(profileQuery.data.name ?? "")
-      setEmail(profileQuery.data.email ?? "")
-      setNis(profileQuery.data.nis ?? "")
-      setTempatLahir(profileQuery.data.birthPlace ?? "")
-      // Use extractDateString to handle birthDate as plain YYYY-MM-DD string
-      setDob(extractDateString(profileQuery.data.birthDate))
-      setGender(
-        (profileQuery.data.gender as "Laki-laki" | "Perempuan") ?? "Laki-laki"
-      )
+      setNama(profileQuery.data.name ?? "");
+      setTempatLahir(profileQuery.data.birthPlace ?? "");
       setSemester(
-        profileQuery.data.semester ? String(profileQuery.data.semester) : ""
-      )
-      setKelas(profileQuery.data.cohort ?? "")
-      setKompetensi(normalizedMajor)
-      setAsalSekolah(profileQuery.data.school ?? "")
-      setAlamat(profileQuery.data.address ?? "")
-      setNoTelp(profileQuery.data.phone ?? "")
+        profileQuery.data.semester ? String(profileQuery.data.semester) : "",
+      );
+      setAsalSekolah(profileQuery.data.school ?? "");
+      setAlamat(profileQuery.data.address ?? "");
+      setNoTelp(profileQuery.data.phone ?? "");
       // Clear any previous validation errors when data loads
-      setNamaError(null)
+      setNamaError(null);
     }
-  }, [profileQuery.data])
+  }, [profileQuery.data]);
 
-  // deteksi perubahan dari loaded data
+  // deteksi perubahan dari loaded data (only editable fields)
   const isDirty =
     nama !== (profileQuery.data?.name ?? "") ||
-    email !== (profileQuery.data?.email ?? "") ||
-    nis !== (profileQuery.data?.nis ?? "") ||
     tempatLahir !== (profileQuery.data?.birthPlace ?? "") ||
-    dob !== extractDateString(profileQuery.data?.birthDate) ||
-    gender !== ((profileQuery.data?.gender as "Laki-laki" | "Perempuan") ?? "Laki-laki") ||
-    kelas !== (profileQuery.data?.cohort ?? "") ||
-    semester !== (profileQuery.data?.semester ? String(profileQuery.data.semester) : "") ||
-    kompetensi !== normalizeMajor(profileQuery.data?.major) ||
+    semester !==
+      (profileQuery.data?.semester ? String(profileQuery.data.semester) : "") ||
     asalSekolah !== (profileQuery.data?.school ?? "") ||
     alamat !== (profileQuery.data?.address ?? "") ||
-    noTelp !== (profileQuery.data?.phone ?? "")
+    noTelp !== (profileQuery.data?.phone ?? "");
 
   const handleReset = () => {
     // Reset to loaded profile data
     if (profileQuery.data) {
-      setNama(profileQuery.data.name ?? "")
-      setEmail(profileQuery.data.email ?? "")
-      setNis(profileQuery.data.nis ?? "")
-      setTempatLahir(profileQuery.data.birthPlace ?? "")
-      // Use extractDateString to handle birthDate as plain YYYY-MM-DD string
-      setDob(extractDateString(profileQuery.data.birthDate))
-      setGender(
-        (profileQuery.data.gender as "Laki-laki" | "Perempuan") ?? "Laki-laki"
-      )
+      setNama(profileQuery.data.name ?? "");
+      setTempatLahir(profileQuery.data.birthPlace ?? "");
       setSemester(
-        profileQuery.data.semester ? String(profileQuery.data.semester) : ""
-      )
-      setKelas(profileQuery.data.cohort ?? "")
-      setKompetensi(normalizeMajor(profileQuery.data.major))
-      setAsalSekolah(profileQuery.data.school ?? "")
-      setAlamat(profileQuery.data.address ?? "")
-      setNoTelp(profileQuery.data.phone ?? "")
+        profileQuery.data.semester ? String(profileQuery.data.semester) : "",
+      );
+      setAsalSekolah(profileQuery.data.school ?? "");
+      setAlamat(profileQuery.data.address ?? "");
+      setNoTelp(profileQuery.data.phone ?? "");
     } else {
-      setNama("")
-      setEmail("")
-      setNis("")
-      setTempatLahir("")
-      setDob("")
-      setGender("Laki-laki")
-      setKelas("")
-      setSemester("")
-      setKompetensi("TKJ")
-      setAsalSekolah("")
-      setAlamat("")
-      setNoTelp("")
+      setNama("");
+      setTempatLahir("");
+      setSemester("");
+      setAsalSekolah("");
+      setAlamat("");
+      setNoTelp("");
     }
     // Clear validation errors on reset
-    setNamaError(null)
-  }
+    setNamaError(null);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
 
     // Validate that name is not empty
     if (!nama.trim()) {
-      setNamaError("Nama tidak boleh kosong")
-      namaInputRef.current?.focus()
-      return
+      setNamaError("Nama tidak boleh kosong");
+      namaInputRef.current?.focus();
+      return;
     }
-    setNamaError(null)
-
-    // Convert dob string to Date for API contract (server expects Date type)
-    // Using UTC midnight to avoid local timezone shifts
-    let birthDateValue: Date | undefined
-    if (dob) {
-      // Parse as UTC to avoid timezone issues: "YYYY-MM-DD" -> UTC midnight
-      const [year, month, day] = dob.split("-").map(Number)
-      birthDateValue = new Date(Date.UTC(year!, month! - 1, day))
-    }
+    setNamaError(null);
 
     updateMutation.mutate({
       name: nama.trim(),
-      email: email.trim(),
-      nis: nis || undefined,
       birthPlace: tempatLahir || undefined,
-      birthDate: birthDateValue,
-      gender: gender || undefined,
-      cohort: kelas || undefined,
       semester: semester ? Number(semester) : undefined,
       school: asalSekolah || undefined,
-      major: kompetensi || undefined,
       address: alamat || undefined,
       phone: noTelp || undefined,
-    })
-  }
+    });
+  };
 
   // Loading state
   if (profileQuery.isLoading) {
     return (
-      <div className="min-h-screen bg-muted/30 flex items-center justify-center">
+      <div className="bg-muted/30 flex min-h-screen items-center justify-center">
         <Spinner className="h-8 w-8" />
       </div>
-    )
+    );
   }
 
   // Error state
   if (profileQuery.isError) {
     return (
-      <div className="min-h-screen bg-muted/30 p-0 m-0">
-        <div className="w-full max-w-none p-0 m-0 pr-4 sm:pr-6 lg:pr-10 pl-4 sm:pl-6 lg:pl-10">
+      <div className="bg-muted/30 m-0 min-h-screen p-0">
+        <div className="m-0 w-full max-w-none p-0 pr-4 pl-4 sm:pr-6 sm:pl-6 lg:pr-10 lg:pl-10">
           <div className="p-6 text-center">
             <p className="text-destructive">
               Gagal memuat profil.{" "}
@@ -230,64 +190,63 @@ export default function BiodataSiswaPage() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
-  return (
-    <div className="min-h-screen bg-muted/30 p-0 m-0">
-      <div className="w-full max-w-none p-5 m-0 pr-4 sm:pr-6 lg:pr-10 pl-4 sm:pl-6 lg:pl-10">
+  // Locked field values from profile
+  const lockedNis = profileQuery.data?.nis ?? "-";
+  const lockedDob = extractDateString(profileQuery.data?.birthDate) || "-";
+  const lockedGender = profileQuery.data?.gender ?? "-";
+  const lockedMajor = majorToDisplayName(profileQuery.data?.major);
+  const lockedCohort = profileQuery.data?.cohort ?? "-";
 
+  return (
+    <div className="bg-muted/30 m-0 min-h-screen p-0">
+      <div className="m-0 w-full max-w-none p-5 pr-4 pl-4 sm:pr-6 sm:pl-6 lg:pr-10 lg:pl-10">
         {/* Header */}
         <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-semibold">Biodata</h1>
+          <h1 className="text-2xl font-semibold sm:text-3xl">Biodata</h1>
           <p className="text-muted-foreground">Silahkan isi biodata anda</p>
         </div>
 
         {/* Card */}
-        <section className="mt-6 rounded-2xl border bg-card p-6">
-          <h2 className="text-base sm:text-lg font-semibold">
+        <section className="bg-card mt-6 rounded-2xl border p-6">
+          <h2 className="text-base font-semibold sm:text-lg">
             Identitas Pribadi Siswa
           </h2>
 
           <form onSubmit={handleSubmit}>
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-5">
-
-              {/* Nama */}
+            <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2">
+              {/* Nama - Editable */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Nama</label>
                 <Input
                   ref={namaInputRef}
                   value={nama}
                   onChange={(e) => {
-                    setNama(e.target.value.replace(/[^\p{L}\s]/gu, ""))
-                    // Clear error when user starts typing
-                    if (namaError) setNamaError(null)
+                    setNama(e.target.value.replace(/[^\p{L}\s]/gu, ""));
+                    if (namaError) setNamaError(null);
                   }}
                   placeholder="Rafif Zharif"
                   className={`h-10 px-4 ${namaError ? "border-destructive" : ""}`}
                   disabled={updateMutation.isPending}
                 />
                 {namaError && (
-                  <p className="text-xs text-destructive">{namaError}</p>
+                  <p className="text-destructive text-xs">{namaError}</p>
                 )}
               </div>
 
-              {/* NIS */}
+              {/* NIS - Locked */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">NIS</label>
-                <Input
-                  value={nis}
-                  onChange={(e) =>
-                    setNis(e.target.value.replace(/[^\d]/g, ""))
-                  }
-                  inputMode="numeric"
-                  placeholder="234658594"
-                  className="h-10 px-4"
-                  disabled={updateMutation.isPending}
-                />
+                <label className="text-muted-foreground flex items-center gap-1 text-sm font-medium">
+                  <Lock className="h-3 w-3" /> NIS
+                </label>
+                <div className="bg-muted flex h-10 items-center rounded-md border px-4 text-sm opacity-70">
+                  {lockedNis}
+                </div>
               </div>
 
-              {/* Tempat lahir */}
+              {/* Tempat lahir - Editable */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Tempat Lahir</label>
                 <Input
@@ -301,83 +260,27 @@ export default function BiodataSiswaPage() {
                 />
               </div>
 
-              {/* Tanggal lahir */}
+              {/* Tanggal lahir - Locked */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">Tanggal Lahir</label>
-                <input
-                  type="date"
-                  value={dob}
-                  onChange={(e) => setDob(e.target.value)}
-                  className="w-full h-10 rounded-md border bg-background px-4 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={updateMutation.isPending}
-                />
+                <label className="text-muted-foreground flex items-center gap-1 text-sm font-medium">
+                  <Lock className="h-3 w-3" /> Tanggal Lahir
+                </label>
+                <div className="bg-muted flex h-10 items-center rounded-md border px-4 text-sm opacity-70">
+                  {lockedDob}
+                </div>
               </div>
 
-              {/* Gender */}
+              {/* Gender - Locked */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">Jenis Kelamin</label>
-
-                <Select
-                  value={gender}
-                  onValueChange={(v) =>
-                    setGender(v as "Laki-laki" | "Perempuan")
-                  }
-                  disabled={updateMutation.isPending}
-                >
-                  <SelectTrigger className="w-full h-10 rounded-full border bg-background px-4 text-sm text-muted-foreground">
-                    <SelectValue placeholder="Pilih jenis kelamin" />
-                  </SelectTrigger>
-                  <SelectContent align="start" className="rounded-xl">
-                    <SelectItem value="Laki-laki">Laki-laki</SelectItem>
-                    <SelectItem value="Perempuan">Perempuan</SelectItem>
-                  </SelectContent>
-                </Select>
+                <label className="text-muted-foreground flex items-center gap-1 text-sm font-medium">
+                  <Lock className="h-3 w-3" /> Jenis Kelamin
+                </label>
+                <div className="bg-muted flex h-10 items-center rounded-md border px-4 text-sm opacity-70">
+                  {lockedGender}
+                </div>
               </div>
 
-              {/* Kelas */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Kelas</label>
-                <Input
-                  value={kelas}
-                  onChange={(e) =>
-                    setKelas(e.target.value.replace(/[^\d]/g, ""))
-                  }
-                  inputMode="numeric"
-                  placeholder="12"
-                  className="h-10 px-4"
-                  disabled={updateMutation.isPending}
-                />
-              </div>
-
-              {/* Jurusan */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Jurusan</label>
-
-                <Select
-                  value={kompetensi}
-                  onValueChange={(v) => {
-                    // Only update if value is not empty
-                    if (v && (v === "TKJ" || v === "RPL")) {
-                      setKompetensi(v as "TKJ" | "RPL")
-                    }
-                  }}
-                  disabled={updateMutation.isPending}
-                >
-                  <SelectTrigger className="w-full h-10 rounded-full border bg-background px-4 text-sm text-muted-foreground">
-                    <SelectValue placeholder="Pilih jurusan" />
-                  </SelectTrigger>
-                  <SelectContent align="start" className="rounded-xl">
-                    <SelectItem value="TKJ">
-                      TKJ
-                    </SelectItem>
-                    <SelectItem value="RPL">
-                      RPL
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Semester */}
+              {/* Semester - Editable */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Semester</label>
                 <Input
@@ -392,7 +295,17 @@ export default function BiodataSiswaPage() {
                 />
               </div>
 
-              {/* Asal sekolah */}
+              {/* Kompetensi Keahlian - Locked */}
+              <div className="space-y-2">
+                <label className="text-muted-foreground flex items-center gap-1 text-sm font-medium">
+                  <Lock className="h-3 w-3" /> Kompetensi Keahlian
+                </label>
+                <div className="bg-muted flex h-10 items-center rounded-md border px-4 text-sm opacity-70">
+                  {lockedMajor}
+                </div>
+              </div>
+
+              {/* Asal sekolah - Editable */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Asal Sekolah</label>
                 <Input
@@ -404,21 +317,18 @@ export default function BiodataSiswaPage() {
                 />
               </div>
 
-              {/* Email */}
+              {/* Tahun (Cohort) - Locked */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">Email</label>
-                <Input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="siswa@example.com"
-                  className="h-10 px-4"
-                  disabled={updateMutation.isPending}
-                />
+                <label className="text-muted-foreground flex items-center gap-1 text-sm font-medium">
+                  <Lock className="h-3 w-3" /> Tahun
+                </label>
+                <div className="bg-muted flex h-10 items-center rounded-md border px-4 text-sm opacity-70">
+                  {lockedCohort}
+                </div>
               </div>
 
-              {/* Alamat */}
-              <div className="space-y-2 md:col-span-2">
+              {/* Alamat - Editable */}
+              <div className="space-y-2">
                 <label className="text-sm font-medium">Alamat</label>
                 <Input
                   value={alamat}
@@ -428,9 +338,9 @@ export default function BiodataSiswaPage() {
                 />
               </div>
 
-              {/* No telp */}
+              {/* No telp - Editable */}
               <div className="space-y-2 md:col-span-2">
-                <label className="text-sm font-medium">No telp</label>
+                <label className="text-sm font-medium">No Telp</label>
                 <Input
                   value={noTelp}
                   onChange={(e) =>
@@ -443,6 +353,12 @@ export default function BiodataSiswaPage() {
               </div>
             </div>
 
+            {/* Info about locked fields */}
+            <p className="text-muted-foreground mt-4 flex items-center gap-1 text-xs">
+              <Lock className="h-3 w-3" /> Field dengan ikon kunci hanya dapat
+              diubah oleh mentor atau admin.
+            </p>
+
             {/* Buttons */}
             <div className="mt-6 flex items-center gap-3">
               <Button
@@ -453,12 +369,12 @@ export default function BiodataSiswaPage() {
               >
                 {updateMutation.isPending ? "Menyimpan..." : "Simpan"}
               </Button>
-              {isDirty && ( // hanya tampil jika ada perubahan
+              {isDirty && (
                 <Button
                   type="button"
                   variant="outline"
                   onClick={handleReset}
-                  className="h-9 px-6 border-destructive text-destructive hover:bg-destructive/10"
+                  className="border-destructive text-destructive hover:bg-destructive/10 h-9 px-6"
                   disabled={updateMutation.isPending}
                 >
                   Bersihkan
@@ -469,5 +385,5 @@ export default function BiodataSiswaPage() {
         </section>
       </div>
     </div>
-  )
+  );
 }

@@ -13,10 +13,14 @@ export default async function MentorLayout({
     redirect("/sign-in");
   }
 
-  // Optional: Check if user is actually a mentor
-  // if (session.user.role !== "mentor") {
-  //   redirect("/unauthorized");
-  // }
+  // Redirect non-mentors to their own dashboard
+  if (session.user.role !== "mentor") {
+    if (session.user.role === "admin") {
+      redirect("/admin/dashboard");
+    } else {
+      redirect("/siswa/dashboard");
+    }
+  }
 
   return (
     <AppShell

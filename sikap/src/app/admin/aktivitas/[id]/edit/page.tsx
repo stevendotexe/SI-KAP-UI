@@ -52,7 +52,7 @@ export default function EditAktivitasPage() {
             setFormData({
                 title: event.title,
                 type: event.type as "in_class" | "field_trip" | "meet_greet",
-                date: startDate.toISOString().split('T')[0],
+                date: startDate.toISOString().split('T')[0]!,
                 time: startDate.toTimeString().slice(0, 5),
                 organizerName: event.organizerName ?? "",
                 colorHex: event.colorHex ?? "#3b82f6",
