@@ -1,12 +1,12 @@
 "use client";
 
 import { Line, LineChart, XAxis, YAxis, CartesianGrid } from "recharts";
+import type { ChartConfig } from "@/components/ui/chart";
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import type { ChartConfig } from "@/components/ui/chart";
 
 type Point = { period: string; count: number };
 
@@ -116,7 +116,9 @@ export default function DashboardLineChart({
             content={
               <ChartTooltipContent
                 hideIndicator
-                formatter={(value) => `${value}${valueSuffix}`}
+                formatter={(value) =>
+                  `${value?.toString() ?? ""}${valueSuffix}`
+                }
               />
             }
           />

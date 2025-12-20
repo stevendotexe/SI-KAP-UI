@@ -244,6 +244,7 @@ export const mentorsRouter = createTRPCRouter({
 
       const code = await generateUserCode("mentor");
 
+      /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any */
       await auth.api.createUser({
         body: {
           email: input.email,
@@ -251,13 +252,18 @@ export const mentorsRouter = createTRPCRouter({
           name: input.name,
           role: "mentor",
           code: code,
-        },
+        } as any,
         headers: ctx.headers,
       });
+      /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any */
       const u = await ctx.db.query.user.findFirst({
         where: eq(user.email, input.email),
       });
       if (!u) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Update the code field directly since better-auth createUser doesn't save additionalFields
+      await ctx.db.update(user).set({ code }).where(eq(user.id, u.id));
+
       const inserted = await ctx.db
         .insert(mentorProfile)
         .values({

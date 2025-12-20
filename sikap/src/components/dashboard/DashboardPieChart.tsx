@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import { Pie, PieChart as RechartsPieChart, Cell, Label } from "recharts";
+import type { ChartConfig } from "@/components/ui/chart";
 import {
-  ChartConfig,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
@@ -75,7 +75,9 @@ export default function DashboardPieChart({ data }: { data: Item[] }) {
           outerRadius={80}
           strokeWidth={2}
           stroke="var(--background)"
-          label={({ name, value }) => `${LABELS[name] || name}: ${value}`}
+          label={({ name, value }) =>
+            `${name && LABELS[name] ? LABELS[name] : (name ?? "")}: ${value}`
+          }
           labelLine={{ stroke: "var(--muted-foreground)", strokeWidth: 1 }}
         >
           {data.map((entry) => (

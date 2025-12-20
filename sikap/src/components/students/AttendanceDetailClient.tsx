@@ -85,8 +85,8 @@ export default function AttendanceDetailClient({ date }: { date: string }) {
   );
 
   const verifyMutation = api.attendances.verify.useMutation({
-    onSuccess: () => {
-      refetch();
+    onSuccess: async () => {
+      await refetch();
     },
     onError: (err) => {
       alert("Gagal memverifikasi: " + err.message);
@@ -94,8 +94,8 @@ export default function AttendanceDetailClient({ date }: { date: string }) {
   });
 
   const deleteMutation = api.attendances.delete.useMutation({
-    onSuccess: () => {
-      refetch();
+    onSuccess: async () => {
+      await refetch();
     },
     onError: (err) => {
       alert("Gagal menghapus: " + err.message);

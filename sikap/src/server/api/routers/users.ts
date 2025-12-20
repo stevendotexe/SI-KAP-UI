@@ -9,6 +9,7 @@ import {
 import { auth } from "@/server/better-auth";
 import { user, userRole } from "@/server/db/schema";
 import { generateUserCode } from "@/server/db/utils";
+import { TRPCError } from "@trpc/server";
 
 const docs = {
   list: {
@@ -86,6 +87,7 @@ export const usersRouter = createTRPCRouter({
       const role = input.role ?? "student";
       const code = await generateUserCode(role);
 
+      /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any */
       await auth.api.createUser({
         body: {
           email: input.email,
@@ -93,10 +95,19 @@ export const usersRouter = createTRPCRouter({
           name: input.name,
           role: role,
           code: code,
-        },
-
+        } as any,
         headers: ctx.headers,
       });
+
+      const u = await ctx.db.query.user.findFirst({
+        where: eq(user.email, input.email),
+      });
+      if (!u) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Update the code field directly since better-auth createUser doesn't save additionalFields
+      await ctx.db.update(user).set({ code }).where(eq(user.id, u.id));
+
+      /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any */
       const created = await ctx.db.query.user.findFirst({
         where: eq(user.email, input.email),
       });
