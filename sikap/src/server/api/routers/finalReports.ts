@@ -2,7 +2,11 @@ import { z } from "zod";
 import { and, eq, ilike, sql, or } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
-import { adminOrMentorProcedure, createTRPCRouter, requirePermissions } from "@/server/api/trpc";
+import {
+  adminOrMentorProcedure,
+  createTRPCRouter,
+  requirePermissions,
+} from "@/server/api/trpc";
 import {
   finalReport,
   finalReportScore,
@@ -13,34 +17,6 @@ import {
   mentorProfile,
   type FinalReportScoreInsert,
 } from "@/server/db/schema";
-
-/**
- * TODO: Add endpoint to fetch competency templates by major
- * 
- * Required for frontend to display score input forms for new final reports.
- * 
- * Suggested procedure:
- * ```
- * getCompetencyTemplates: adminOrMentorProcedure
- *   .input(z.object({ major: z.string() })) // e.g., "TKJ" or "RPL"
- *   .query(async ({ ctx, input }) => {
- *     const templates = await ctx.db.query.competencyTemplate.findMany({
- *       where: eq(competencyTemplate.major, input.major),
- *       orderBy: [competencyTemplate.category, competencyTemplate.position]
- *     });
- *     return {
- *       personality: templates.filter(t => t.category === 'personality'),
- *       technical: templates.filter(t => t.category === 'technical')
- *     };
- *   })
- * ```
- * 
- * Also ensure competency templates are seeded in the database (currently missing in seed.ts).
- * Example seed data:
- * - Personality (both majors): Disiplin, Inisiatif, Tanggung Jawab, Kerja Sama, Kerajinan
- * - Technical TKJ: Penerapan KSLH, Menginstalasi sistem operasi, Perbaikan peripheral, etc.
- * - Technical RPL: Penerapan KSLH, Pemrograman Dasar, Basis Data, Pemrograman Web, etc.
- */
 
 const docs = {
   list: {
@@ -59,19 +35,30 @@ const docs = {
 
 async function enforceMentorScope(ctx: any, placementId: number) {
   if (ctx.session.user.role !== "mentor") return;
-  const p = await ctx.db.query.placement.findFirst({ where: eq(placement.id, placementId) });
-  if (!p || p.mentorId !== (await getMentorId(ctx))) throw new TRPCError({ code: "FORBIDDEN" });
+  const p = await ctx.db.query.placement.findFirst({
+    where: eq(placement.id, placementId),
+  });
+  if (!p || p.mentorId !== (await getMentorId(ctx)))
+    throw new TRPCError({ code: "FORBIDDEN" });
 }
 
 async function getMentorId(ctx: any) {
-  const mp = await ctx.db.query.mentorProfile.findFirst({ where: eq(mentorProfile.userId, ctx.session.user.id) });
+  const mp = await ctx.db.query.mentorProfile.findFirst({
+    where: eq(mentorProfile.userId, ctx.session.user.id),
+  });
   return mp?.id ?? null;
 }
 
 export const finalReportsRouter = createTRPCRouter({
   list: adminOrMentorProcedure
     .meta(docs.list)
-    .use(requirePermissions({ finalReport: ["read"], placement: ["read"], studentProfile: ["read"] }))
+    .use(
+      requirePermissions({
+        report: ["read"],
+        placement: ["read"],
+        studentProfile: ["read"],
+      }),
+    )
     .input(
       z.object({
         cohort: z.string().optional(),
@@ -84,7 +71,9 @@ export const finalReportsRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       let mentorId: number | null = null;
       if (ctx.session.user.role === "mentor") {
-        const mp = await ctx.db.query.mentorProfile.findFirst({ where: eq(mentorProfile.userId, ctx.session.user.id) });
+        const mp = await ctx.db.query.mentorProfile.findFirst({
+          where: eq(mentorProfile.userId, ctx.session.user.id),
+        });
         if (!mp) throw new TRPCError({ code: "FORBIDDEN" });
         mentorId = mp.id;
       }
@@ -95,9 +84,9 @@ export const finalReportsRouter = createTRPCRouter({
         mentorId ? eq(placement.mentorId, mentorId) : undefined,
         input.search
           ? or(
-            ilike(user.name, `%${input.search}%`),
-            ilike(studentProfile.nis, `%${input.search}%`),
-          )
+              ilike(user.name, `%${input.search}%`),
+              ilike(studentProfile.nis, `%${input.search}%`),
+            )
           : undefined,
       );
 
@@ -117,7 +106,10 @@ export const finalReportsRouter = createTRPCRouter({
         .innerJoin(studentProfile, eq(placement.studentId, studentProfile.id))
         .innerJoin(user, eq(studentProfile.userId, user.id))
         .innerJoin(finalReport, eq(finalReport.placementId, placement.id))
-        .leftJoin(finalReportScore, eq(finalReportScore.finalReportId, finalReport.id))
+        .leftJoin(
+          finalReportScore,
+          eq(finalReportScore.finalReportId, finalReport.id),
+        )
         .where(where)
         .groupBy(
           finalReport.id,
@@ -154,14 +146,24 @@ export const finalReportsRouter = createTRPCRouter({
             averageScore: cnt === 0 ? 0 : Number((total / cnt).toFixed(2)),
           };
         }),
-        pagination: { total: Number(countRows[0]?.total ?? 0), limit: input.limit, offset: input.offset },
+        pagination: {
+          total: Number(countRows[0]?.total ?? 0),
+          limit: input.limit,
+          offset: input.offset,
+        },
         lastUpdated: new Date().toISOString(),
       };
     }),
 
   detail: adminOrMentorProcedure
     .meta(docs.detail)
-    .use(requirePermissions({ finalReport: ["read"], placement: ["read"], studentProfile: ["read"] }))
+    .use(
+      requirePermissions({
+        finalReport: ["read"],
+        placement: ["read"],
+        studentProfile: ["read"],
+      }),
+    )
     .input(z.object({ finalReportId: z.number() }))
     .query(async ({ ctx, input }) => {
       const row = await ctx.db
@@ -185,8 +187,11 @@ export const finalReportsRouter = createTRPCRouter({
       const fr = row[0];
       if (!fr) throw new TRPCError({ code: "NOT_FOUND" });
       if (ctx.session.user.role === "mentor") {
-        const p = await ctx.db.query.placement.findFirst({ where: eq(placement.id, fr.placementId) });
-        if (!p || p.mentorId !== (await getMentorId(ctx))) throw new TRPCError({ code: "FORBIDDEN" });
+        const p = await ctx.db.query.placement.findFirst({
+          where: eq(placement.id, fr.placementId),
+        });
+        if (!p || p.mentorId !== (await getMentorId(ctx)))
+          throw new TRPCError({ code: "FORBIDDEN" });
       }
 
       const scores = await ctx.db
@@ -200,14 +205,23 @@ export const finalReportsRouter = createTRPCRouter({
           weight: competencyTemplate.weight,
         })
         .from(finalReportScore)
-        .innerJoin(competencyTemplate, eq(finalReportScore.competencyTemplateId, competencyTemplate.id))
+        .innerJoin(
+          competencyTemplate,
+          eq(finalReportScore.competencyTemplateId, competencyTemplate.id),
+        )
         .where(eq(finalReportScore.finalReportId, input.finalReportId))
         .orderBy(competencyTemplate.position, competencyTemplate.id);
 
       const personality = scores.filter((s) => s.category === "personality");
       const technical = scores.filter((s) => s.category === "technical");
-      const totalScore = scores.reduce((acc, s) => acc + Number(s.score ?? 0), 0);
-      const avgScore = scores.length === 0 ? 0 : Number((totalScore / scores.length).toFixed(2));
+      const totalScore = scores.reduce(
+        (acc, s) => acc + Number(s.score ?? 0),
+        0,
+      );
+      const avgScore =
+        scores.length === 0
+          ? 0
+          : Number((totalScore / scores.length).toFixed(2));
 
       return {
         id: fr.id,
@@ -222,8 +236,16 @@ export const finalReportsRouter = createTRPCRouter({
         },
         placementStatus: fr.status,
         scores: {
-          personality: personality.map((p) => ({ id: p.competencyId, name: p.name, score: Number(p.score ?? 0) })),
-          technical: technical.map((p) => ({ id: p.competencyId, name: p.name, score: Number(p.score ?? 0) })),
+          personality: personality.map((p) => ({
+            id: p.competencyId,
+            name: p.name,
+            score: Number(p.score ?? 0),
+          })),
+          technical: technical.map((p) => ({
+            id: p.competencyId,
+            name: p.name,
+            score: Number(p.score ?? 0),
+          })),
         },
         totalScore,
         averageScore: avgScore,
@@ -246,9 +268,12 @@ export const finalReportsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      if (ctx.session.user.role === "mentor") await enforceMentorScope(ctx, input.placementId);
+      if (ctx.session.user.role === "mentor")
+        await enforceMentorScope(ctx, input.placementId);
 
-      let fr = await ctx.db.query.finalReport.findFirst({ where: eq(finalReport.placementId, input.placementId) });
+      let fr = await ctx.db.query.finalReport.findFirst({
+        where: eq(finalReport.placementId, input.placementId),
+      });
       if (!fr) {
         const inserted = await ctx.db
           .insert(finalReport)
@@ -270,7 +295,9 @@ export const finalReportsRouter = createTRPCRouter({
       }
       if (!fr?.id) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-      await ctx.db.delete(finalReportScore).where(eq(finalReportScore.finalReportId, fr.id));
+      await ctx.db
+        .delete(finalReportScore)
+        .where(eq(finalReportScore.finalReportId, fr.id));
       if (input.scores.length) {
         const values: FinalReportScoreInsert[] = input.scores.map((s) => ({
           finalReportId: fr.id,
@@ -345,17 +372,22 @@ export const finalReportsRouter = createTRPCRouter({
           .from(finalReportScore)
           .where(eq(finalReportScore.finalReportId, fr.id));
 
-        const totalScore = scores.reduce((acc, s) => acc + Number(s.score ?? 0), 0);
-        const avgScore = scores.length > 0 ? Math.round(totalScore / scores.length) : 0;
+        const totalScore = scores.reduce(
+          (acc, s) => acc + Number(s.score ?? 0),
+          0,
+        );
+        const avgScore =
+          scores.length > 0 ? Math.round(totalScore / scores.length) : 0;
 
         // Create score trend matching attendance months (or default 6 months)
-        const months = attendanceTrend.length > 0
-          ? attendanceTrend.map(a => a.period)
-          : Array.from({ length: 6 }, (_, i) => {
-            const d = new Date();
-            d.setMonth(d.getMonth() - (5 - i));
-            return d.toISOString().slice(0, 7);
-          });
+        const months =
+          attendanceTrend.length > 0
+            ? attendanceTrend.map((a) => a.period)
+            : Array.from({ length: 6 }, (_, i) => {
+                const d = new Date();
+                d.setMonth(d.getMonth() - (5 - i));
+                return d.toISOString().slice(0, 7);
+              });
 
         scoreTrend = months.map((period) => ({
           period,

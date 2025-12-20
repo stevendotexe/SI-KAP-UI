@@ -1,8 +1,8 @@
-"use client"
+"use client";
 
 /**
  * TODO: Backend Integration
- * 
+ *
  * This dialog currently creates tasks with local state only.
  * When backend is ready:
  * 1. Replace onAdd callback with api.tasks.create.useMutation()
@@ -10,117 +10,181 @@
  * 3. Handle task distribution to placements on backend
  * 4. Show loading state during mutation
  * 5. Display success/error messages
- * 
+ *
  * Required backend endpoint:
  * api.tasks.create({ title, description, dueDate, targetMajor, placementIds, attachments })
  */
 
-import React from "react"
-import { api } from "@/trpc/react"
-import { toast } from "sonner"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Field, FieldContent, FieldGroup, FieldSet, FieldTitle } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { FileUploadField, type FileUploadValue } from "@/components/ui/file-upload-field"
-import { RUBRIC_CATEGORIES, RUBRICS_BY_MAJOR } from "@/lib/rubrics"
+import React from "react";
+import { api } from "@/trpc/react";
+import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import {
+  Field,
+  FieldContent,
+  FieldGroup,
+  FieldSet,
+  FieldTitle,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import {
+  FileUploadField,
+  type FileUploadValue,
+} from "@/components/ui/file-upload-field";
+import { RUBRIC_CATEGORIES, RUBRICS_BY_MAJOR } from "@/lib/rubrics";
 
 export type TaskItem = {
-  id: string
-  titleMain: string
-  titleSub: string
-  description: string
-  date: string
-  attachments?: Array<{ url: string, filename?: string }>
-}
+  id: string;
+  titleMain: string;
+  titleSub: string;
+  description: string;
+  date: string;
+  attachments?: Array<{ url: string; filename?: string }>;
+};
 
-export default function AddTaskDialog({ onAdd }: { onAdd: (t: TaskItem) => void }) {
-  const [open, setOpen] = React.useState(false)
-  const [titleMain, setTitleMain] = React.useState("")
-  const [titleSub, setTitleSub] = React.useState("")
-  const [description, setDescription] = React.useState("")
-  const [date, setDate] = React.useState("")
-  const [error, setError] = React.useState<string | null>(null)
-  const [majors, setMajors] = React.useState<Array<"RPL" | "TKJ" | "Umum">>([])
-  const [rubrics, setRubrics] = React.useState<string[]>([])
-  const [attachments, setAttachments] = React.useState<FileUploadValue[]>([])
+export default function AddTaskDialog({
+  onAdd,
+}: {
+  onAdd: (t: TaskItem) => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const [titleMain, setTitleMain] = React.useState("");
+  const [titleSub, setTitleSub] = React.useState("");
+  const [description, setDescription] = React.useState("");
+  const [date, setDate] = React.useState("");
+  const [error, setError] = React.useState<string | null>(null);
+  const [majors, setMajors] = React.useState<Array<"RPL" | "TKJ" | "Umum">>([]);
+  const [rubrics, setRubrics] = React.useState<string[]>([]);
+  const [attachments, setAttachments] = React.useState<FileUploadValue[]>([]);
 
   const todayStr = React.useMemo(() => {
     const d = new Date();
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, "0");
     const dd = String(d.getDate()).padStart(2, "0");
-    return `${yyyy}-${mm}-${dd}`
-  }, [])
+    return `${yyyy}-${mm}-${dd}`;
+  }, []);
 
   function toggleMajor(m: "RPL" | "TKJ" | "Umum") {
     setMajors((prev) => {
+      // Rule: "Umum" is exclusive - cannot combine with others
       if (m === "Umum") {
-        const next = prev.includes("Umum") ? prev.filter((x) => x !== "Umum") : ["Umum"] as ("RPL" | "TKJ" | "Umum")[]
-        return next
+        // If Umum already selected, unselect it
+        if (prev.includes("Umum")) return [];
+        // Otherwise, select only Umum (clear RPL/TKJ)
+        return ["Umum"];
       }
-      if (prev.includes("Umum")) return prev
-      return (prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]) as ("RPL" | "TKJ" | "Umum")[]
-    })
+
+      // Clicking RPL or TKJ
+      // If Umum is currently selected, remove it and add the new major
+      if (prev.includes("Umum")) {
+        return [m];
+      }
+
+      // Normal toggle for RPL/TKJ (can select both together)
+      if (prev.includes(m)) {
+        return prev.filter((x) => x !== m);
+      }
+      return [...prev, m] as ("RPL" | "TKJ" | "Umum")[];
+    });
   }
 
   const availableRubrics = React.useMemo(() => {
-    if (majors.length === 0) return [] as string[]
-    const all: string[] = []
+    if (majors.length === 0) return [] as string[];
+    const all: string[] = [];
     majors.forEach((m) => {
-      if (m === "Umum") return
-      const cats = RUBRICS_BY_MAJOR[m]
-      Object.values(cats).forEach((list) => list.forEach((i) => { if (!all.includes(i)) all.push(i) }))
-    })
-    return all
-  }, [majors])
+      if (m === "Umum") return;
+      const cats = RUBRICS_BY_MAJOR[m];
+      Object.values(cats).forEach((list) =>
+        list.forEach((i) => {
+          if (!all.includes(i)) all.push(i);
+        }),
+      );
+    });
+    return all;
+  }, [majors]);
 
   function toggleRubric(r: string) {
-    setRubrics((prev) => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r])
+    setRubrics((prev) =>
+      prev.includes(r) ? prev.filter((x) => x !== r) : [...prev, r],
+    );
   }
 
-  const utils = api.useUtils()
+  const utils = api.useUtils();
   const createTask = api.tasks.create.useMutation({
     onSuccess: () => {
-      toast.success("Tugas berhasil dibuat")
-      setOpen(false)
-      void utils.tasks.list.invalidate()
+      toast.success("Tugas berhasil dibuat");
+      setOpen(false);
+      void utils.tasks.list.invalidate();
       onAdd({
         id: "temp",
         titleMain: "",
         titleSub: "",
         description: "",
         date: "",
-      }) // Trigger parent refresh if needed, though invalidate handles it
+      }); // Trigger parent refresh if needed, though invalidate handles it
 
       // Reset form
-      setTitleMain("")
-      setTitleSub("")
-      setDescription("")
-      setDate("")
-      setMajors([])
-      setRubrics([])
-      setAttachments([])
+      setTitleMain("");
+      setTitleSub("");
+      setDescription("");
+      setDate("");
+      setMajors([]);
+      setRubrics([]);
+      setAttachments([]);
     },
     onError: (err) => {
-      toast.error(err.message)
-      setError(err.message)
-    }
-  })
+      toast.error(err.message);
+      setError(err.message);
+    },
+  });
 
   function submit() {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const d = date ? new Date(date) : null
-    if (!titleMain.trim()) { setError("Topik wajib diisi"); return }
-    if (titleMain.length > 100) { setError("Judul besar maksimal 100 karakter"); return }
-    if (titleSub && titleSub.length > 50) { setError("Judul kecil maksimal 50 karakter"); return }
-    if (!description.trim()) { setError("Deskripsi tugas wajib diisi"); return }
-    if (majors.length === 0) { setError("Minimal pilih satu jurusan"); return }
-    if (availableRubrics.length > 0 && rubrics.length === 0) { setError("Minimal pilih satu rubrik penilaian"); return }
-    if (!d || isNaN(d.getTime())) { setError("Tanggal deadline wajib dipilih"); return }
-    if (d < today) { setError("Tanggal deadline tidak boleh lebih awal dari hari ini"); return }
-    setError(null)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const d = date ? new Date(date) : null;
+    if (!titleMain.trim()) {
+      setError("Topik wajib diisi");
+      return;
+    }
+    if (titleMain.length > 100) {
+      setError("Judul besar maksimal 100 karakter");
+      return;
+    }
+    if (titleSub && titleSub.length > 50) {
+      setError("Judul kecil maksimal 50 karakter");
+      return;
+    }
+    if (!description.trim()) {
+      setError("Deskripsi tugas wajib diisi");
+      return;
+    }
+    if (majors.length === 0) {
+      setError("Minimal pilih satu jurusan");
+      return;
+    }
+    if (availableRubrics.length > 0 && rubrics.length === 0) {
+      setError("Minimal pilih satu rubrik penilaian");
+      return;
+    }
+    if (!d || isNaN(d.getTime())) {
+      setError("Tanggal deadline wajib dipilih");
+      return;
+    }
+    if (d < today) {
+      setError("Tanggal deadline tidak boleh lebih awal dari hari ini");
+      return;
+    }
+    setError(null);
 
     // Call mutation
     createTask.mutate({
@@ -128,19 +192,27 @@ export default function AddTaskDialog({ onAdd }: { onAdd: (t: TaskItem) => void 
       description: description, // Note: titleSub is not in schema yet, maybe append to title or desc?
       dueDate: d,
       targetMajor: majors.includes("Umum") ? undefined : majors[0], // Schema only supports one targetMajor for now
-      attachments: attachments.map(a => ({ url: a.url, filename: a.filename })),
-    })
+      attachments: attachments.map((a) => ({
+        url: a.url,
+        filename: a.filename,
+      })),
+    });
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="destructive" size="lg" className="rounded-full">+ Tambah Tugas</Button>
+        <Button variant="destructive" size="lg" className="rounded-full">
+          + Tambah Tugas
+        </Button>
       </DialogTrigger>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Tambah Tugas</DialogTitle>
-          <DialogDescription>Atur topik, subtopik, deskripsi, jurusan, rubrik, dan tanggal deadline.</DialogDescription>
+          <DialogDescription>
+            Atur topik, subtopik, deskripsi, jurusan, rubrik, dan tanggal
+            deadline.
+          </DialogDescription>
         </DialogHeader>
 
         <FieldSet>
@@ -148,31 +220,65 @@ export default function AddTaskDialog({ onAdd }: { onAdd: (t: TaskItem) => void 
             <Field orientation="vertical">
               <FieldTitle>Topik</FieldTitle>
               <FieldContent>
-                <Input value={titleMain} onChange={(e) => setTitleMain(e.target.value)} placeholder="Mis. Implementasi API" aria-invalid={!!error && !titleMain} />
-                <div className="text-xs text-muted-foreground mt-1">Maksimal 100 karakter</div>
+                <Input
+                  value={titleMain}
+                  onChange={(e) => setTitleMain(e.target.value)}
+                  placeholder="Mis. Implementasi API"
+                  aria-invalid={!!error && !titleMain}
+                />
+                <div className="text-muted-foreground mt-1 text-xs">
+                  Maksimal 100 karakter
+                </div>
               </FieldContent>
             </Field>
             <Field orientation="vertical">
               <FieldTitle>Subtopik</FieldTitle>
               <FieldContent>
-                <Input value={titleSub} onChange={(e) => setTitleSub(e.target.value)} placeholder="Mis. Endpoint Auth" aria-invalid={!!error && titleSub.length > 50} />
-                <div className="text-xs text-muted-foreground mt-1">Opsional, maksimal 50 karakter</div>
+                <Input
+                  value={titleSub}
+                  onChange={(e) => setTitleSub(e.target.value)}
+                  placeholder="Mis. Endpoint Auth"
+                  aria-invalid={!!error && titleSub.length > 50}
+                />
+                <div className="text-muted-foreground mt-1 text-xs">
+                  Opsional, maksimal 50 karakter
+                </div>
               </FieldContent>
             </Field>
             <Field orientation="vertical">
               <FieldTitle>Deskripsi</FieldTitle>
               <FieldContent>
-                <div className="flex items-center gap-2 mb-2 text-xs">
-                  <button type="button" className="px-2 py-1 rounded-(--radius-sm) border" onClick={() => document.execCommand('bold', false)}>B</button>
-                  <button type="button" className="px-2 py-1 rounded-(--radius-sm) border" onClick={() => document.execCommand('italic', false)}><i>I</i></button>
-                  <button type="button" className="px-2 py-1 rounded-(--radius-sm) border" onClick={() => document.execCommand('underline', false)}><u>U</u></button>
+                <div className="mb-2 flex items-center gap-2 text-xs">
+                  <button
+                    type="button"
+                    className="rounded-(--radius-sm) border px-2 py-1"
+                    onClick={() => document.execCommand("bold", false)}
+                  >
+                    B
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-(--radius-sm) border px-2 py-1"
+                    onClick={() => document.execCommand("italic", false)}
+                  >
+                    <i>I</i>
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-(--radius-sm) border px-2 py-1"
+                    onClick={() => document.execCommand("underline", false)}
+                  >
+                    <u>U</u>
+                  </button>
                 </div>
                 <div
                   contentEditable
                   role="textbox"
                   aria-multiline
                   className="file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input min-h-24 w-full min-w-0 border bg-transparent px-3 py-2 text-base shadow-xs outline-none md:text-sm"
-                  onInput={(e) => setDescription((e.target as HTMLElement).innerHTML)}
+                  onInput={(e) =>
+                    setDescription((e.target as HTMLElement).innerHTML)
+                  }
                 />
               </FieldContent>
             </Field>
@@ -197,17 +303,20 @@ export default function AddTaskDialog({ onAdd }: { onAdd: (t: TaskItem) => void 
             <Field orientation="vertical">
               <FieldTitle>Pilih Jurusan</FieldTitle>
               <FieldContent>
-                <div className="max-h-[400px] overflow-auto grid grid-cols-2 gap-3">
+                <div className="grid max-h-[400px] grid-cols-2 gap-3 overflow-auto">
                   {["RPL", "TKJ", "Umum"].map((m) => (
                     <label
                       key={m}
-                      className={`flex items-center justify-between gap-2 border rounded-(--radius-sm) px-3 py-2 cursor-pointer transition-transform active:scale-[0.98] ${majors.includes(m as any) ? (m === "Umum" ? "ring-1 ring-muted-foreground/40 bg-accent" : "ring-1 ring-primary bg-secondary") : "bg-card"}`}
+                      className={`flex cursor-pointer items-center justify-between gap-2 rounded-(--radius-sm) border px-3 py-2 transition-transform active:scale-[0.98] ${majors.includes(m as any) ? (m === "Umum" ? "ring-muted-foreground/40 bg-accent ring-1" : "ring-primary bg-secondary ring-1") : "bg-card"}`}
                     >
-                      <span className={`text-sm ${m === "Umum" ? "font-medium text-muted-foreground" : ""}`}>{m}</span>
+                      <span
+                        className={`text-sm ${m === "Umum" ? "text-muted-foreground font-medium" : ""}`}
+                      >
+                        {m}
+                      </span>
                       <input
                         type="checkbox"
-                        className="size-4 disabled:opacity-50 disabled:cursor-not-allowed"
-                        disabled={majors.includes("Umum") && m !== "Umum"}
+                        className="size-4"
                         checked={majors.includes(m as any)}
                         onChange={() => toggleMajor(m as any)}
                       />
@@ -221,11 +330,19 @@ export default function AddTaskDialog({ onAdd }: { onAdd: (t: TaskItem) => void 
               <Field orientation="vertical">
                 <FieldTitle>Rubrik Penilaian</FieldTitle>
                 <FieldContent>
-                  <div className="max-h-[500px] overflow-auto grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="grid max-h-[500px] grid-cols-1 gap-3 overflow-auto md:grid-cols-2">
                     {availableRubrics.map((r) => (
-                      <label key={r} className={`flex items-center justify-between gap-2 border rounded-(--radius-sm) px-3 py-2 cursor-pointer transition-transform active:scale-[0.98] ${rubrics.includes(r) ? "ring-1 ring-primary bg-secondary" : "bg-card"}`}>
+                      <label
+                        key={r}
+                        className={`flex cursor-pointer items-center justify-between gap-2 rounded-(--radius-sm) border px-3 py-2 transition-transform active:scale-[0.98] ${rubrics.includes(r) ? "ring-primary bg-secondary ring-1" : "bg-card"}`}
+                      >
                         <span className="text-sm">{r}</span>
-                        <input type="checkbox" className="size-4" checked={rubrics.includes(r)} onChange={() => toggleRubric(r)} />
+                        <input
+                          type="checkbox"
+                          className="size-4"
+                          checked={rubrics.includes(r)}
+                          onChange={() => toggleRubric(r)}
+                        />
                       </label>
                     ))}
                   </div>
@@ -235,7 +352,13 @@ export default function AddTaskDialog({ onAdd }: { onAdd: (t: TaskItem) => void 
             <Field orientation="vertical">
               <FieldTitle>Tanggal Deadline</FieldTitle>
               <FieldContent>
-                <Input type="date" min={todayStr} value={date} onChange={(e) => setDate(e.target.value)} aria-invalid={!!error && (!date)} />
+                <Input
+                  type="date"
+                  min={todayStr}
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  aria-invalid={!!error && !date}
+                />
               </FieldContent>
             </Field>
           </FieldGroup>
@@ -244,12 +367,25 @@ export default function AddTaskDialog({ onAdd }: { onAdd: (t: TaskItem) => void 
         {error && <div className="text-destructive text-sm">{error}</div>}
 
         <DialogFooter>
-          <Button variant="secondary" onClick={() => setOpen(false)}>Batal</Button>
-          <Button variant="destructive" onClick={submit} disabled={!titleMain || !description || !date || majors.length === 0 || (availableRubrics.length > 0 && rubrics.length === 0) || createTask.isPending}>
+          <Button variant="secondary" onClick={() => setOpen(false)}>
+            Batal
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={submit}
+            disabled={
+              !titleMain ||
+              !description ||
+              !date ||
+              majors.length === 0 ||
+              (availableRubrics.length > 0 && rubrics.length === 0) ||
+              createTask.isPending
+            }
+          >
             {createTask.isPending ? "Menyimpan..." : "Simpan"}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
