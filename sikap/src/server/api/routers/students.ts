@@ -578,6 +578,7 @@ export const studentsRouter = createTRPCRouter({
     return {
       id: sp.id,
       userId: sp.userId,
+      code: ctx.session.user.code,
       name: sp.user?.name ?? "",
       email: sp.user?.email ?? "",
       nis: sp.nis ?? null,

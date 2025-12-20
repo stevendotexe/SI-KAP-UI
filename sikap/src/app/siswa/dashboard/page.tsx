@@ -77,6 +77,7 @@ export default function DashboardPage() {
 
   // Fetch today's attendance to persist state across refreshes
   const todayAttendance = api.attendances.getTodayLog.useQuery();
+  const me = api.students.me.useQuery();
 
   // Calculate real-time statistics
   const todoCount =
@@ -431,7 +432,9 @@ export default function DashboardPage() {
             <h1 className="text-2xl font-semibold sm:text-3xl">
               Selamat datang, Siswa!
             </h1>
-            <p className="text-muted-foreground mt-1">ID Siswa: 010101</p>
+            <p className="text-muted-foreground mt-1">
+              Kode Siswa: {me.data?.code}
+            </p>
             <div className="mt-1 flex flex-col gap-6">
               {/* NOTE: Attendance form posts to /api/attendance endpoint. Backend implementation may be required. */}
               <div className="order-1 md:order-2">
