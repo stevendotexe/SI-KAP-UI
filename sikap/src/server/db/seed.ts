@@ -214,11 +214,18 @@ async function main() {
     studentProfiles.push(sp);
   }
 
-  // Placements
+  // Placements - assign most students to Mentor Utama for dashboard display
   console.log("📍 Creating placements...");
   const placements = [];
-  for (const sp of studentProfiles) {
-    const mentor = faker.helpers.arrayElement(mentorProfiles);
+  const mentorUtamaProfile = mentorProfiles[0]; // First mentor is "Mentor Utama"
+
+  for (let idx = 0; idx < studentProfiles.length; idx++) {
+    const sp = studentProfiles[idx];
+    // Assign 70% of students to Mentor Utama for better dashboard data
+    const mentor =
+      idx < Math.ceil(studentProfiles.length * 0.7)
+        ? mentorUtamaProfile
+        : faker.helpers.arrayElement(mentorProfiles);
     const program = faker.helpers.arrayElement(programs);
     if (!mentor?.companyId || !program?.id || !sp?.id) continue;
 
@@ -277,28 +284,77 @@ async function main() {
       }
     }
 
-    // Attendance
-    const numDays = 15;
+    // Attendance - Create 6 months of historical data for better charts
+    const monthsOfData = 6;
     const today = new Date();
-    for (let k = 0; k < numDays; k++) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - k);
-      const dateStr = d.toISOString().split("T")[0]!;
+    for (let m = 0; m < monthsOfData; m++) {
+      // Create 15-20 attendance entries per month
+      const entriesPerMonth = faker.number.int({ min: 15, max: 20 });
+      for (let k = 0; k < entriesPerMonth; k++) {
+        const d = new Date(today);
+        d.setMonth(d.getMonth() - m);
+        d.setDate(faker.number.int({ min: 1, max: 28 }));
+        const dateStr = d.toISOString().split("T")[0]!;
 
-      await db.insert(schema.attendanceLog).values({
-        placementId: pl.id,
-        date: dateStr,
-        status: faker.helpers.arrayElement([
-          "present",
-          "present",
-          "late",
-          "absent",
-        ]),
-        checkInAt: new Date(d.setHours(8, 0, 0)),
-        checkOutAt: new Date(d.setHours(17, 0, 0)),
-        latitude: String(faker.location.latitude()),
-        longitude: String(faker.location.longitude()),
-      });
+        // Check if date already exists to avoid conflicts
+        try {
+          await db.insert(schema.attendanceLog).values({
+            placementId: pl.id,
+            date: dateStr,
+            status: faker.helpers.arrayElement([
+              "present",
+              "present",
+              "present",
+              "late",
+              "absent",
+              "excused",
+            ]),
+            checkInAt: new Date(d.setHours(8, 0, 0)),
+            checkOutAt: new Date(d.setHours(17, 0, 0)),
+            latitude: String(faker.location.latitude()),
+            longitude: String(faker.location.longitude()),
+          });
+        } catch {
+          // Ignore duplicate key errors
+        }
+      }
+    }
+
+    // Assessments - Create 6 months of score data for better charts
+    for (let m = 0; m < monthsOfData; m++) {
+      const assessmentDate = new Date(today);
+      assessmentDate.setMonth(assessmentDate.getMonth() - m);
+      assessmentDate.setDate(15); // Mid-month
+
+      const [assess] = await db
+        .insert(schema.assessment)
+        .values({
+          placementId: pl.id,
+          evaluatorMentorId: pl.mentorId,
+          totalScore: String(faker.number.int({ min: 70, max: 95 })),
+          comments: faker.lorem.sentence(),
+          createdAt: assessmentDate,
+        })
+        .returning();
+
+      if (assess?.id) {
+        // Add assessment items
+        const criteria = [
+          "Kedisiplinan",
+          "Keterampilan Teknis",
+          "Komunikasi",
+          "Kerja Tim",
+        ];
+        for (let c = 0; c < criteria.length; c++) {
+          await db.insert(schema.assessmentItem).values({
+            assessmentId: assess.id,
+            criterion: criteria[c]!,
+            maxScore: "100",
+            score: String(faker.number.int({ min: 60, max: 100 })),
+            position: c,
+          });
+        }
+      }
     }
 
     // Final Report for random students

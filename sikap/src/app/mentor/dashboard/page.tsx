@@ -8,8 +8,8 @@ import { getSession } from "@/server/better-auth/server";
 import { headers } from "next/headers";
 
 import StatisticCard from "@/components/dashboard/StatisticCard";
-import AttendanceLine from "@/components/students/AttendanceLine";
-import PieChart from "@/components/dashboard/PieChart";
+import DashboardLineChart from "@/components/dashboard/DashboardLineChart";
+import DashboardPieChart from "@/components/dashboard/DashboardPieChart";
 import AttendanceTable from "@/components/dashboard/AttendanceTable";
 import StatusButtons from "@/components/dashboard/StatusButtons";
 
@@ -34,11 +34,24 @@ export default async function DashboardPage() {
     const ctx = await createTRPCContext({ headers: await headers() });
     const caller = createCaller(ctx);
 
+    // Calculate 6 months ago for historical data
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
     const results = await Promise.allSettled([
       caller.dashboards.getDashboardCounts({}),
-      caller.dashboards.getAverageStudentScores({ granularity: "month" }),
-      caller.dashboards.getAverageStudentAttendances({ granularity: "month" }),
-      caller.dashboards.getStudentCountPerPeriod({ granularity: "month" }),
+      caller.dashboards.getAverageStudentScores({
+        granularity: "month",
+        from: sixMonthsAgo,
+      }),
+      caller.dashboards.getAverageStudentAttendances({
+        granularity: "month",
+        from: sixMonthsAgo,
+      }),
+      caller.dashboards.getStudentCountPerPeriod({
+        granularity: "month",
+        from: sixMonthsAgo,
+      }),
       caller.dashboards.getAttendancePieChart({}),
       caller.attendances.detail({ date: new Date() }),
     ]);
@@ -135,7 +148,7 @@ export default async function DashboardPage() {
           <div className="lg:col-span-6">
             <StatisticCard
               title="Rata - Rata Skor Siswa"
-              subtitle="Keseluruhan"
+              subtitle={`Tahun ${new Date().getFullYear()}`}
               value={
                 avgScores.length
                   ? `${Math.round(avgScores[avgScores.length - 1]!.count)}`
@@ -143,7 +156,7 @@ export default async function DashboardPage() {
               }
             >
               <div className="mt-2">
-                <AttendanceLine data={avgScores} />
+                <DashboardLineChart data={avgScores} />
               </div>
               <div className="text-muted-foreground mt-2 text-xs">
                 Periode hingga hari ini
@@ -154,7 +167,7 @@ export default async function DashboardPage() {
           <div className="lg:col-span-6">
             <StatisticCard
               title="Rata - Rata Kehadiran Siswa"
-              subtitle="Keseluruhan"
+              subtitle={`Tahun ${new Date().getFullYear()}`}
               value={
                 avgAttendances.length
                   ? `${Math.round(avgAttendances[avgAttendances.length - 1]!.count)}%`
@@ -162,7 +175,7 @@ export default async function DashboardPage() {
               }
             >
               <div className="mt-2">
-                <AttendanceLine data={avgAttendances} />
+                <DashboardLineChart data={avgAttendances} />
               </div>
               <div className="text-muted-foreground mt-2 text-xs">
                 Periode hingga hari ini
@@ -178,7 +191,7 @@ export default async function DashboardPage() {
               value={studentGrowth.length ? `${growthPercent}%` : "-"}
             >
               <div className="mt-2">
-                <AttendanceLine data={studentGrowth} height={256} padding={4} />
+                <DashboardLineChart data={studentGrowth} height={200} />
               </div>
               {periodRange && (
                 <div className="text-muted-foreground mt-2 text-xs">
@@ -194,7 +207,9 @@ export default async function DashboardPage() {
               </h3>
               <div className="flex flex-col items-center gap-4 sm:flex-row">
                 <div className="flex h-64 w-full items-center justify-center sm:w-64">
-                  <PieChart data={pieData.filter((p) => p.name !== "late")} />
+                  <DashboardPieChart
+                    data={pieData.filter((p) => p.name !== "late")}
+                  />
                 </div>
                 <div className="flex-1">
                   <div className="text-muted-foreground text-sm">
