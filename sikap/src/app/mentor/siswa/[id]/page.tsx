@@ -109,27 +109,27 @@ export default async function Page({
     status: t.status as any,
   }));
 
-  // Create score series from reports
+  // Use score history from API (weekly averages)
   const scoreSeries: SeriesPoint[] =
-    backendReports.length > 0
-      ? backendReports.map((r, index) => ({
-          period: `M${index + 1}`,
-          count: Number(r.score ?? 0),
-        }))
+    studentData.scoreHistory && studentData.scoreHistory.length > 0
+      ? studentData.scoreHistory
       : [
-          { period: "M1", count: 0 },
-          { period: "M2", count: 0 },
-          { period: "M3", count: 0 },
-          { period: "M4", count: 0 },
+          { period: "W1", count: 0 },
+          { period: "W2", count: 0 },
+          { period: "W3", count: 0 },
+          { period: "W4", count: 0 },
         ];
 
-  // Create attendance series from attendance data
-  const attendanceSeries: SeriesPoint[] = [
-    { period: "M1", count: attendance.percent },
-    { period: "M2", count: attendance.percent },
-    { period: "M3", count: attendance.percent },
-    { period: "M4", count: attendance.percent },
-  ];
+  // Use attendance history from API (weekly percentages)
+  const attendanceSeries: SeriesPoint[] =
+    studentData.attendanceHistory && studentData.attendanceHistory.length > 0
+      ? studentData.attendanceHistory
+      : [
+          { period: "W1", count: attendance.percent },
+          { period: "W2", count: attendance.percent },
+          { period: "W3", count: attendance.percent },
+          { period: "W4", count: attendance.percent },
+        ];
 
   // Map info object
   const info = {
@@ -149,6 +149,7 @@ export default async function Page({
     semester: profile.semester ?? 0,
     nis: profile.nis ?? "-",
     cohort: profile.cohort ?? "-",
+    code: profile.code ?? null,
   };
 
   return (

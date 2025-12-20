@@ -14,6 +14,9 @@ interface DashboardLineChartProps {
   data: Point[];
   height?: number;
   color?: string;
+  xAxisLabel?: string; // Optional label like "Minggu" shown before numbers
+  valueLabel?: string; // Label for the value in tooltip (e.g., "Nilai", "Kehadiran")
+  valueSuffix?: string; // Suffix for value (e.g., "%", " poin")
 }
 
 const BULAN_INDONESIA = [
@@ -31,8 +34,15 @@ const BULAN_INDONESIA = [
   "Des",
 ];
 
-// Convert "YYYY-MM" to Indonesian month abbreviation
-function formatPeriodToMonth(period: string): string {
+// Convert period string to Indonesian human-readable format
+// For week format, just return index-based label
+function formatPeriodLabel(period: string, index: number): string {
+  // Handle ISO week format: return just the index + 1
+  if (period.includes("-W") || period.includes('"W"')) {
+    return String(index + 1);
+  }
+
+  // Handle month format: "2025-06" -> "Jun"
   const parts = period.split("-");
   if (parts.length >= 2) {
     const month = parseInt(parts[1]!, 10);
@@ -40,20 +50,17 @@ function formatPeriodToMonth(period: string): string {
       return BULAN_INDONESIA[month - 1]!;
     }
   }
+
   return period;
 }
-
-const chartConfig = {
-  count: {
-    label: "Nilai",
-    color: "var(--chart-1)",
-  },
-} satisfies ChartConfig;
 
 export default function DashboardLineChart({
   data,
   height = 120,
   color = "var(--chart-1)",
+  xAxisLabel,
+  valueLabel = "Nilai",
+  valueSuffix = "",
 }: DashboardLineChartProps) {
   if (!data.length) {
     return (
@@ -66,32 +73,63 @@ export default function DashboardLineChart({
     );
   }
 
+  // Pre-format data with index-based labels and formatted display value
+  const formattedData = data.map((item, index) => ({
+    ...item,
+    label: formatPeriodLabel(item.period, index),
+    displayValue: `${item.count}${valueSuffix}`,
+  }));
+
+  // Dynamic chart config based on valueLabel
+  const chartConfig = {
+    count: {
+      label: valueLabel,
+      color: color,
+    },
+  } satisfies ChartConfig;
+
   return (
-    <ChartContainer config={chartConfig} className="w-full" style={{ height }}>
-      <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-        <XAxis
-          dataKey="period"
-          tickLine={false}
-          axisLine={false}
-          tickMargin={8}
-          tick={{ fontSize: 10 }}
-          tickFormatter={formatPeriodToMonth}
-        />
-        <YAxis hide domain={["dataMin - 5", "dataMax + 5"]} />
-        <ChartTooltip
-          cursor={false}
-          content={<ChartTooltipContent hideIndicator />}
-        />
-        <Line
-          type="monotone"
-          dataKey="count"
-          stroke={color}
-          strokeWidth={2.5}
-          dot={{ r: 3, fill: color }}
-          activeDot={{ r: 5, fill: color }}
-        />
-      </LineChart>
-    </ChartContainer>
+    <div>
+      {xAxisLabel && (
+        <div className="text-muted-foreground mb-1 text-xs">{xAxisLabel}</div>
+      )}
+      <ChartContainer
+        config={chartConfig}
+        className="w-full"
+        style={{ height }}
+      >
+        <LineChart
+          data={formattedData}
+          margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+        >
+          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+          <XAxis
+            dataKey="label"
+            tickLine={false}
+            axisLine={false}
+            tickMargin={8}
+            tick={{ fontSize: 10 }}
+          />
+          <YAxis hide domain={["dataMin - 5", "dataMax + 5"]} />
+          <ChartTooltip
+            cursor={false}
+            content={
+              <ChartTooltipContent
+                hideIndicator
+                formatter={(value) => `${value}${valueSuffix}`}
+              />
+            }
+          />
+          <Line
+            type="monotone"
+            dataKey="count"
+            stroke={color}
+            strokeWidth={2.5}
+            dot={{ r: 3, fill: color }}
+            activeDot={{ r: 5, fill: color }}
+          />
+        </LineChart>
+      </ChartContainer>
+    </div>
   );
 }

@@ -8,6 +8,7 @@ import StudentReportTable, {
   type StudentTask,
 } from "@/components/students/StudentReportTable";
 import StudentInfo from "@/components/students/StudentInfo";
+import DeleteStudentSection from "@/components/students/DeleteStudentSection";
 
 type SeriesPoint = { period: string; count: number };
 type Info = {
@@ -27,6 +28,7 @@ type Info = {
   nis: string;
   semester: number;
   cohort: string;
+  code: string | null;
 };
 
 export default function ClientSection({
@@ -63,7 +65,14 @@ export default function ClientSection({
           onReviewedChange={setReviewed}
         />
       ) : (
-        <StudentInfo info={info} />
+        <>
+          <StudentInfo info={info} />
+          <DeleteStudentSection
+            userId={info.userId}
+            studentCode={info.code}
+            studentName={info.name}
+          />
+        </>
       )}
     </div>
   );

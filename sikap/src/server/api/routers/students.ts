@@ -250,7 +250,11 @@ export const studentsRouter = createTRPCRouter({
           sql`to_char(date_trunc('week', ${assessment.createdAt}::timestamp), 'IYYY-"W"IW')`,
         );
 
-      // Attendance History (Weekly Percentage)
+      // Attendance History (Weekly Percentage) - Last 7 weeks only
+      const sevenWeeksAgo = new Date();
+      sevenWeeksAgo.setDate(sevenWeeksAgo.getDate() - 49); // 7 weeks * 7 days
+      const sevenWeeksAgoStr = sevenWeeksAgo.toISOString().slice(0, 10);
+
       const attendanceHistoryRows = await ctx.db
         .select({
           period: sql<string>`to_char(date_trunc('week', ${attendanceLog.date}::timestamp), 'IYYY-"W"IW')`,
@@ -259,7 +263,12 @@ export const studentsRouter = createTRPCRouter({
         })
         .from(attendanceLog)
         .innerJoin(placement, eq(attendanceLog.placementId, placement.id))
-        .where(eq(placement.studentId, sp.id))
+        .where(
+          and(
+            eq(placement.studentId, sp.id),
+            sql`${attendanceLog.date}::date >= ${sevenWeeksAgoStr}::date`,
+          ),
+        )
         .groupBy(
           sql`to_char(date_trunc('week', ${attendanceLog.date}::timestamp), 'IYYY-"W"IW')`,
           attendanceLog.status,
@@ -432,6 +441,9 @@ export const studentsRouter = createTRPCRouter({
         birthDate: z.date().optional(),
         address: z.string().optional(),
         semester: z.number().optional(),
+        gender: z.string().nullable().optional(),
+        startDate: z.date().nullable().optional(),
+        endDate: z.date().nullable().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -443,7 +455,6 @@ export const studentsRouter = createTRPCRouter({
           password: input.password,
           name: input.name,
           role: "student",
-          code: code,
         } as any,
         headers: ctx.headers,
       });
@@ -451,6 +462,10 @@ export const studentsRouter = createTRPCRouter({
         where: eq(user.email, input.email),
       });
       if (!u) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Update the code field directly since better-auth createUser doesn't save additionalFields
+      await ctx.db.update(user).set({ code }).where(eq(user.id, u.id));
+
       await ctx.db.insert(studentProfile).values({
         userId: u.id,
         school: input.school ?? null,
@@ -464,6 +479,7 @@ export const studentsRouter = createTRPCRouter({
           : null,
         address: input.address ?? null,
         semester: input.semester ?? null,
+        gender: input.gender ?? null,
       });
       const sp = await ctx.db.query.studentProfile.findFirst({
         where: eq(studentProfile.userId, u.id),
@@ -481,7 +497,12 @@ export const studentsRouter = createTRPCRouter({
             mentorId: mp.id,
             companyId: mp.companyId,
             status: "active" as any,
-            startDate: new Date().toISOString().slice(0, 10),
+            startDate: input.startDate
+              ? input.startDate.toISOString().slice(0, 10)
+              : new Date().toISOString().slice(0, 10),
+            endDate: input.endDate
+              ? input.endDate.toISOString().slice(0, 10)
+              : undefined,
           });
         }
       }
