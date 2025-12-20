@@ -176,14 +176,18 @@ export default function StudentInfo({ info }: { info: Info }) {
           />
         </div>
         <div>
-          <div className="mb-1 text-sm font-semibold">Jurusan</div>
+          <div className="mb-1 text-sm font-semibold">Kompetensi Keahlian</div>
           <Select value={form.major} onValueChange={(v) => update("major", v)}>
             <SelectTrigger className="rounded-lg">
-              <SelectValue placeholder="Pilih Jurusan" />
+              <SelectValue placeholder="Pilih Kompetensi" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="RPL">RPL</SelectItem>
-              <SelectItem value="TKJ">TKJ</SelectItem>
+              <SelectItem value="RPL">
+                Rekayasa Perangkat Lunak (RPL)
+              </SelectItem>
+              <SelectItem value="TKJ">
+                Teknik Komputer dan Jaringan (TKJ)
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
