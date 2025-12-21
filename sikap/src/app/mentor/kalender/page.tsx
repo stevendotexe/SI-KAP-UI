@@ -68,6 +68,8 @@ type CalendarEvent = {
   organizerName: string | null
   colorHex: string | null
   placementId: number | null
+  description: string | null
+  organizerLogoUrl: string | null
 }
 
 
@@ -289,7 +291,6 @@ export default function Page() {
                   <div key={wi} className="relative">
                     <div className="grid grid-cols-7">
                       {week.map((c, ci) => (
-                        // Use min-h-28 to ensure consistent grid, but allow expansion
                         <div
                           key={ci}
                           className={`min-h-28 border ${c.inMonth ? "bg-card" : "bg-muted/40"}`}

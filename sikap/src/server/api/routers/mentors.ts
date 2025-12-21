@@ -197,12 +197,14 @@ export const mentorsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const existing = await ctx.db.query.user.findFirst({ where: eq(user.email, input.email) });
       if (existing) throw new TRPCError({ code: "CONFLICT" });
+      const userCode = `M-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
       await auth.api.createUser({
-        body: { email: input.email, password: input.password, name: input.name, role: "mentor" },
+        body: { email: input.email, password: input.password, name: input.name, role: "mentor", code: userCode } as any,
         headers: ctx.headers,
       });
       const u = await ctx.db.query.user.findFirst({ where: eq(user.email, input.email) });
       if (!u) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await ctx.db.update(user).set({ code: userCode }).where(eq(user.id, u.id));
       const inserted = await ctx.db
         .insert(mentorProfile)
         .values({ userId: u.id, companyId: input.companyId ?? null, phone: input.phone ?? null })

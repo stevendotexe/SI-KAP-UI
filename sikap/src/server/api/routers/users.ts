@@ -82,18 +82,24 @@ export const usersRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      // Generate a simple unique code
+      const code = `U-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
       await auth.api.createUser({
         body: {
           email: input.email,
           password: input.password,
           name: input.name,
           role: input.role ?? "student",
-        },
+          code,
+        } as any,
         headers: ctx.headers,
       });
       const created = await ctx.db.query.user.findFirst({
         where: eq(user.email, input.email),
       });
+      if (created) {
+        await ctx.db.update(user).set({ code }).where(eq(user.id, created.id));
+      }
       return created ?? null;
     }),
 

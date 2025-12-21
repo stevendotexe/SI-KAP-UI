@@ -205,22 +205,28 @@ export const studentsRouter = createTRPCRouter({
         .where(eq(placement.studentId, sp.id))
         .orderBy(task.dueDate);
 
-      // Score History (Weekly Average)
+      // Score History (Daily Average from Tasks)
       const scoreHistoryRows = await ctx.db
         .select({
-          period: sql<string>`to_char(date_trunc('week', ${assessment.createdAt}::timestamp), 'IYYY-"W"IW')`,
-          avgScore: sql<number>`avg(${assessment.totalScore})`,
+          period: sql<string>`to_char(${task.submittedAt}, 'YYYY-MM-DD')`,
+          avgScore: sql<number>`avg(${task.score})`,
         })
-        .from(assessment)
-        .innerJoin(placement, eq(assessment.placementId, placement.id))
-        .where(eq(placement.studentId, sp.id))
-        .groupBy(sql`to_char(date_trunc('week', ${assessment.createdAt}::timestamp), 'IYYY-"W"IW')`)
-        .orderBy(sql`to_char(date_trunc('week', ${assessment.createdAt}::timestamp), 'IYYY-"W"IW')`);
+        .from(task)
+        .innerJoin(placement, eq(task.placementId, placement.id))
+        .where(
+          and(
+            eq(placement.studentId, sp.id),
+            eq(task.status, "approved"),
+            sql`${task.submittedAt} is not null`
+          )
+        )
+        .groupBy(sql`to_char(${task.submittedAt}, 'YYYY-MM-DD')`)
+        .orderBy(sql`to_char(${task.submittedAt}, 'YYYY-MM-DD')`);
 
-      // Attendance History (Weekly Percentage)
+      // Attendance History (Daily Percentage)
       const attendanceHistoryRows = await ctx.db
         .select({
-          period: sql<string>`to_char(date_trunc('week', ${attendanceLog.date}::timestamp), 'IYYY-"W"IW')`,
+          period: sql<string>`to_char(${attendanceLog.date}, 'YYYY-MM-DD')`,
           status: attendanceLog.status,
           count: sql<number>`count(*)`,
         })
@@ -228,10 +234,10 @@ export const studentsRouter = createTRPCRouter({
         .innerJoin(placement, eq(attendanceLog.placementId, placement.id))
         .where(eq(placement.studentId, sp.id))
         .groupBy(
-          sql`to_char(date_trunc('week', ${attendanceLog.date}::timestamp), 'IYYY-"W"IW')`,
+          sql`to_char(${attendanceLog.date}, 'YYYY-MM-DD')`,
           attendanceLog.status,
         )
-        .orderBy(sql`to_char(date_trunc('week', ${attendanceLog.date}::timestamp), 'IYYY-"W"IW')`);
+        .orderBy(sql`to_char(${attendanceLog.date}, 'YYYY-MM-DD')`);
 
       const attendanceHistoryMap: Record<string, { present: number; total: number }> = {};
       for (const r of attendanceHistoryRows) {
@@ -363,12 +369,18 @@ export const studentsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      // Generate a simple unique code
+      const code = `S-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
       await auth.api.createUser({
-        body: { email: input.email, password: input.password, name: input.name, role: "student" },
+        body: { email: input.email, password: input.password, name: input.name, role: "student", code } as any,
         headers: ctx.headers,
       });
       const u = await ctx.db.query.user.findFirst({ where: eq(user.email, input.email) });
       if (!u) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Force update code to ensure it's set correctly (workaround for better-auth stripping it)
+      await ctx.db.update(user).set({ code }).where(eq(user.id, u.id));
+
       await ctx.db.insert(studentProfile).values({
         userId: u.id,
         school: input.school ?? null,

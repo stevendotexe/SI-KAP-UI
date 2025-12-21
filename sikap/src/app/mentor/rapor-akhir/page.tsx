@@ -169,7 +169,7 @@ export default function RaporAkhirPage() {
                         {student.averageScore}
                       </td>
                       <td className="px-4 py-3">
-                        <Link href={`/mentor/rapor-akhir/${student.id}`}>
+                        <Link href={`/mentor/rapor-akhir/${student.placementId}`}>
                           <Button
                             size="sm"
                             variant="ghost"

@@ -163,71 +163,98 @@ export const finalReportsRouter = createTRPCRouter({
   detail: adminOrMentorProcedure
     .meta(docs.detail)
     .use(requirePermissions({ finalReport: ["read"], placement: ["read"], studentProfile: ["read"] }))
-    .input(z.object({ finalReportId: z.number() }))
+    .input(z.object({ placementId: z.number() }))
     .query(async ({ ctx, input }) => {
+      // 1. Validate mentor access first
+      if (ctx.session.user.role === "mentor") {
+        await enforceMentorScope(ctx, input.placementId);
+      }
+
+      // 2. Get Placement + Student Info
       const row = await ctx.db
         .select({
-          id: finalReport.id,
           placementId: placement.id,
+          status: placement.status,
           studentId: studentProfile.id,
           studentName: user.name,
           studentCode: studentProfile.nis,
           school: studentProfile.school,
           cohort: studentProfile.cohort,
-          status: placement.status,
           major: studentProfile.major,
+          finalReportId: finalReport.id, // Can be null
         })
-        .from(finalReport)
-        .innerJoin(placement, eq(finalReport.placementId, placement.id))
+        .from(placement)
         .innerJoin(studentProfile, eq(placement.studentId, studentProfile.id))
         .innerJoin(user, eq(studentProfile.userId, user.id))
-        .where(eq(finalReport.id, input.finalReportId))
+        .leftJoin(finalReport, eq(finalReport.placementId, placement.id))
+        .where(eq(placement.id, input.placementId))
         .limit(1);
-      const fr = row[0];
-      if (!fr) throw new TRPCError({ code: "NOT_FOUND" });
-      if (ctx.session.user.role === "mentor") {
-        const p = await ctx.db.query.placement.findFirst({ where: eq(placement.id, fr.placementId) });
-        if (!p || p.mentorId !== (await getMentorId(ctx))) throw new TRPCError({ code: "FORBIDDEN" });
+
+      const p = row[0];
+      if (!p) throw new TRPCError({ code: "NOT_FOUND", message: "Placement info not found" });
+
+      // 3. Get Scores (if final report exists)
+      let personality: { id: number; name: string; score: number }[] = [];
+      let technical: { id: number; name: string; score: number }[] = [];
+      let totalScore = 0;
+      let averageScore = 0;
+
+      if (p.finalReportId) {
+        const scores = await ctx.db
+          .select({
+            id: finalReportScore.id,
+            competencyId: competencyTemplate.id,
+            name: competencyTemplate.name,
+            category: competencyTemplate.category,
+            major: competencyTemplate.major,
+            score: finalReportScore.score,
+          })
+          .from(finalReportScore)
+          .innerJoin(competencyTemplate, eq(finalReportScore.competencyTemplateId, competencyTemplate.id))
+          .where(eq(finalReportScore.finalReportId, p.finalReportId))
+          .orderBy(competencyTemplate.position, competencyTemplate.id);
+
+        const pScores = scores.filter((s) => s.category === "personality");
+        const tScores = scores.filter((s) => s.category === "technical");
+
+        personality = pScores.map((s) => ({ id: s.competencyId, name: s.name, score: Number(s.score ?? 0) }));
+        technical = tScores.map((s) => ({ id: s.competencyId, name: s.name, score: Number(s.score ?? 0) }));
+
+        totalScore = scores.reduce((acc, s) => acc + Number(s.score ?? 0), 0);
+        averageScore = scores.length === 0 ? 0 : Number((totalScore / scores.length).toFixed(2));
+      } else {
+        // Fetch templates for new report
+        const templates = await ctx.db
+          .select()
+          .from(competencyTemplate)
+          .orderBy(competencyTemplate.position);
+
+        // Filter relevant templates
+        const pTemplates = templates.filter(t => t.category === "personality" && (t.major === "GENERAL" || t.major === null));
+        const tTemplates = templates.filter(t => t.category === "technical" && t.major === p.major);
+
+        personality = pTemplates.map(t => ({ id: t.id, name: t.name, score: 0 }));
+        technical = tTemplates.map(t => ({ id: t.id, name: t.name, score: 0 }));
       }
 
-      const scores = await ctx.db
-        .select({
-          id: finalReportScore.id,
-          competencyId: competencyTemplate.id,
-          name: competencyTemplate.name,
-          category: competencyTemplate.category,
-          major: competencyTemplate.major,
-          score: finalReportScore.score,
-          weight: competencyTemplate.weight,
-        })
-        .from(finalReportScore)
-        .innerJoin(competencyTemplate, eq(finalReportScore.competencyTemplateId, competencyTemplate.id))
-        .where(eq(finalReportScore.finalReportId, input.finalReportId))
-        .orderBy(competencyTemplate.position, competencyTemplate.id);
-
-      const personality = scores.filter((s) => s.category === "personality");
-      const technical = scores.filter((s) => s.category === "technical");
-      const totalScore = scores.reduce((acc, s) => acc + Number(s.score ?? 0), 0);
-      const avgScore = scores.length === 0 ? 0 : Number((totalScore / scores.length).toFixed(2));
-
       return {
-        id: fr.id,
-        placementId: fr.placementId,
+        id: p.finalReportId, // Can be null
+        placementId: p.placementId,
         student: {
-          id: fr.studentId,
-          name: fr.studentName ?? "",
-          code: fr.studentCode ?? "",
-          school: fr.school ?? null,
-          cohort: fr.cohort ?? null,
-          major: fr.major ?? null,
+          id: p.studentId,
+          name: p.studentName ?? "",
+          code: p.studentCode ?? "",
+          school: p.school ?? null,
+          cohort: p.cohort ?? null,
+          major: p.major ?? null,
         },
-        placementStatus: fr.status,
+        placementStatus: p.status,
         scores: {
-          personality: personality.map((p) => ({ id: p.competencyId, name: p.name, score: Number(p.score ?? 0) })),
-          technical: technical.map((p) => ({ id: p.competencyId, name: p.name, score: Number(p.score ?? 0) })),
+          personality,
+          technical,
         },
         totalScore,
-        averageScore: avgScore,
+        averageScore,
         lastUpdated: new Date().toISOString(),
       };
     }),

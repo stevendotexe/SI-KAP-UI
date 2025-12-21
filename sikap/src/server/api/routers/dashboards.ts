@@ -15,10 +15,15 @@ import {
   placement,
   report,
   studentProfile,
+  task,
   user,
 } from "@/server/db/schema";
 
 const docs = {
+  getAverageTaskScores: {
+    description:
+      "## Rata-Rata Skor Tugas\n\nTimeseries rata-rata skor tugas (review laporan) yang sudah diapprove.\n\n### Parameters\n- `from` (Date, optional)\n- `to` (Date, optional)\n- `granularity` (day | week | month, default month)\n- `programId` (number, optional)\n\n### Response\nArray timeseries `{ period: string, count: number }[]`.\n\n### Example (React)\n```ts\nconst { data } = api.dashboards.getAverageTaskScores.useQuery({ granularity: 'month' });\n```",
+  },
   getAverageStudentScores: {
     description:
       "## Rata-Rata Skor Siswa\n\nTimeseries rata-rata skor siswa berdasarkan asesmen.\n\n### Parameters\n- `from` (Date, optional)\n- `to` (Date, optional)\n- `granularity` (day | week | month, default month)\n- `programId` (number, optional)\n\n### Response\nArray timeseries dengan format `{ period: string, count: number }[]`.\n\n### Example (React)\n```ts\nconst { data } = api.dashboards.getAverageStudentScores.useQuery({\n  from: new Date(new Date().getFullYear(), new Date().getMonth()-5, 1),\n  granularity: 'month'\n});\n```",
@@ -56,12 +61,12 @@ function coerceRange(input: { from?: Date; to?: Date }) {
 
 function periodExpr(granularity: "day" | "week" | "month", dateCol: unknown) {
   if (granularity === "day") {
-    return sql<string>`to_char(date_trunc('day', ${dateCol}::timestamp), 'YYYY-MM-DD')`;
+    return sql<string>`to_char(${dateCol}, 'YYYY-MM-DD')`;
   }
   if (granularity === "week") {
-    return sql<string>`to_char(date_trunc('week', ${dateCol}::timestamp), 'IYYY-IW')`;
+    return sql<string>`to_char(${dateCol}, 'IYYY-IW')`;
   }
-  return sql<string>`to_char(date_trunc('month', ${dateCol}::timestamp), 'YYYY-MM')`;
+  return sql<string>`to_char(${dateCol}, 'YYYY-MM')`;
 }
 
 export const dashboardsRouter = createTRPCRouter({
@@ -100,6 +105,57 @@ export const dashboardsRouter = createTRPCRouter({
           and(
             gte(assessment.createdAt, range.from),
             lte(assessment.createdAt, range.to),
+            input.programId === undefined
+              ? undefined
+              : eq(placement.programId, input.programId),
+            mentorFilterId ? eq(placement.mentorId, mentorFilterId) : undefined,
+          ),
+        )
+        .groupBy(per)
+        .orderBy(per);
+      return rows.map((r) => ({
+        period: r.period,
+        count: Number(r.count ?? 0),
+      }));
+    }),
+
+  getAverageTaskScores: adminOrMentorProcedure
+    .meta(docs.getAverageTaskScores)
+    .use(requirePermissions({ analytics: ["read"] }))
+    .input(
+      z.object({
+        from: z.date().optional(),
+        to: z.date().optional(),
+        granularity: z.enum(["day", "week", "month"]).default("month"),
+        programId: z.number().optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const range = coerceRange(input);
+      // Use submittedAt as the date timestamp
+      const per = periodExpr(input.granularity, task.submittedAt); // using submittedAt instead of createdAt for report date
+
+      let mentorFilterId: number | null = null;
+      if (ctx.session.user.role === "mentor") {
+        const mp = await ctx.db.query.mentorProfile.findFirst({
+          where: eq(mentorProfile.userId, ctx.session.user.id),
+        });
+        if (!mp) throw new TRPCError({ code: "FORBIDDEN" });
+        mentorFilterId = mp.id;
+      }
+
+      const rows = await ctx.db
+        .select({
+          period: per,
+          count: sql<number>`avg(${task.score})`,
+        })
+        .from(task)
+        .innerJoin(placement, eq(task.placementId, placement.id))
+        .where(
+          and(
+            eq(task.status, "approved"),
+            gte(task.submittedAt, range.from),
+            lte(task.submittedAt, range.to),
             input.programId === undefined
               ? undefined
               : eq(placement.programId, input.programId),

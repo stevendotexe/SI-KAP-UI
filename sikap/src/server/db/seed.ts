@@ -69,6 +69,7 @@ async function main() {
           email,
           password,
           name,
+          code: `SEED-${role.toUpperCase()}-${Math.floor(Math.random() * 10000)}`,
         },
       });
 

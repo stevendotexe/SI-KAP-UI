@@ -21,7 +21,8 @@ function polarToCartesian(cx: number, cy: number, r: number, angleInDegrees: num
 const palette = ["var(--color-chart-1)", "var(--color-chart-2)", "var(--color-chart-3)", "var(--color-chart-4)", "var(--color-chart-5)"];
 
 export default function PieChart({ data }: { data: Item[] }) {
-  const total = data.reduce((s, d) => s + d.value, 0) || 1;
+  const sum = data.reduce((s, d) => s + d.value, 0);
+  const total = sum || 1;
   let angle = 0;
   const cx = 50;
   const cy = 50;
@@ -39,7 +40,7 @@ export default function PieChart({ data }: { data: Item[] }) {
       })}
       <circle cx={cx} cy={cy} r={r - 12} fill="var(--background)" />
       <text x={cx} y={cy} textAnchor="middle" dy="4" className="text-xs font-medium">
-        {total}
+        {sum}
       </text>
     </svg>
   );

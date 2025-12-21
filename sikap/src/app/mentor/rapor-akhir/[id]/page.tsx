@@ -19,11 +19,11 @@ type ScoreItem = {
 export default function EditRaporAkhirPage() {
     const params = useParams();
     const router = useRouter();
-    const finalReportId = Number(params.id);
+    const placementId = Number(params.id);
 
     const { data: reportData, isLoading, error } = api.finalReports.detail.useQuery(
-        { finalReportId },
-        { enabled: !isNaN(finalReportId) }
+        { placementId },
+        { enabled: !isNaN(placementId) }
     );
 
     const upsertMutation = api.finalReports.upsertScores.useMutation({
@@ -137,7 +137,7 @@ export default function EditRaporAkhirPage() {
         }));
 
         upsertMutation.mutate({
-            placementId: (reportData as any).placementId, // Cast to any because we will add this field to the backend
+            placementId: placementId,
             scores: allScores
         });
     };
@@ -150,7 +150,7 @@ export default function EditRaporAkhirPage() {
         );
     }
 
-    if (error || isNaN(finalReportId)) {
+    if (error || isNaN(placementId)) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-muted">
                 <div className="bg-card p-8 rounded-xl border shadow-sm max-w-md w-full text-center">

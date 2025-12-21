@@ -87,26 +87,15 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     status: t.status as any,
   }))
 
-  // Create score series from reports
-  const scoreSeries: SeriesPoint[] = backendReports.length > 0
-    ? backendReports.map((r, index) => ({
-      period: `M${index + 1}`,
-      count: Number(r.score ?? 0),
-    }))
-    : [
-      { period: "M1", count: 0 },
-      { period: "M2", count: 0 },
-      { period: "M3", count: 0 },
-      { period: "M4", count: 0 },
-    ]
+  // Create score series from backend scoreHistory (daily task scores)
+  const scoreSeries: SeriesPoint[] = studentData.scoreHistory.length > 0
+    ? studentData.scoreHistory
+    : []
 
-  // Create attendance series from attendance data
-  const attendanceSeries: SeriesPoint[] = [
-    { period: "M1", count: attendance.percent },
-    { period: "M2", count: attendance.percent },
-    { period: "M3", count: attendance.percent },
-    { period: "M4", count: attendance.percent },
-  ]
+  // Create attendance series from backend attendanceHistory (daily percentage)
+  const attendanceSeries: SeriesPoint[] = studentData.attendanceHistory.length > 0
+    ? studentData.attendanceHistory
+    : []
 
   // Map info object
   const info = {

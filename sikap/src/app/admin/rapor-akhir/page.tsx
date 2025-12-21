@@ -168,7 +168,7 @@ export default function RaporAkhirPage() {
                                     ) : (
                                         data.items.map((report, index) => (
                                             <tr
-                                                key={report.id}
+                                                key={report.placementId}
                                                 className={`border-t ${index % 2 === 0 ? "bg-background" : "bg-muted/30"}`}
                                             >
                                                 <td className="px-4 py-3 text-sm font-medium">
@@ -191,7 +191,7 @@ export default function RaporAkhirPage() {
                                                     {report.averageScore}
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    <Link href={`/admin/rapor-akhir/${report.id}`}>
+                                                    <Link href={`/admin/rapor-akhir/${report.placementId}`}>
                                                         <Button
                                                             size="sm"
                                                             variant="ghost"

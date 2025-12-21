@@ -35,10 +35,10 @@ export default async function DashboardPage() {
 
     const results = await Promise.allSettled([
       caller.dashboards.getDashboardCounts({}),
-      caller.dashboards.getAverageStudentScores({ granularity: "month" }),
-      caller.dashboards.getAverageStudentAttendances({ granularity: "month" }),
-      caller.dashboards.getStudentCountPerPeriod({ granularity: "month" }),
-      caller.dashboards.getAttendancePieChart({}),
+      caller.dashboards.getAverageTaskScores({ granularity: "day" }),
+      caller.dashboards.getAverageStudentAttendances({ granularity: "day" }),
+      caller.dashboards.getStudentCountPerPeriod({ granularity: "day" }),
+      caller.dashboards.getAttendancePieChart({ from: new Date(), to: new Date() }),
       caller.attendances.detail({ date: new Date() }),
     ]);
 
@@ -134,7 +134,7 @@ export default async function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Baris 1: dua kartu metrik */}
           <div className="lg:col-span-6">
-            <StatisticCard title="Rata - Rata Skor Siswa" subtitle="Keseluruhan" value={avgScores.length ? `${Math.round(avgScores[avgScores.length - 1]!.count)}` : "-"}>
+            <StatisticCard title="Rata - Rata Skor Siswa" subtitle="Laporan & Tugas" value={avgScores.length ? `${Math.round(avgScores[avgScores.length - 1]!.count)}` : "-"}>
               <div className="mt-2"><AttendanceLine data={avgScores} /></div>
               <div className="text-xs text-muted-foreground mt-2">Periode hingga hari ini</div>
             </StatisticCard>

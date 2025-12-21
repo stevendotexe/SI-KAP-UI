@@ -1,0 +1,29 @@
+src/app/mentor/kalender/page.tsx(43,3): error TS2353: Object literal may only specify known properties, and 'meeting' does not exist in type 'Record<"in_class" | "field_trip" | "meet_greet", string>'.
+src/app/mentor/kalender/page.tsx(156,43): error TS7053: Element implicitly has an 'any' type because expression of type '"meeting" | "deadline" | "milestone" | "in_class" | "field_trip" | "meet_greet"' can't be used to index type 'Record<"in_class" | "field_trip" | "meet_greet", string>'.
+  Property 'meeting' does not exist on type 'Record<"in_class" | "field_trip" | "meet_greet", string>'.
+src/app/mentor/kalender/page.tsx(179,15): error TS2532: Object is possibly 'undefined'.
+src/app/mentor/kalender/page.tsx(190,9): error TS2532: Object is possibly 'undefined'.
+src/app/mentor/kalender/page.tsx(316,55): error TS2345: Argument of type '{ id: number; title: string; description: string | null; type: "meeting" | "deadline" | "milestone" | "in_class" | "field_trip" | "meet_greet"; startDate: Date; dueDate: Date; organizerName: string | null; organizerLogoUrl: string | null; colorHex: string | null; placementId: number | null; }' is not assignable to parameter of type 'CalendarEvent'.
+  Types of property 'type' are incompatible.
+    Type '"meeting" | "deadline" | "milestone" | "in_class" | "field_trip" | "meet_greet"' is not assignable to type '"in_class" | "field_trip" | "meet_greet"'.
+      Type '"meeting"' is not assignable to type '"in_class" | "field_trip" | "meet_greet"'.
+src/app/mentor/kalender/page.tsx(337,21): error TS7053: Element implicitly has an 'any' type because expression of type '"meeting" | "deadline" | "milestone" | "in_class" | "field_trip" | "meet_greet"' can't be used to index type 'Record<"in_class" | "field_trip" | "meet_greet", string>'.
+  Property 'meeting' does not exist on type 'Record<"in_class" | "field_trip" | "meet_greet", string>'.
+src/app/mentor/kalender/page.tsx(361,92): error TS2345: Argument of type '{ id: number; title: string; description: string | null; type: "meeting" | "deadline" | "milestone" | "in_class" | "field_trip" | "meet_greet"; startDate: Date; dueDate: Date; organizerName: string | null; organizerLogoUrl: string | null; colorHex: string | null; placementId: number | null; }' is not assignable to parameter of type 'CalendarEvent'.
+  Types of property 'type' are incompatible.
+    Type '"meeting" | "deadline" | "milestone" | "in_class" | "field_trip" | "meet_greet"' is not assignable to type '"in_class" | "field_trip" | "meet_greet"'.
+      Type '"meeting"' is not assignable to type '"in_class" | "field_trip" | "meet_greet"'.
+src/app/mentor/kalender/page.tsx(368,53): error TS2345: Argument of type '{ id: number; title: string; description: string | null; type: "meeting" | "deadline" | "milestone" | "in_class" | "field_trip" | "meet_greet"; startDate: Date; dueDate: Date; organizerName: string | null; organizerLogoUrl: string | null; colorHex: string | null; placementId: number | null; }' is not assignable to parameter of type 'CalendarEvent'.
+  Types of property 'type' are incompatible.
+    Type '"meeting" | "deadline" | "milestone" | "in_class" | "field_trip" | "meet_greet"' is not assignable to type '"in_class" | "field_trip" | "meet_greet"'.
+      Type '"meeting"' is not assignable to type '"in_class" | "field_trip" | "meet_greet"'.
+src/server/api/routers/mentors.ts(202,81): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Type '"mentor"' is not assignable to type '"user" | "admin" | ("user" | "admin")[] | undefined'.
+src/server/api/routers/students.ts(375,81): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Type '"student"' is not assignable to type '"admin" | "user" | ("admin" | "user")[] | undefined'.
+src/server/api/routers/users.ts(92,11): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Type '"admin" | "mentor" | "student"' is not assignable to type '"user" | "admin" | ("user" | "admin")[] | undefined'.
+      Type '"mentor"' is not assignable to type '"user" | "admin" | ("user" | "admin")[] | undefined'.
