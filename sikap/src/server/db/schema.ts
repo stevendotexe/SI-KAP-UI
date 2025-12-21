@@ -369,9 +369,15 @@ export const task = createTable(
       .$defaultFn(() => new Date())
       .notNull(),
     updatedAt: d.timestamp({ withTimezone: true }).$onUpdate(() => new Date()),
+    // Submission fields
     submissionNote: d.text(),
     submittedAt: d.timestamp({ withTimezone: true }),
     targetMajor: d.text(),
+    // Review fields (similar to report table)
+    reviewedByMentorId: d.integer().references(() => mentorProfile.id),
+    reviewNotes: d.text(),
+    reviewedAt: d.timestamp({ withTimezone: true }),
+    score: d.numeric({ precision: 5, scale: 2 }),
   }),
   (t) => [
     index("task_placement_status_idx").on(t.placementId, t.status),
@@ -385,6 +391,10 @@ export const taskRelations = relations(task, ({ one, many }) => ({
     references: [placement.id],
   }),
   checklistItems: many(taskChecklistItem),
+  reviewedBy: one(mentorProfile, {
+    fields: [task.reviewedByMentorId],
+    references: [mentorProfile.id],
+  }),
 }));
 
 /**

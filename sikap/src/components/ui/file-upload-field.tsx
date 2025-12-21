@@ -7,6 +7,7 @@ import {
   FileText,
   Image as ImageIcon,
   File as FileIcon,
+  ExternalLink,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -26,10 +27,7 @@ import {
   FieldDescription,
   FieldError,
 } from "@/components/ui/field";
-import {
-  uploadFilesAction,
-  deleteFileAction,
-} from "@/server/storage";
+import { uploadFilesAction, deleteFileAction } from "@/server/storage";
 import type { OwnerType } from "@/server/storage.types";
 
 /**
@@ -187,7 +185,7 @@ export function FileUploadField({
       filename: file.filename ?? extractFilenameFromUrl(file.url),
       url: file.url,
       status: "success" as const,
-    }))
+    })),
   );
   const [localError, setLocalError] = useState<string | null>(null);
 
@@ -202,7 +200,7 @@ export function FileUploadField({
 
       // Keep success files that are not yet in value (race condition protection)
       const recentSuccessFiles = prevFiles.filter(
-        (f) => f.status === "success" && f.url && !valueUrls.has(f.url)
+        (f) => f.status === "success" && f.url && !valueUrls.has(f.url),
       );
 
       // Build new files from value, preserving metadata where URL still exists
@@ -227,11 +225,12 @@ export function FileUploadField({
   }, [value]);
 
   const allowedMimeTypes = parseAcceptToMimeTypes(accept);
-  const acceptString =
-    accept ?? DEFAULT_ALLOWED_MIME_TYPES.join(",");
+  const acceptString = accept ?? DEFAULT_ALLOWED_MIME_TYPES.join(",");
 
   const isUploading = files.some((f) => f.status === "uploading");
-  const hasReachedLimit = multiple ? files.length >= maxFiles : files.length >= 1;
+  const hasReachedLimit = multiple
+    ? files.length >= maxFiles
+    : files.length >= 1;
 
   /**
    * Handle file selection from input.
@@ -249,19 +248,24 @@ export function FileUploadField({
       setLocalError(null);
 
       // Check max files limit
-      const availableSlots = multiple ? maxFiles - files.length : 1 - files.length;
+      const availableSlots = multiple
+        ? maxFiles - files.length
+        : 1 - files.length;
       if (availableSlots <= 0) {
         setLocalError(
           multiple
             ? `Maksimal ${maxFiles} file yang dapat diunggah`
-            : "Hanya 1 file yang dapat diunggah"
+            : "Hanya 1 file yang dapat diunggah",
         );
         return;
       }
 
       const filesToUpload = selectedFiles.slice(0, availableSlots);
       if (process.env.NODE_ENV !== "production") {
-        console.debug("[upload-ui] select", { count: filesToUpload.length, names: filesToUpload.map(f => f.name) });
+        console.debug("[upload-ui] select", {
+          count: filesToUpload.length,
+          names: filesToUpload.map((f) => f.name),
+        });
       }
 
       // Validate files
@@ -329,7 +333,9 @@ export function FileUploadField({
             }
 
             if (process.env.NODE_ENV !== "production") {
-              console.debug("[upload-ui] uploaded", { count: response.data.length });
+              console.debug("[upload-ui] uploaded", {
+                count: response.data.length,
+              });
             }
             return updated;
           });
@@ -337,7 +343,9 @@ export function FileUploadField({
           // Notify parent of new files
           if (onChange && uploadedFiles.length > 0) {
             // If multiple is false, replace existing files; otherwise append
-            onChange(multiple ? [...(value ?? []), ...uploadedFiles] : uploadedFiles);
+            onChange(
+              multiple ? [...(value ?? []), ...uploadedFiles] : uploadedFiles,
+            );
           }
         }
       } catch (err) {
@@ -352,8 +360,8 @@ export function FileUploadField({
           prev.map((f) =>
             pendingFiles.some((pf) => pf.id === f.id)
               ? { ...f, status: "error" as const, error: errorMessage }
-              : f
-          )
+              : f,
+          ),
         );
 
         // Handle specific error messages
@@ -365,7 +373,8 @@ export function FileUploadField({
         } else if (errorMessage === "UNAUTHORIZED") {
           displayError = "Anda harus login untuk mengupload file";
         } else if (errorMessage === "STORAGE_UPLOAD_FAILED") {
-          displayError = "Layanan penyimpanan tidak tersedia. Silakan coba lagi nanti.";
+          displayError =
+            "Layanan penyimpanan tidak tersedia. Silakan coba lagi nanti.";
         } else if (errorMessage === "STORAGE_CONFIGURATION_MISSING") {
           displayError = "Konfigurasi penyimpanan file tidak ditemukan.";
         }
@@ -375,9 +384,7 @@ export function FileUploadField({
         // Remove error files after delay
         setTimeout(() => {
           setFiles((prev) =>
-            prev.filter(
-              (f) => !pendingFiles.some((pf) => pf.id === f.id)
-            )
+            prev.filter((f) => !pendingFiles.some((pf) => pf.id === f.id)),
           );
         }, 3000);
       }
@@ -392,7 +399,7 @@ export function FileUploadField({
       files.length,
       value,
       onChange,
-    ]
+    ],
   );
 
   /**
@@ -414,8 +421,8 @@ export function FileUploadField({
       // Mark as uploading while deleting
       setFiles((prev) =>
         prev.map((f) =>
-          f.id === fileState.id ? { ...f, status: "uploading" as const } : f
-        )
+          f.id === fileState.id ? { ...f, status: "uploading" as const } : f,
+        ),
       );
 
       try {
@@ -436,22 +443,19 @@ export function FileUploadField({
         // Restore file state on error
         setFiles((prev) =>
           prev.map((f) =>
-            f.id === fileState.id
-              ? { ...f, status: "success" as const }
-              : f
-          )
+            f.id === fileState.id ? { ...f, status: "success" as const } : f,
+          ),
         );
 
-        const errorMessage =
-          err instanceof Error ? err.message : "Hapus gagal";
+        const errorMessage = err instanceof Error ? err.message : "Hapus gagal";
         setLocalError(
           errorMessage === "UNAUTHORIZED"
             ? "Anda tidak memiliki izin untuk menghapus file ini"
-            : "Gagal menghapus file. Silakan coba lagi."
+            : "Gagal menghapus file. Silakan coba lagi.",
         );
       }
     },
-    [ownerType, ownerId, value, onChange, disabled, isUploading]
+    [ownerType, ownerId, value, onChange, disabled, isUploading],
   );
 
   /**
@@ -492,10 +496,10 @@ export function FileUploadField({
         className={cn(
           "relative rounded-xl border-2 border-dashed p-4 transition-colors",
           disabled
-            ? "cursor-not-allowed bg-muted/50 border-muted"
+            ? "bg-muted/50 border-muted cursor-not-allowed"
             : hasReachedLimit
-              ? "cursor-not-allowed border-muted bg-muted/20"
-              : "cursor-pointer border-muted-foreground/25 hover:border-primary/50 hover:bg-primary/5"
+              ? "border-muted bg-muted/20 cursor-not-allowed"
+              : "border-muted-foreground/25 hover:border-primary/50 hover:bg-primary/5 cursor-pointer",
         )}
         onClick={handleUploadClick}
         onKeyDown={(e) => {
@@ -515,7 +519,7 @@ export function FileUploadField({
               "rounded-full p-3",
               disabled || hasReachedLimit
                 ? "bg-muted text-muted-foreground"
-                : "bg-primary/10 text-primary"
+                : "bg-primary/10 text-primary",
             )}
           >
             {isUploading ? (
@@ -530,7 +534,7 @@ export function FileUploadField({
                 "text-sm font-medium",
                 disabled || hasReachedLimit
                   ? "text-muted-foreground"
-                  : "text-foreground"
+                  : "text-foreground",
               )}
             >
               {isUploading
@@ -542,7 +546,7 @@ export function FileUploadField({
                   : "Klik untuk upload"}
             </p>
             {!hasReachedLimit && (
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-muted-foreground mt-1 text-xs">
                 Maksimal {formatFileSize(maxSizeBytes)} per file
               </p>
             )}
@@ -562,7 +566,7 @@ export function FileUploadField({
                   ? "border-destructive/50 bg-destructive/5"
                   : fileState.status === "uploading"
                     ? "border-primary/50 bg-primary/5"
-                    : "border-border bg-card"
+                    : "border-border bg-card",
               )}
             >
               {/* File icon or preview */}
@@ -580,7 +584,7 @@ export function FileUploadField({
                       "flex size-10 items-center justify-center rounded",
                       fileState.status === "error"
                         ? "bg-destructive/10 text-destructive"
-                        : "bg-muted text-muted-foreground"
+                        : "bg-muted text-muted-foreground",
                     )}
                   >
                     <FileTypeIcon
@@ -592,47 +596,68 @@ export function FileUploadField({
               </div>
 
               {/* File info */}
-              <div className="flex-1 min-w-0">
+              <div className="min-w-0 flex-1">
                 <p
                   className={cn(
-                    "text-sm font-medium truncate",
+                    "truncate text-sm font-medium",
                     fileState.status === "error"
                       ? "text-destructive"
-                      : "text-foreground"
+                      : "text-foreground",
                   )}
                 >
                   {fileState.filename}
                 </p>
                 {fileState.status === "error" && fileState.error ? (
-                  <p className="text-xs text-destructive">
-                    {fileState.error}
-                  </p>
+                  <p className="text-destructive text-xs">{fileState.error}</p>
                 ) : fileState.size ? (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-muted-foreground text-xs">
                     {formatFileSize(fileState.size)}
                   </p>
                 ) : null}
               </div>
 
-              {/* Status / Delete button */}
-              <div className="flex-shrink-0">
+              {/* Status / View / Delete buttons */}
+              <div className="flex flex-shrink-0 items-center gap-1">
                 {fileState.status === "uploading" ? (
                   <Spinner className="size-4" />
                 ) : (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    className="rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void handleDelete(fileState);
-                    }}
-                    disabled={disabled || isUploading}
-                    aria-label={`Hapus ${fileState.filename}`}
-                  >
-                    <X className="size-4" />
-                  </Button>
+                  <>
+                    {/* View file button */}
+                    {fileState.url && fileState.status === "success" && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.open(
+                            fileState.url,
+                            "_blank",
+                            "noopener,noreferrer",
+                          );
+                        }}
+                        aria-label={`Lihat ${fileState.filename}`}
+                      >
+                        <ExternalLink className="size-4" />
+                      </Button>
+                    )}
+                    {/* Delete file button */}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleDelete(fileState);
+                      }}
+                      disabled={disabled || isUploading}
+                      aria-label={`Hapus ${fileState.filename}`}
+                    >
+                      <X className="size-4" />
+                    </Button>
+                  </>
                 )}
               </div>
             </div>
@@ -647,4 +672,3 @@ export function FileUploadField({
 }
 
 export type { FileState };
-

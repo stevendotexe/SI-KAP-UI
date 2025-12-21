@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/file-upload-field";
 import { Spinner } from "@/components/ui/spinner";
 import { api } from "@/trpc/react";
-import { Send, ChevronLeft } from "lucide-react";
+import { Send, ChevronLeft, AlertTriangle, RefreshCw } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 
@@ -126,9 +126,11 @@ export default function UnggahTugasPage() {
     setNotes("");
   };
 
-  // Check if task can be uploaded
+  // Check if task can be uploaded (todo, in_progress, or rejected status)
   const canUpload = (status: string) => {
-    return status === "todo" || status === "in_progress";
+    return (
+      status === "todo" || status === "in_progress" || status === "rejected"
+    );
   };
 
   // Loading state while fetching task
@@ -272,11 +274,51 @@ export default function UnggahTugasPage() {
           </div>
         </div>
 
+        {/* Late Submission Warning */}
+        {task?.isLate && (
+          <div className="flex items-start gap-3 rounded-xl border border-amber-500/50 bg-amber-50 p-4 dark:bg-amber-950/30">
+            <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-600" />
+            <div>
+              <p className="font-medium text-amber-800 dark:text-amber-200">
+                Pengumpulan Terlambat
+              </p>
+              <p className="mt-1 text-sm text-amber-700 dark:text-amber-300">
+                Tenggat waktu tugas ini sudah lewat. Tugas yang dikirim akan
+                dicatat sebagai terlambat.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Rejected Task Info */}
+        {task?.status === "rejected" && (
+          <div className="flex items-start gap-3 rounded-xl border border-red-500/50 bg-red-50 p-4 dark:bg-red-950/30">
+            <RefreshCw className="mt-0.5 size-5 shrink-0 text-red-600" />
+            <div>
+              <p className="font-medium text-red-800 dark:text-red-200">
+                Upload Ulang Tugas
+              </p>
+              <p className="mt-1 text-sm text-red-700 dark:text-red-300">
+                Tugas sebelumnya ditolak oleh mentor. Silakan perbaiki dan
+                unggah ulang.
+              </p>
+              {task.submission?.note && (
+                <div className="mt-2 rounded bg-red-100 p-2 text-sm text-red-800 dark:bg-red-900/50 dark:text-red-200">
+                  <span className="font-medium">Catatan mentor: </span>
+                  {task.submission.note}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Card */}
         <section className="bg-card mt-6 rounded-2xl border p-6 shadow-sm">
           {/* Judul area tugas */}
           <h2 className="text-base font-semibold sm:text-lg">
-            Form Unggah Tugas
+            {task?.status === "rejected"
+              ? "Form Upload Ulang Tugas"
+              : "Form Unggah Tugas"}
           </h2>
 
           {/* Form fields */}
