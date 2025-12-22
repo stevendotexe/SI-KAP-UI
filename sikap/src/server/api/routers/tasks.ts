@@ -404,7 +404,7 @@ export const tasksRouter = createTRPCRouter({
           task.dueDate,
           task.targetMajor,
         )
-        .orderBy(sql`${task.dueDate} desc`)
+        .orderBy(sql`min(${task.createdAt}) desc`)
         .limit(input.limit)
         .offset(input.offset);
 
@@ -472,7 +472,11 @@ export const tasksRouter = createTRPCRouter({
             eq(placement.status, "active"),
             mentorId ? eq(placement.mentorId, mentorId) : undefined,
             input.targetMajor
-              ? eq(studentProfile.major, input.targetMajor)
+              ? input.targetMajor.includes(",")
+                ? // Handle comma-separated majors (e.g., "RPL,TKJ")
+                inArray(studentProfile.major, input.targetMajor.split(","))
+                : // Single major
+                eq(studentProfile.major, input.targetMajor)
               : undefined,
             input.placementIds
               ? inArray(placement.id, input.placementIds)
@@ -758,7 +762,7 @@ export const tasksRouter = createTRPCRouter({
         .innerJoin(studentProfile, eq(placement.studentId, studentProfile.id))
         .innerJoin(user, eq(studentProfile.userId, user.id))
         .where(where)
-        .orderBy(sql`${task.dueDate} desc nulls last`, sql`${task.createdAt} desc`)
+        .orderBy(sql`${task.createdAt} desc`)
         .limit(input.limit)
         .offset(input.offset);
 

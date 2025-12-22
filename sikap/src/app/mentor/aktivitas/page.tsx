@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
+import { sanitizeHtml } from "@/lib/sanitize-html";
 import {
     Select,
     SelectContent,
@@ -213,9 +214,10 @@ export default function MentorAktivitasPage() {
 
                                     {/* Description */}
                                     {activity.description && (
-                                        <p className="text-sm text-gray-600 mb-4 line-clamp-2">
-                                            {activity.description}
-                                        </p>
+                                        <div
+                                            className="text-sm text-gray-600 mb-4 line-clamp-2"
+                                            dangerouslySetInnerHTML={{ __html: sanitizeHtml(activity.description) }}
+                                        />
                                     )}
 
                                     {/* Date & Time */}

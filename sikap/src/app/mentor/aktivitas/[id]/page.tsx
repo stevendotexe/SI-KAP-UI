@@ -6,6 +6,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import BackButton from "@/components/students/BackButton";
 import { formatFileSize } from "@/lib/file-utils";
+import { sanitizeHtml } from "@/lib/sanitize-html";
 import {
     Calendar,
     Clock,
@@ -172,9 +173,10 @@ export default function AktivitasDetailPage() {
                         {data.description && (
                             <div className="bg-white rounded-xl border shadow-sm p-6">
                                 <h2 className="text-sm font-medium text-gray-500 mb-3">Deskripsi</h2>
-                                <div className="text-sm text-gray-700 whitespace-pre-wrap">
-                                    {data.description}
-                                </div>
+                                <div
+                                    className="text-sm text-gray-700 whitespace-pre-wrap"
+                                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(data.description) }}
+                                />
                             </div>
                         )}
 
