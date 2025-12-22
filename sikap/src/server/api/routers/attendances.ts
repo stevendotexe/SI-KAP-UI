@@ -425,12 +425,10 @@ export const attendancesRouter = createTRPCRouter({
     }),
 
   getTodayLog: protectedProcedure.query(async ({ ctx }) => {
-    // Verify user is a student
+    // Return null for non-students instead of throwing error
+    // This prevents console errors during background refetch when navigating between pages
     if (ctx.session.user.role !== "student") {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "Only students can access their attendance log",
-      });
+      return null;
     }
 
     // Get student profile
