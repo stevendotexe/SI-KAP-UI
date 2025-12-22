@@ -125,6 +125,7 @@ export const calendarEventsRouter = createTRPCRouter({
           organizerName: calendarEvent.organizerName,
           colorHex: calendarEvent.colorHex,
           placementId: placement.id,
+          organizerLogoUrl: calendarEvent.organizerLogoUrl,
         })
         .from(calendarEvent)
         .leftJoin(placement, eq(calendarEvent.placementId, placement.id))
@@ -155,6 +156,7 @@ export const calendarEventsRouter = createTRPCRouter({
         startDate: r.startDate,
         dueDate: r.dueDate ?? r.startDate,
         organizerName: r.organizerName ?? null,
+        organizerLogoUrl: r.organizerLogoUrl ?? null,
         colorHex: r.colorHex ?? null,
         placementId: r.placementId ?? null,
       }));

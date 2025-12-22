@@ -2,14 +2,13 @@
 
 import { useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { ChevronDown, Plus, Pencil, Trash2, X } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { ChevronDown, Pencil, Trash2 } from "lucide-react"
 import { api } from "@/trpc/react"
 import { useMentorCompany } from "@/components/mentor/useMentorCompany"
-import { FileUploadField, type FileUploadValue } from "@/components/ui/file-upload-field"
+import ActivityFormDialog from "@/components/mentor/ActivityFormDialog"
 
 type DayCell = { date: Date; inMonth: boolean; day: number }
 
@@ -30,12 +29,9 @@ const MONTHS_ID = [
 const WEEKDAYS_ID = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"]
 
 const EVENT_TYPES = [
-  { value: "in_class", label: "Kelas" },
-  { value: "field_trip", label: "Kunjungan Lapangan" },
+  { value: "in_class", label: "In-Class" },
+  { value: "field_trip", label: "Field Trip" },
   { value: "meet_greet", label: "Meet & Greet" },
-  { value: "meeting", label: "Rapat" },
-  { value: "deadline", label: "Tenggat Waktu" },
-  { value: "milestone", label: "Milestone" },
 ] as const
 
 type EventType = typeof EVENT_TYPES[number]["value"]
@@ -72,29 +68,11 @@ type CalendarEvent = {
   organizerName: string | null
   colorHex: string | null
   placementId: number | null
+  description: string | null
+  organizerLogoUrl: string | null
 }
 
-type FormData = {
-  title: string
-  type: EventType
-  date: string
-  endDate: string
-  description: string
-  organizerName: string
-  placementId: number | null
-  attachments: FileUploadValue[]
-}
 
-const defaultFormData: FormData = {
-  title: "",
-  type: "meeting",
-  date: "",
-  endDate: "",
-  description: "",
-  organizerName: "",
-  placementId: null,
-  attachments: [],
-}
 
 export default function Page() {
   const [year, setYear] = useState(2025)
@@ -102,7 +80,6 @@ export default function Page() {
   const [open, setOpen] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
-  const [formData, setFormData] = useState<FormData>(defaultFormData)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [eventToDelete, setEventToDelete] = useState<CalendarEvent | null>(null)
 
@@ -117,23 +94,6 @@ export default function Page() {
     year: year,
   }, { enabled: !!companyId })
 
-  const createMutation = api.calendarEvents.create.useMutation({
-    onSuccess: () => {
-      void utils.calendarEvents.list.invalidate()
-      setDialogOpen(false)
-      resetForm()
-    },
-  })
-
-  const updateMutation = api.calendarEvents.update.useMutation({
-    onSuccess: () => {
-      void utils.calendarEvents.list.invalidate()
-      setDialogOpen(false)
-      setEditingEvent(null)
-      resetForm()
-    },
-  })
-
   const deleteMutation = api.calendarEvents.delete.useMutation({
     onSuccess: () => {
       void utils.calendarEvents.list.invalidate()
@@ -142,28 +102,8 @@ export default function Page() {
     },
   })
 
-  function resetForm() {
-    setFormData(defaultFormData)
-    setEditingEvent(null)
-  }
-
-  function handleOpenCreate() {
-    resetForm()
-    setDialogOpen(true)
-  }
-
   function handleOpenEdit(event: CalendarEvent) {
     setEditingEvent(event)
-    setFormData({
-      title: event.title,
-      type: event.type,
-      date: new Date(event.startDate).toISOString().slice(0, 10),
-      endDate: new Date(event.dueDate).toISOString().slice(0, 10),
-      description: "",
-      organizerName: event.organizerName ?? "",
-      placementId: event.placementId,
-      attachments: [],
-    })
     setDialogOpen(true)
   }
 
@@ -178,48 +118,16 @@ export default function Page() {
     }
   }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-
-    if (editingEvent) {
-      updateMutation.mutate({
-        eventId: editingEvent.id,
-        title: formData.title,
-        type: formData.type,
-        date: new Date(formData.date),
-        endDate: formData.endDate ? new Date(formData.endDate) : undefined,
-        description: formData.description || undefined,
-        organizerName: formData.organizerName || undefined,
-        placementId: formData.placementId ?? undefined,
-        attachments: formData.attachments.length > 0
-          ? formData.attachments
-          : undefined,
-      })
-    } else {
-      createMutation.mutate({
-        title: formData.title,
-        type: formData.type,
-        date: new Date(formData.date),
-        endDate: formData.endDate ? new Date(formData.endDate) : undefined,
-        description: formData.description || undefined,
-        organizerName: formData.organizerName || undefined,
-        placementId: formData.placementId ?? undefined,
-        attachments: formData.attachments.length > 0
-          ? formData.attachments
-          : undefined,
-      })
-    }
-  }
-
   // Get events for a specific week to render on calendar
   function getWeekSegments(week: DayCell[]) {
-    if (!events || events.length === 0) return []
+    if (!events || events.length === 0) return { segments: [], maxSlot: 0 }
 
     const minDay = Math.min(...week.filter(w => w.inMonth).map(w => w.day))
     const maxDay = Math.max(...week.filter(w => w.inMonth).map(w => w.day))
-    if (!isFinite(minDay) || !isFinite(maxDay)) return []
+    if (!isFinite(minDay) || !isFinite(maxDay)) return { segments: [], maxSlot: 0 }
 
-    return events
+    // 1. Convert events to raw segments
+    const rawSegments = events
       .map(evt => {
         const startDate = new Date(evt.startDate)
         const endDate = new Date(evt.dueDate)
@@ -238,40 +146,67 @@ export default function Page() {
         const endIdx = week.findIndex(c => c.inMonth && c.day === segEndDay)
         if (startIdx < 0 || endIdx < 0) return null
 
-        const span = endIdx - startIdx + 1
-        const leftPct = (startIdx / 7) * 100
-        const widthPct = (span / 7) * 100
-
-        const colorClass = evt.colorHex
-          ? ""
-          : EVENT_COLORS[evt.type] ?? "bg-chart-4"
-
         return {
-          leftPct,
-          widthPct,
+          startIdx, // 0-6
+          endIdx,   // 0-6
+          span: endIdx - startIdx + 1,
+          leftPct: (startIdx / 7) * 100,
+          widthPct: ((endIdx - startIdx + 1) / 7) * 100,
           label: evt.title,
-          colorClass,
+          colorClass: evt.colorHex ? "" : EVENT_COLORS[evt.type] ?? "bg-chart-4",
           colorHex: evt.colorHex,
           event: evt,
         }
       })
-      .filter(Boolean) as { leftPct: number; widthPct: number; label: string; colorClass: string; colorHex: string | null; event: CalendarEvent }[]
+      .filter((s): s is NonNullable<typeof s> => !!s)
+      .sort((a, b) => {
+        // Sort by start index, then span (longer first)
+        if (a.startIdx !== b.startIdx) return a.startIdx - b.startIdx
+        return b.span - a.span
+      })
+
+    // 2. Assign slots to prevent overlap
+    const slots: number[][] = Array(7).fill([]).map(() => []) // 7 days in a week
+    const segmentsWithSlot: (typeof rawSegments[0] & { slot: number })[] = []
+    let maxSlot = -1
+
+    for (const seg of rawSegments) {
+      // Find first available slot for this segment's duration
+      let slot = 0
+      while (true) {
+        let fit = true
+        for (let i = seg.startIdx; i <= seg.endIdx; i++) {
+          if (slots[i][slot]) {
+            fit = false
+            break
+          }
+        }
+        if (fit) break
+        slot++
+      }
+
+      // Mark slot as occupied
+      for (let i = seg.startIdx; i <= seg.endIdx; i++) {
+        slots[i][slot] = 1
+      }
+
+      if (slot > maxSlot) maxSlot = slot
+      segmentsWithSlot.push({ ...seg, slot })
+    }
+
+    return { segments: segmentsWithSlot, maxSlot }
   }
 
-  const isSubmitting = createMutation.isPending || updateMutation.isPending
+  // const isSubmitting = createMutation.isPending || updateMutation.isPending
 
   return (
-    <div className="min-h-screen bg-muted/30 p-0 m-0">
-      <div className="w-full max-w-none p-0 m-0 pr-4 sm:pr-6 lg:pr-10 pl-4 sm:pl-6 lg:pl-10">
+    <div className="min-h-screen bg-muted/30 p-6">
+      <div className="w-full max-w-7xl mx-auto">
         <div className="flex items-start justify-between">
           <div className="space-y-1">
             <h1 className="text-2xl sm:text-3xl font-semibold">Kalender</h1>
             <p className="text-muted-foreground">Daftar jadwal</p>
           </div>
-          <Button onClick={handleOpenCreate} className="gap-2">
-            <Plus className="size-4" />
-            Tambah Event
-          </Button>
         </div>
 
         <div className="mt-4 flex items-center gap-3">
@@ -288,7 +223,7 @@ export default function Page() {
             </Button>
 
             {open && (
-              <div className="absolute z-20 mt-2 w-44 rounded-xl border bg-card shadow-sm">
+              <div className="absolute z-20 mt-2 w-44 rounded-md border bg-card shadow-sm">
                 <ul className="max-h-64 overflow-auto py-1" role="listbox">
                   {MONTHS_ID.map((m, i) => (
                     <li key={m}>
@@ -347,12 +282,20 @@ export default function Page() {
 
             <div className="mt-0">
               {weeks.map((week, wi) => {
-                const segments = getWeekSegments(week)
+                const { segments, maxSlot } = getWeekSegments(week)
+                // Calculate dynamic height based on max overlapping events
+                // Base 7rem (28) + extra space per additional slot
+                const heightStyle = maxSlot > 2 ? { height: `${(maxSlot + 2) * 2.5}rem` } : undefined
+
                 return (
                   <div key={wi} className="relative">
                     <div className="grid grid-cols-7">
                       {week.map((c, ci) => (
-                        <div key={ci} className={`h-28 border ${c.inMonth ? "bg-card" : "bg-muted/40"}`}>
+                        <div
+                          key={ci}
+                          className={`min-h-28 border ${c.inMonth ? "bg-card" : "bg-muted/40"}`}
+                          style={heightStyle}
+                        >
                           <div className="px-2 pt-2 text-xs text-muted-foreground">{c.day}</div>
                         </div>
                       ))}
@@ -363,7 +306,7 @@ export default function Page() {
                         key={si}
                         className={`absolute z-10 h-7 ${s.colorClass} rounded-full flex items-center justify-center text-xs font-medium text-primary-foreground cursor-pointer hover:opacity-90 transition-opacity`}
                         style={{
-                          top: 34,
+                          top: 34 + (s.slot * 32), // Dynamic top: Base 34 + 32px per slot
                           left: `${s.leftPct}%`,
                           width: `${s.widthPct}%`,
                           paddingLeft: 12,
@@ -386,7 +329,7 @@ export default function Page() {
         {/* Event List */}
         {events && events.length > 0 && (
           <section className="mt-6">
-            <h2 className="text-lg font-semibold mb-3">Daftar Event Bulan Ini</h2>
+            <h2 className="text-lg font-semibold mb-3">Daftar Aktivitas Bulan Ini</h2>
             <div className="space-y-2">
               {events.map((event) => {
                 const colorClass = event.colorHex
@@ -435,101 +378,21 @@ export default function Page() {
         )}
       </div>
 
-      {/* Create/Edit Event Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm() }}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{editingEvent ? "Edit Event" : "Tambah Event Baru"}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Judul Event *</label>
-              <Input
-                value={formData.title}
-                onChange={(e) => setFormData(f => ({ ...f, title: e.target.value }))}
-                placeholder="Masukkan judul event"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-medium">Tipe Event *</label>
-              <Select value={formData.type} onValueChange={(v) => setFormData(f => ({ ...f, type: v as EventType }))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {EVENT_TYPES.map((t) => (
-                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm font-medium">Tanggal Mulai *</label>
-                <Input
-                  type="date"
-                  value={formData.date}
-                  onChange={(e) => setFormData(f => ({ ...f, date: e.target.value }))}
-                  required
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Tanggal Selesai</label>
-                <Input
-                  type="date"
-                  value={formData.endDate}
-                  onChange={(e) => setFormData(f => ({ ...f, endDate: e.target.value }))}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium">Deskripsi</label>
-              <textarea
-                className="w-full border rounded-lg px-3 py-2 text-sm min-h-[80px]"
-                value={formData.description}
-                onChange={(e) => setFormData(f => ({ ...f, description: e.target.value }))}
-                placeholder="Deskripsi event (opsional)"
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-medium">Penyelenggara</label>
-              <Input
-                value={formData.organizerName}
-                onChange={(e) => setFormData(f => ({ ...f, organizerName: e.target.value }))}
-                placeholder="Nama penyelenggara (opsional)"
-              />
-            </div>
-
-            {/* File Upload - only show when editing (needs ownerId) */}
-            {editingEvent && (
-              <FileUploadField
-                ownerType="calendar_event"
-                ownerId={editingEvent.id}
-                value={formData.attachments}
-                onChange={(files) => setFormData(f => ({ ...f, attachments: files }))}
-                label="Lampiran"
-                description="Upload file lampiran (opsional)"
-                multiple
-                maxFiles={5}
-              />
-            )}
-
-            <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                Batal
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? <><Spinner className="mr-2" /> Menyimpan...</> : editingEvent ? "Simpan Perubahan" : "Tambah Event"}
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {/* Edit Activity Dialog */}
+      <ActivityFormDialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open)
+          if (!open) {
+            setEditingEvent(null)
+          }
+        }}
+        editingEvent={editingEvent}
+        onSuccess={() => {
+          void utils.calendarEvents.list.invalidate()
+          setDialogOpen(false)
+        }}
+      />
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
