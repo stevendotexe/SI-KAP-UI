@@ -7,12 +7,6 @@ import { api } from "@/trpc/react"
 import { Spinner } from "@/components/ui/spinner"
 
 type DayCell = { date: Date; inMonth: boolean; day: number }
-type EventSpec = {
-  label: string
-  startDay: number
-  endDay: number
-  colorClass: string // e.g. "bg-chart-4", "bg-chart-5"
-}
 
 const MONTHS_ID = [
   "Januari",
@@ -30,6 +24,25 @@ const MONTHS_ID = [
 ]
 const WEEKDAYS_ID = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"]
 
+// Event type colors matching siswa/aktivitas page
+const EVENT_TYPE_COLORS: Record<string, string> = {
+  in_class: "#3b82f6",      // blue
+  field_trip: "#10b981",    // green
+  meet_greet: "#f59e0b",    // amber
+  meeting: "#8b5cf6",       // purple
+  deadline: "#ef4444",      // red
+  milestone: "#ec4899",     // pink
+}
+
+type CalendarEvent = {
+  id: number
+  title: string
+  type: string
+  startDate: Date
+  endDate: Date | null
+  colorHex: string | null
+}
+
 function buildWeeks(year: number, month: number) {
   const first = new Date(year, month, 1)
   const offset = first.getDay() // 0=Sunday, 1=Monday, etc.
@@ -43,19 +56,6 @@ function buildWeeks(year: number, month: number) {
   const weeks: DayCell[][] = []
   for (let i = 0; i < 6; i++) weeks.push(cells.slice(i * 7, i * 7 + 7))
   return weeks
-}
-
-// Helper to get color class for events
-const EVENT_COLORS = [
-  "bg-blue-500",
-  "bg-green-500",
-  "bg-purple-500",
-  "bg-orange-500",
-  "bg-pink-500",
-]
-
-function getColorClass(colorHex: string | null, index: number): string {
-  return EVENT_COLORS[index % EVENT_COLORS.length]!
 }
 
 export default function CalendarPage() {
@@ -72,22 +72,64 @@ export default function CalendarPage() {
     year,
   })
 
-  // Transform API events to EventSpec format
-  const events: EventSpec[] = useMemo(() => {
+  // Transform API events to CalendarEvent format
+  const events: CalendarEvent[] = useMemo(() => {
     if (!data?.items) return []
 
-    return data.items.map((event, index) => {
-      const startDate = new Date(event.startDate)
-      const endDate = event.endDate ? new Date(event.endDate) : startDate
-
-      return {
-        label: event.title,
-        startDay: startDate.getDate(),
-        endDay: endDate.getDate(),
-        colorClass: getColorClass(event.colorHex, index),
-      }
-    })
+    return data.items.map((event) => ({
+      id: event.id,
+      title: event.title,
+      type: event.type,
+      startDate: new Date(event.startDate),
+      endDate: event.endDate ? new Date(event.endDate) : null,
+      colorHex: event.colorHex,
+    }))
   }, [data])
+
+  // Get events for a specific week to render on calendar
+  function getWeekSegments(week: DayCell[]) {
+    if (!events || events.length === 0) return []
+
+    const minDay = Math.min(...week.filter(w => w.inMonth).map(w => w.day))
+    const maxDay = Math.max(...week.filter(w => w.inMonth).map(w => w.day))
+    if (!isFinite(minDay) || !isFinite(maxDay)) return []
+
+    return events
+      .map(evt => {
+        const startDate = evt.startDate
+        const endDate = evt.endDate ?? evt.startDate
+
+        // Check if event is in current month
+        if (startDate.getMonth() !== month && endDate.getMonth() !== month) return null
+
+        const startDay = startDate.getMonth() === month ? startDate.getDate() : 1
+        const endDay = endDate.getMonth() === month ? endDate.getDate() : new Date(year, month + 1, 0).getDate()
+
+        const segStartDay = Math.max(startDay, minDay)
+        const segEndDay = Math.min(endDay, maxDay)
+        if (segStartDay > segEndDay) return null
+
+        const startIdx = week.findIndex(c => c.inMonth && c.day === segStartDay)
+        const endIdx = week.findIndex(c => c.inMonth && c.day === segEndDay)
+        if (startIdx < 0 || endIdx < 0) return null
+
+        const span = endIdx - startIdx + 1
+        const leftPct = (startIdx / 7) * 100
+        const widthPct = (span / 7) * 100
+
+        // Use colorHex if available, otherwise use default color for event type
+        const backgroundColor = evt.colorHex ?? EVENT_TYPE_COLORS[evt.type] ?? "#6b7280"
+
+        return {
+          leftPct,
+          widthPct,
+          label: evt.title,
+          backgroundColor,
+          event: evt,
+        }
+      })
+      .filter(Boolean) as { leftPct: number; widthPct: number; label: string; backgroundColor: string; event: CalendarEvent }[]
+  }
 
   return (
     <div className="min-h-screen bg-muted/30 p-0 m-0">
@@ -178,34 +220,34 @@ export default function CalendarPage() {
             {/* Weeks */}
             <div className="mt-0">
               {weeks.map((week, wi) => {
+                const segments = getWeekSegments(week)
                 return (
-                  <div key={wi} className="grid grid-cols-7">
-                    {week.map((c, ci) => {
-                      // Find events for this day
-                      const dayEvents = c.inMonth
-                        ? events.filter(evt => c.day >= evt.startDay && c.day <= evt.endDay)
-                        : []
-
-                      return (
-                        <div
-                          key={ci}
-                          className={`h-28 border overflow-hidden ${c.inMonth ? "bg-card" : "bg-muted/40"}`}
-                        >
+                  <div key={wi} className="relative">
+                    <div className="grid grid-cols-7">
+                      {week.map((c, ci) => (
+                        <div key={ci} className={`h-28 border ${c.inMonth ? "bg-card" : "bg-muted/40"}`}>
                           <div className="px-2 pt-2 text-xs text-muted-foreground">{c.day}</div>
-                          {/* Events for this day */}
-                          <div className="px-1 pt-1 space-y-1 overflow-hidden">
-                            {dayEvents.map((evt, ei) => (
-                              <div
-                                key={ei}
-                                className={`${evt.colorClass} text-white text-xs px-2 py-0.5 rounded truncate`}
-                              >
-                                {evt.label}
-                              </div>
-                            ))}
-                          </div>
                         </div>
-                      )
-                    })}
+                      ))}
+                    </div>
+
+                    {segments.map((s, si) => (
+                      <div
+                        key={si}
+                        className="absolute z-10 h-7 rounded-full flex items-center justify-center text-xs font-medium text-white cursor-default"
+                        style={{
+                          top: 34,
+                          left: `${s.leftPct}%`,
+                          width: `${s.widthPct}%`,
+                          paddingLeft: 12,
+                          paddingRight: 12,
+                          backgroundColor: s.backgroundColor,
+                        }}
+                        title={s.label}
+                      >
+                        <span className="truncate">{s.label}</span>
+                      </div>
+                    ))}
                   </div>
                 )
               })}
