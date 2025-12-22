@@ -17,6 +17,10 @@ const config = {
         protocol: "https",
         hostname: "via.placeholder.com",
       },
+      {
+        protocol: "https",
+        hostname: "sikap-storage.rplupiproject.com",
+      },
     ],
   },
 };

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import BackButton from "@/components/students/BackButton"
 import { formatFileSize } from "@/lib/file-utils"
+import { sanitizeHtml } from "@/lib/sanitize-html"
 import { FileText, Image as ImageIcon, File as FileIcon, Download, CheckCircle2, Clock, ClipboardList } from "lucide-react"
 
 // Format date to Indonesian locale
@@ -162,9 +163,10 @@ export default function Page() {
             {/* Task Description */}
             <div className="bg-card border rounded-xl shadow-sm p-4">
               <h2 className="text-sm font-medium text-muted-foreground mb-3">Deskripsi Tugas</h2>
-              <div className="text-sm whitespace-pre-wrap bg-muted/50 rounded-lg p-4">
-                {data.description || "Tidak ada deskripsi."}
-              </div>
+              <div
+                className="text-sm whitespace-pre-wrap bg-muted/50 rounded-lg p-4"
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(data.description) || "Tidak ada deskripsi." }}
+              />
             </div>
 
             {/* Task Attachments (from mentor) */}
@@ -216,9 +218,10 @@ export default function Page() {
                 {data.submission.note && (
                   <div className="mb-4">
                     <div className="text-xs text-muted-foreground mb-2">Catatan Siswa</div>
-                    <div className="text-sm bg-muted/50 rounded-lg p-4 whitespace-pre-wrap">
-                      {data.submission.note}
-                    </div>
+                    <div
+                      className="text-sm bg-muted/50 rounded-lg p-4 whitespace-pre-wrap"
+                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(data.submission.note) }}
+                    />
                   </div>
                 )}
 

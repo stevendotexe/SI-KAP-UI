@@ -54,7 +54,11 @@ function TaskClient() {
     tasksData?.items.map((t) => ({
       id: t.id.toString(),
       titleMain: t.title,
-      titleSub: t.targetMajor ?? "Umum",
+      titleSub: t.targetMajor
+        ? t.targetMajor.includes(",")
+          ? t.targetMajor.split(",").join(" dan ")
+          : t.targetMajor
+        : "Umum",
       description: t.description,
       date: t.dueDate ? new Date(t.dueDate).toISOString().slice(0, 10) : "",
       assignedCount: t.assignedCount,

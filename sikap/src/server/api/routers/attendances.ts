@@ -142,26 +142,26 @@ export const attendancesRouter = createTRPCRouter({
       return {
         summary: summaryRow
           ? (() => {
-              const present = Number(summaryRow.present ?? 0);
-              const absent = Number(summaryRow.absent ?? 0);
-              const total = Number(summaryRow.total ?? 0);
-              const attendancePercent =
-                total === 0 ? 0 : Math.round((present / total) * 100);
-              return {
-                date: summaryDate,
-                presentCount: present,
-                absentCount: absent,
-                total,
-                attendancePercent,
-              };
-            })()
-          : {
+            const present = Number(summaryRow.present ?? 0);
+            const absent = Number(summaryRow.absent ?? 0);
+            const total = Number(summaryRow.total ?? 0);
+            const attendancePercent =
+              total === 0 ? 0 : Math.round((present / total) * 100);
+            return {
               date: summaryDate,
-              presentCount: 0,
-              absentCount: 0,
-              total: 0,
-              attendancePercent: 0,
-            },
+              presentCount: present,
+              absentCount: absent,
+              total,
+              attendancePercent,
+            };
+          })()
+          : {
+            date: summaryDate,
+            presentCount: 0,
+            absentCount: 0,
+            total: 0,
+            attendancePercent: 0,
+          },
         items: rows.map(formatRow),
         pagination: {
           total: Number(totalDays ?? 0),
@@ -378,7 +378,10 @@ export const attendancesRouter = createTRPCRouter({
         };
       }
 
-      // Query attendance logs
+      // Get today's date in YYYY-MM-DD format to filter out future dates
+      const today = new Date().toISOString().slice(0, 10);
+
+      // Query attendance logs - only show dates up to today
       const rows = await ctx.db
         .select({
           id: attendanceLog.id,
@@ -389,7 +392,12 @@ export const attendancesRouter = createTRPCRouter({
           locationNote: attendanceLog.locationNote,
         })
         .from(attendanceLog)
-        .where(eq(attendanceLog.placementId, activePlacement.id))
+        .where(
+          and(
+            eq(attendanceLog.placementId, activePlacement.id),
+            lte(attendanceLog.date, today), // Only show dates <= today
+          ),
+        )
         .orderBy(sql`${attendanceLog.date} desc`)
         .limit(input.limit)
         .offset(input.offset);
@@ -397,7 +405,12 @@ export const attendancesRouter = createTRPCRouter({
       const totalRows = await ctx.db
         .select({ total: sql<number>`count(*)` })
         .from(attendanceLog)
-        .where(eq(attendanceLog.placementId, activePlacement.id));
+        .where(
+          and(
+            eq(attendanceLog.placementId, activePlacement.id),
+            lte(attendanceLog.date, today), // Only count dates <= today
+          ),
+        );
 
       const total = totalRows[0]?.total ?? 0;
 
@@ -412,12 +425,10 @@ export const attendancesRouter = createTRPCRouter({
     }),
 
   getTodayLog: protectedProcedure.query(async ({ ctx }) => {
-    // Verify user is a student
+    // Return null for non-students instead of throwing error
+    // This prevents console errors during background refetch when navigating between pages
     if (ctx.session.user.role !== "student") {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "Only students can access their attendance log",
-      });
+      return null;
     }
 
     // Get student profile

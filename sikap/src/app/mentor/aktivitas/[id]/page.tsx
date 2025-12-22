@@ -6,6 +6,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import BackButton from "@/components/students/BackButton";
 import { formatFileSize } from "@/lib/file-utils";
+import { sanitizeHtml } from "@/lib/sanitize-html";
 import {
     Calendar,
     Clock,
@@ -172,9 +173,10 @@ export default function AktivitasDetailPage() {
                         {data.description && (
                             <div className="bg-white rounded-xl border shadow-sm p-6">
                                 <h2 className="text-sm font-medium text-gray-500 mb-3">Deskripsi</h2>
-                                <div className="text-sm text-gray-700 whitespace-pre-wrap">
-                                    {data.description}
-                                </div>
+                                <div
+                                    className="text-sm text-gray-700 whitespace-pre-wrap"
+                                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(data.description) }}
+                                />
                             </div>
                         )}
 
@@ -183,18 +185,21 @@ export default function AktivitasDetailPage() {
                             <div className="bg-white rounded-xl border shadow-sm p-6">
                                 <h2 className="text-sm font-medium text-gray-500 mb-4">Penyelenggara</h2>
                                 <div className="flex items-center gap-4">
-                                    <Image
-                                        src={
-                                            data.organizerLogoUrl ??
-                                            `https://via.placeholder.com/80x80/e5e7eb/374151?text=${encodeURIComponent(
-                                                data.organizerName.substring(0, 2)
-                                            )}`
-                                        }
-                                        alt={data.organizerName}
-                                        width={60}
-                                        height={60}
-                                        className="rounded-lg object-cover border border-gray-200"
-                                    />
+                                    <div className="w-[60px] h-[60px] relative flex-shrink-0 flex items-center justify-center rounded-lg border border-gray-200 bg-white overflow-hidden">
+                                        {data.organizerLogoUrl ? (
+                                            <Image
+                                                src={data.organizerLogoUrl}
+                                                alt={data.organizerName}
+                                                fill
+                                                className="object-contain p-1"
+                                                sizes="60px"
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-500 font-semibold text-lg">
+                                                {data.organizerName.substring(0, 2).toUpperCase()}
+                                            </div>
+                                        )}
+                                    </div>
                                     <div>
                                         <div className="text-lg font-medium text-gray-900">
                                             {data.organizerName}

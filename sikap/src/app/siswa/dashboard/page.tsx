@@ -76,7 +76,10 @@ export default function DashboardPage() {
   });
 
   // Fetch today's attendance to persist state across refreshes
-  const todayAttendance = api.attendances.getTodayLog.useQuery();
+  const todayAttendance = api.attendances.getTodayLog.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
   const me = api.students.me.useQuery();
 
   // Calculate real-time statistics
@@ -254,22 +257,28 @@ export default function DashboardPage() {
 
   function getCoords(): Promise<{ latitude: number; longitude: number }> {
     return new Promise((resolve, reject) => {
-      if (!navigator.geolocation)
+      if (!navigator.geolocation) {
+        console.error("[Geolocation] Not supported in this browser");
         return reject(new Error("Geolocation tidak didukung"));
+      }
+      console.log("[Geolocation] Requesting location...");
       navigator.geolocation.getCurrentPosition(
-        (pos) =>
+        (pos) => {
+          console.log("[Geolocation] Success:", pos.coords.latitude, pos.coords.longitude);
           resolve({
             latitude: pos.coords.latitude,
             longitude: pos.coords.longitude,
-          }),
+          });
+        },
         (err) => {
+          console.error("[Geolocation] Error:", err.code, err.message);
           const message =
             err && typeof err === "object" && "message" in err
               ? String((err as { message?: string }).message)
               : "Geolocation error";
           reject(new Error(message));
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
       );
     });
   }
@@ -430,7 +439,7 @@ export default function DashboardPage() {
         <main className="space-y-6 p-5 pr-4 pl-4 sm:pr-6 sm:pl-6 lg:pr-10 lg:pl-10">
           <section className="p-0">
             <h1 className="text-2xl font-semibold sm:text-3xl">
-              Selamat datang, Siswa!
+              Selamat datang, {me.data?.name ?? "Siswa"}!
             </h1>
             <p className="text-muted-foreground mt-1">
               Kode Siswa: {me.data?.code}
@@ -460,21 +469,21 @@ export default function DashboardPage() {
                     >
                       {now
                         ? new Intl.DateTimeFormat("en-GB", {
-                            weekday: "long",
-                            day: "numeric",
-                            month: "long",
-                            year: "numeric",
-                          }).format(now)
+                          weekday: "long",
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric",
+                        }).format(now)
                         : "—"}
                       <br />
                       <span className="text-muted-foreground">
                         {now
                           ? new Intl.DateTimeFormat("en-GB", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                              second: "2-digit",
-                              hour12: false,
-                            }).format(now)
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            second: "2-digit",
+                            hour12: false,
+                          }).format(now)
                           : "—"}
                       </span>
                     </div>
@@ -515,11 +524,10 @@ export default function DashboardPage() {
                         }}
                       />
                       <div
-                        className={`mt-4 flex items-center gap-2 ${
-                          masukImageName && !isMasukSaved
-                            ? "w-full justify-between md:justify-start"
-                            : ""
-                        }`}
+                        className={`mt-4 flex items-center gap-2 ${masukImageName && !isMasukSaved
+                          ? "w-full justify-between md:justify-start"
+                          : ""
+                          }`}
                       >
                         <Button
                           variant={
@@ -528,11 +536,10 @@ export default function DashboardPage() {
                               : "destructive"
                           }
                           disabled={isMasukSaved || isIzinSaved}
-                          className={`inline-flex h-9 items-center gap-2 rounded-md px-5 ${
-                            isMasukSaved || isIzinSaved
-                              ? "bg-muted text-muted-foreground hover:bg-muted cursor-not-allowed border"
-                              : ""
-                          }`}
+                          className={`inline-flex h-9 items-center gap-2 rounded-md px-5 ${isMasukSaved || isIzinSaved
+                            ? "bg-muted text-muted-foreground hover:bg-muted cursor-not-allowed border"
+                            : ""
+                            }`}
                           onClick={() => {
                             setCameraOpenFor("masuk");
                             setTimeout(() => {
@@ -565,11 +572,10 @@ export default function DashboardPage() {
                           <Button
                             type="button"
                             variant={isIzinSaved ? "outline" : "secondary"}
-                            className={`inline-flex h-9 items-center gap-2 rounded-md px-5 ${
-                              isIzinSaved
-                                ? "bg-muted text-muted-foreground cursor-not-allowed border"
-                                : ""
-                            }`}
+                            className={`inline-flex h-9 items-center gap-2 rounded-md px-5 ${isIzinSaved
+                              ? "bg-muted text-muted-foreground cursor-not-allowed border"
+                              : ""
+                              }`}
                             onClick={() => setIzinOpen(true)}
                             disabled={isIzinSaved}
                             title="Ajukan Izin"
@@ -653,11 +659,10 @@ export default function DashboardPage() {
                         }}
                       />
                       <div
-                        className={`mt-4 flex items-center gap-2 ${
-                          keluarImageName && !isKeluarSaved
-                            ? "w-full justify-between md:justify-start"
-                            : ""
-                        }`}
+                        className={`mt-4 flex items-center gap-2 ${keluarImageName && !isKeluarSaved
+                          ? "w-full justify-between md:justify-start"
+                          : ""
+                          }`}
                       >
                         <Button
                           variant={
@@ -673,11 +678,10 @@ export default function DashboardPage() {
                               ? "Lakukan presensi masuk terlebih dahulu"
                               : "Ambil Foto"
                           }
-                          className={`inline-flex h-9 items-center gap-2 rounded-md px-5 ${
-                            !isMasukSaved || isKeluarSaved || isIzinSaved
-                              ? "bg-muted text-muted-foreground hover:bg-muted cursor-not-allowed border"
-                              : ""
-                          }`}
+                          className={`inline-flex h-9 items-center gap-2 rounded-md px-5 ${!isMasukSaved || isKeluarSaved || isIzinSaved
+                            ? "bg-muted text-muted-foreground hover:bg-muted cursor-not-allowed border"
+                            : ""
+                            }`}
                           onClick={() => {
                             if (!isMasukSaved) return;
                             setCameraOpenFor("keluar");

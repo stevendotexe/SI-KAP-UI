@@ -47,7 +47,7 @@ export default function RaporAkhirPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Cari berdasarkan nama atau kode siswa"
-              className="pl-11 rounded-full bg-background border-border"
+              className="pl-11 bg-background border-border"
             />
           </div>
         </div>
@@ -55,7 +55,7 @@ export default function RaporAkhirPage() {
         {/* Filters */}
         <div className="flex gap-3 mb-6">
           <Select value={filterCohort} onValueChange={setFilterCohort}>
-            <SelectTrigger className="w-[180px] rounded-full bg-background">
+            <SelectTrigger className="w-[180px] bg-background">
               <SelectValue placeholder="Semua Angkatan" />
             </SelectTrigger>
             <SelectContent>
@@ -66,7 +66,7 @@ export default function RaporAkhirPage() {
           </Select>
 
           <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-[180px] rounded-full bg-background">
+            <SelectTrigger className="w-[180px] bg-background">
               <SelectValue placeholder="Semua Status" />
             </SelectTrigger>
             <SelectContent>
@@ -149,10 +149,10 @@ export default function RaporAkhirPage() {
                       <td className="px-4 py-3">
                         <span
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${student.status === "completed"
-                              ? "bg-green-100 text-green-700"
-                              : student.status === "active"
-                                ? "bg-blue-100 text-blue-700"
-                                : "bg-gray-100 text-gray-700"
+                            ? "bg-green-100 text-green-700"
+                            : student.status === "active"
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-gray-100 text-gray-700"
                             }`}
                         >
                           {student.status === "completed"

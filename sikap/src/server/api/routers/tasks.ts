@@ -195,9 +195,9 @@ export const tasksRouter = createTRPCRouter({
       const dueDate = t.dueDate ? new Date(t.dueDate) : null;
       const isLate = dueDate
         ? now > dueDate &&
-          (t.status === "todo" ||
-            t.status === "in_progress" ||
-            t.status === "rejected")
+        (t.status === "todo" ||
+          t.status === "in_progress" ||
+          t.status === "rejected")
         : false;
 
       return {
@@ -417,8 +417,7 @@ export const tasksRouter = createTRPCRouter({
           ? sql`${task.dueDate} <= ${input.to.toISOString()}`
           : undefined,
         input.search
-          ? sql`(lower(${task.title}) like ${"%" + input.search.toLowerCase() + "%"} or lower(${task.description}) like ${
-              "%" + input.search.toLowerCase() + "%"
+          ? sql`(lower(${task.title}) like ${"%" + input.search.toLowerCase() + "%"} or lower(${task.description}) like ${"%" + input.search.toLowerCase() + "%"
             })`
           : undefined,
       );
@@ -506,7 +505,11 @@ export const tasksRouter = createTRPCRouter({
             eq(placement.status, "active"),
             mentorId ? eq(placement.mentorId, mentorId) : undefined,
             input.targetMajor
-              ? eq(studentProfile.major, input.targetMajor)
+              ? input.targetMajor.includes(",")
+                ? // Handle comma-separated majors (e.g., "RPL,TKJ")
+                inArray(studentProfile.major, input.targetMajor.split(","))
+                : // Single major
+                eq(studentProfile.major, input.targetMajor)
               : undefined,
             input.placementIds
               ? inArray(placement.id, input.placementIds)
@@ -669,11 +672,11 @@ export const tasksRouter = createTRPCRouter({
       const attachments =
         taskIds.length > 0
           ? await ctx.db.query.attachment.findMany({
-              where: and(
-                eq(attachment.ownerType, "task"),
-                inArray(attachment.ownerId, taskIds),
-              ),
-            })
+            where: and(
+              eq(attachment.ownerType, "task"),
+              inArray(attachment.ownerId, taskIds),
+            ),
+          })
           : [];
 
       // 4. Calculate stats
