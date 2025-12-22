@@ -113,6 +113,23 @@ export default function AddTaskDialog({
     return all;
   }, [majors]);
 
+  // Group rubrics by major for visual separation
+  const rubricsByMajor = React.useMemo(() => {
+    const groups: Record<string, string[]> = {};
+
+    majors.forEach((major) => {
+      if (major === "Umum") return;
+      const cats = RUBRICS_BY_MAJOR[major];
+      const rubricList: string[] = [];
+      Object.values(cats).forEach((list) => list.forEach((i) => {
+        if (!rubricList.includes(i)) rubricList.push(i);
+      }));
+      groups[major] = rubricList;
+    });
+
+    return groups;
+  }, [majors]);
+
   function toggleRubric(r: string) {
     setRubrics((prev) =>
       prev.includes(r) ? prev.filter((x) => x !== r) : [...prev, r],
@@ -148,7 +165,7 @@ export default function AddTaskDialog({
     },
   });
 
-  function submit() {
+  async function submit() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const d = date ? new Date(date) : null;
@@ -186,17 +203,29 @@ export default function AddTaskDialog({
     }
     setError(null);
 
-    // Call mutation
-    createTask.mutate({
-      title: titleMain,
-      description: description, // Note: titleSub is not in schema yet, maybe append to title or desc?
-      dueDate: d,
-      targetMajor: majors.includes("Umum") ? undefined : majors[0], // Schema only supports one targetMajor for now
-      attachments: attachments.map((a) => ({
-        url: a.url,
-        filename: a.filename,
-      })),
-    });
+    // Combine majors into a single string for targetMajor
+    // e.g., ["RPL", "TKJ"] => "RPL,TKJ"
+    const combinedMajor = majors.includes("Umum")
+      ? undefined
+      : majors.length > 1
+        ? majors.join(",")
+        : majors[0];
+
+    try {
+      await createTask.mutateAsync({
+        title: titleMain,
+        description: description,
+        dueDate: d,
+        targetMajor: combinedMajor,
+        attachments: attachments.map((a) => ({
+          url: a.url,
+          filename: a.filename,
+        })),
+      });
+    } catch (err) {
+      // Error handling is done in mutation's onError
+      return;
+    }
   }
 
   return (
@@ -331,19 +360,27 @@ export default function AddTaskDialog({
                 <FieldTitle>Rubrik Penilaian</FieldTitle>
                 <FieldContent>
                   <div className="grid max-h-[500px] grid-cols-1 gap-3 overflow-auto md:grid-cols-2">
-                    {availableRubrics.map((r) => (
-                      <label
-                        key={r}
-                        className={`flex cursor-pointer items-center justify-between gap-2 rounded-(--radius-sm) border px-3 py-2 transition-transform active:scale-[0.98] ${rubrics.includes(r) ? "ring-primary bg-secondary ring-1" : "bg-card"}`}
-                      >
-                        <span className="text-sm">{r}</span>
-                        <input
-                          type="checkbox"
-                          className="size-4"
-                          checked={rubrics.includes(r)}
-                          onChange={() => toggleRubric(r)}
-                        />
-                      </label>
+                    {Object.entries(rubricsByMajor).map(([major, rubricList], idx) => (
+                      <React.Fragment key={major}>
+                        {idx > 0 && <div className="col-span-full border-t pt-3 mt-1" />}
+                        <div className="col-span-full text-xs font-semibold text-muted-foreground mb-2">
+                          {major}
+                        </div>
+                        {rubricList.map((r) => (
+                          <label
+                            key={r}
+                            className={`flex cursor-pointer items-center justify-between gap-2 rounded-(--radius-sm) border px-3 py-2 transition-transform active:scale-[0.98] ${rubrics.includes(r) ? "ring-primary bg-secondary ring-1" : "bg-card"}`}
+                          >
+                            <span className="text-sm">{r}</span>
+                            <input
+                              type="checkbox"
+                              className="size-4"
+                              checked={rubrics.includes(r)}
+                              onChange={() => toggleRubric(r)}
+                            />
+                          </label>
+                        ))}
+                      </React.Fragment>
                     ))}
                   </div>
                 </FieldContent>
