@@ -79,7 +79,7 @@ export default function MentorDetailPage() {
                     <div>
                         <h1 className="text-2xl font-semibold">{profile.name}</h1>
                         <p className="text-sm text-muted-foreground mt-1">
-                            {profile.userId}
+                            {profile.code}
                         </p>
                     </div>
                 </div>

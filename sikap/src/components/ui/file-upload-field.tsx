@@ -31,8 +31,7 @@ import { uploadFilesAction, deleteFileAction } from "@/server/storage";
 import type { OwnerType } from "@/server/storage.types";
 
 /**
- * Value type for file upload field - represents an uploaded file.
- * Use this type when storing/passing file data between components.
+ * Simple file value type for controlled state with URL and optional filename.
  */
 export type FileUploadValue = {
   url: string;
@@ -58,12 +57,12 @@ type FileState = {
 export interface FileUploadFieldProps {
   /** Owner type for the attachment (task, report, final_report, assessment) */
   ownerType: OwnerType;
-  /** Owner ID for the attachment (null for new entities not yet created) */
+  /** Owner ID for the attachment */
   ownerId: number | null;
-  /** Array of uploaded file objects with url and optional filename (controlled) */
+  /** Array of uploaded file values (controlled) */
   value?: FileUploadValue[];
-  /** Callback when uploaded files change */
-  onChange?: (files: FileUploadValue[]) => void;
+  /** Callback when uploaded values change */
+  onChange?: (values: FileUploadValue[]) => void;
   /** Allow multiple file uploads */
   multiple?: boolean;
   /** Maximum number of files allowed (only applies when multiple is true) */
@@ -180,10 +179,10 @@ export function FileUploadField({
   const inputId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<FileState[]>(() =>
-    (value ?? []).map((file) => ({
-      id: file.url,
-      filename: file.filename ?? extractFilenameFromUrl(file.url),
-      url: file.url,
+    (value ?? []).map((v) => ({
+      id: v.url,
+      filename: v.filename ?? extractFilenameFromUrl(v.url),
+      url: v.url,
       status: "success" as const,
     })),
   );
@@ -191,8 +190,7 @@ export function FileUploadField({
 
   // Sync internal files state with controlled value prop
   useEffect(() => {
-    const valueFiles = value ?? [];
-    const valueUrls = new Set(valueFiles.map((f) => f.url));
+    const valueUrls = new Set((value ?? []).map((v) => v.url));
 
     setFiles((prevFiles) => {
       // Keep uploading files as they are
@@ -204,22 +202,22 @@ export function FileUploadField({
       );
 
       // Build new files from value, preserving metadata where URL still exists
-      const syncedFiles: FileState[] = valueFiles.map((file) => {
-        const existing = prevFiles.find((f) => f.url === file.url);
+      const syncedFiles: FileState[] = (value ?? []).map((v) => {
+        const existing = prevFiles.find((f) => f.url === v.url);
         if (existing) {
           // Preserve existing metadata
           return existing;
         }
-        // Create new file state from value object
+        // Create new file state from value
         return {
-          id: file.url,
-          filename: file.filename ?? extractFilenameFromUrl(file.url),
-          url: file.url,
+          id: v.url,
+          filename: v.filename ?? extractFilenameFromUrl(v.url),
+          url: v.url,
           status: "success" as const,
         };
       });
 
-      // Combine: synced files from value + uploading files + recent success files not in value
+      // Combine uploading files with synced files and recent success files
       return [...syncedFiles, ...uploadingFiles, ...recentSuccessFiles];
     });
   }, [value]);
@@ -290,10 +288,9 @@ export function FileUploadField({
 
       try {
         // Create FormData and upload
-        // Use 0 as placeholder ownerId if null (for new entities not yet created)
         const formData = new FormData();
         formData.append("ownerType", ownerType);
-        formData.append("ownerId", String(ownerId ?? 0));
+        formData.append("ownerId", String(ownerId));
         for (const file of filesToUpload) {
           formData.append("file", file);
         }
@@ -301,12 +298,9 @@ export function FileUploadField({
         const response = await uploadFilesAction(formData);
 
         if (response.status === "success" && response.data) {
-          // Build uploadedFiles array from response data first
-          const uploadedFiles: FileUploadValue[] = response.data
-            .filter((item): item is NonNullable<typeof item> => !!item)
-            .map((item) => ({ url: item.url, filename: item.filename }));
-
           // Update file states with successful uploads
+          const uploadedUrls: string[] = [];
+
           setFiles((prev) => {
             const updated = [...prev];
 
@@ -316,19 +310,16 @@ export function FileUploadField({
               if (!uploadItem || !pendingFile) continue;
 
               const idx = updated.findIndex((f) => f.id === pendingFile.id);
-
-              const newFileState: FileState = {
-                id: uploadItem.url,
-                filename: uploadItem.filename,
-                url: uploadItem.url,
-                mimeType: uploadItem.mimetype,
-                status: "success",
-              };
-
               if (idx !== -1) {
-                updated[idx] = newFileState;
-              } else {
-                updated.push(newFileState);
+                updated[idx] = {
+                  ...updated[idx]!,
+                  id: uploadItem.url,
+                  filename: uploadItem.filename,
+                  url: uploadItem.url,
+                  mimeType: uploadItem.mimetype,
+                  status: "success",
+                };
+                uploadedUrls.push(uploadItem.url);
               }
             }
 
@@ -340,18 +331,19 @@ export function FileUploadField({
             return updated;
           });
 
-          // Notify parent of new files
-          if (onChange && uploadedFiles.length > 0) {
+          // Notify parent of new values
+          if (onChange && uploadedUrls.length > 0) {
+            const newValues: FileUploadValue[] = uploadedUrls.map((url) => ({
+              url,
+              filename: extractFilenameFromUrl(url),
+            }));
             // If multiple is false, replace existing files; otherwise append
             onChange(
-              multiple ? [...(value ?? []), ...uploadedFiles] : uploadedFiles,
+              multiple ? [...(value ?? []), ...newValues] : newValues,
             );
           }
         }
       } catch (err) {
-        if (process.env.NODE_ENV !== "production") {
-          console.debug("[upload-ui] error", err);
-        }
         // Mark pending files as error
         const errorMessage =
           err instanceof Error ? err.message : "Upload gagal";
@@ -426,7 +418,6 @@ export function FileUploadField({
       );
 
       try {
-        // Use 0 as placeholder ownerId if null (for new entities not yet created)
         await deleteFileAction(fileState.filename, {
           ownerType,
           ownerId: ownerId ?? 0,
@@ -437,7 +428,7 @@ export function FileUploadField({
 
         // Notify parent
         if (onChange) {
-          onChange((value ?? []).filter((file) => file.url !== fileState.url));
+          onChange((value ?? []).filter((v) => v.url !== fileState.url));
         }
       } catch (err) {
         // Restore file state on error

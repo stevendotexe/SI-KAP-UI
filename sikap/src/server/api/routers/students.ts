@@ -455,6 +455,7 @@ export const studentsRouter = createTRPCRouter({
           password: input.password,
           name: input.name,
           role: "student",
+          code: code,
         } as any,
         headers: ctx.headers,
       });
@@ -463,7 +464,7 @@ export const studentsRouter = createTRPCRouter({
       });
       if (!u) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-      // Update the code field directly since better-auth createUser doesn't save additionalFields
+      // Update the code field directly since better-auth createUser might not save additionalFields
       await ctx.db.update(user).set({ code }).where(eq(user.id, u.id));
 
       await ctx.db.insert(studentProfile).values({

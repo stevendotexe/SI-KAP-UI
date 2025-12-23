@@ -73,7 +73,7 @@ export const eventType = pgEnum("event_type", [
  */
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
-  code: text("code").notNull().unique(),
+  code: text("code").notNull().unique().$defaultFn(() => `TEMP-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   role: userRole("role").notNull().default("student"),

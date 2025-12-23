@@ -2,23 +2,14 @@
 
 import { useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { ChevronDown, Loader2, AlertCircle } from "lucide-react"
+import { Spinner } from "@/components/ui/spinner"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { ChevronDown, Pencil, Trash2 } from "lucide-react"
 import { api } from "@/trpc/react"
+import ActivityFormDialog from "@/components/mentor/ActivityFormDialog"
 
 type DayCell = { date: Date; inMonth: boolean; day: number }
-type EventSpec = {
-  label: string
-  startDate: Date
-  endDate: Date
-  startDay: number
-  endDay: number
-  startMonth: number
-  endMonth: number
-  startYear: number
-  endYear: number
-  colorHex: string | null
-  colorClass: string // e.g. "bg-chart-4", "bg-chart-5"
-}
 
 const MONTHS_ID = [
   "Januari",
@@ -36,19 +27,26 @@ const MONTHS_ID = [
 ]
 const WEEKDAYS_ID = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"]
 
-// Event type to color mapping
-const EVENT_TYPE_COLORS: Record<string, string> = {
+const EVENT_TYPES = [
+  { value: "in_class", label: "In-Class" },
+  { value: "field_trip", label: "Field Trip" },
+  { value: "meet_greet", label: "Meet & Greet" },
+] as const
+
+type EventType = typeof EVENT_TYPES[number]["value"]
+
+const EVENT_COLORS: Record<string, string> = {
+  in_class: "bg-blue-500",
+  field_trip: "bg-green-500",
+  meet_greet: "bg-purple-500",
+  meeting: "bg-orange-500",
   deadline: "bg-red-500",
-  milestone: "bg-purple-500",
-  meeting: "bg-blue-500",
-  in_class: "bg-green-500",
-  field_trip: "bg-orange-500",
-  meet_greet: "bg-pink-500",
+  milestone: "bg-yellow-500",
 }
 
 function buildWeeks(year: number, month: number) {
   const first = new Date(year, month, 1)
-  const offset = first.getFullYear() === 1970 ? 4 : first.getDay() // 0=Sun
+  const offset = first.getFullYear() === 1970 ? 4 : first.getDay()
   const start = 1 - offset
   const cells: DayCell[] = []
   for (let i = 0; i < 42; i++) {
@@ -60,115 +58,154 @@ function buildWeeks(year: number, month: number) {
   return weeks
 }
 
-export default function AdminKalenderPage() {
-  const now = new Date()
-  const [year] = useState(now.getFullYear())
-  const [month, setMonth] = useState(now.getMonth()) // 0-based
-  const [open, setOpen] = useState(false)
+type CalendarEvent = {
+  id: number
+  title: string
+  type: EventType
+  startDate: Date
+  dueDate: Date
+  organizerName: string | null
+  colorHex: string | null
+  placementId: number | null
+  description: string | null
+  organizerLogoUrl: string | null
+}
 
-  // Fetch events from backend
-  const { data: eventsData, isLoading, error } = api.calendarEvents.listForAdmin.useQuery({
-    month: month + 1, // API expects 1-based month
-    year,
-  })
+
+
+export default function Page() {
+  const [year, setYear] = useState(2025)
+  const [month, setMonth] = useState(new Date().getMonth())
+  const [open, setOpen] = useState(false)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [eventToDelete, setEventToDelete] = useState<CalendarEvent | null>(null)
 
   const weeks = useMemo(() => buildWeeks(year, month), [year, month])
 
-  // Convert API events to EventSpec format for display
-  const events: EventSpec[] = useMemo(() => {
-    if (!eventsData) return []
+  const utils = api.useUtils()
 
-    return eventsData.map((event) => {
-      const startDate = new Date(event.startDate)
-      const endDate = new Date(event.endDate)
+  // Admin sees all events - use listForAdmin
+  const { data: events, isLoading, isError, refetch } = api.calendarEvents.listForAdmin.useQuery({
+    month: month + 1, // API expects 1-12
+    year: year,
+  })
 
-      return {
-        label: event.title,
-        startDate: startDate,
-        endDate: endDate,
-        startDay: startDate.getDate(),
-        endDay: endDate.getDate(),
-        startMonth: startDate.getMonth(),
-        endMonth: endDate.getMonth(),
-        startYear: startDate.getFullYear(),
-        endYear: endDate.getFullYear(),
-        colorHex: event.colorHex,
-        colorClass: event.colorHex
-          ? "" // Use inline style instead of dynamic Tailwind class
-          : EVENT_TYPE_COLORS[event.type] || "bg-chart-4",
-      }
-    })
-  }, [eventsData])
+  const deleteMutation = api.calendarEvents.delete.useMutation({
+    onSuccess: () => {
+      void utils.calendarEvents.listForAdmin.invalidate()
+      setDeleteConfirmOpen(false)
+      setEventToDelete(null)
+    },
+  })
 
-  // Compute event segments per week for overlay
-  function getWeekSegments(week: DayCell[]) {
-    const inMonthCells = week.filter(w => w.inMonth)
-    if (inMonthCells.length === 0) return []
+  function handleOpenEdit(event: CalendarEvent) {
+    setEditingEvent(event)
+    setDialogOpen(true)
+  }
 
-    // Normalize dates to compare only date part (no time)
-    const normalizeDate = (date: Date) => {
-      const d = new Date(date)
-      d.setHours(0, 0, 0, 0)
-      return d
+  function handleDelete(event: CalendarEvent) {
+    setEventToDelete(event)
+    setDeleteConfirmOpen(true)
+  }
+
+  function confirmDelete() {
+    if (eventToDelete) {
+      deleteMutation.mutate({ eventId: eventToDelete.id })
     }
+  }
 
-    const weekStart = normalizeDate(inMonthCells[0]!.date)
-    const weekEnd = normalizeDate(inMonthCells[inMonthCells.length - 1]!.date)
+  // Get events for a specific week to render on calendar
+  function getWeekSegments(week: DayCell[]) {
+    if (!events || events.length === 0) return { segments: [], maxSlot: 0 }
 
-    return events
+    const minDay = Math.min(...week.filter(w => w.inMonth).map(w => w.day))
+    const maxDay = Math.max(...week.filter(w => w.inMonth).map(w => w.day))
+    if (!isFinite(minDay) || !isFinite(maxDay)) return { segments: [], maxSlot: 0 }
+
+    // 1. Convert events to raw segments
+    const rawSegments = events
       .map(evt => {
-        const evtStart = normalizeDate(evt.startDate)
-        const evtEnd = normalizeDate(evt.endDate)
+        const startDate = new Date(evt.startDate)
+        const endDate = new Date(evt.dueDate)
 
-        // Check if event overlaps with this week
-        if (evtStart > weekEnd || evtEnd < weekStart) return null
+        // Check if event is in current month
+        if (startDate.getMonth() !== month && endDate.getMonth() !== month) return null
 
-        // Find the actual start and end within this week
-        const segStart = evtStart > weekStart ? evtStart : weekStart
-        const segEnd = evtEnd < weekEnd ? evtEnd : weekEnd
+        const startDay = startDate.getMonth() === month ? startDate.getDate() : 1
+        const endDay = endDate.getMonth() === month ? endDate.getDate() : new Date(year, month + 1, 0).getDate()
 
-        // Find cell indices
-        const startIdx = week.findIndex(c => {
-          if (!c.inMonth) return false
-          const cellDate = normalizeDate(c.date)
-          return cellDate.getTime() === segStart.getTime()
-        })
-        
-        const endIdx = week.findIndex(c => {
-          if (!c.inMonth) return false
-          const cellDate = normalizeDate(c.date)
-          return cellDate.getTime() === segEnd.getTime()
-        })
+        const segStartDay = Math.max(startDay, minDay)
+        const segEndDay = Math.min(endDay, maxDay)
+        if (segStartDay > segEndDay) return null
 
-        if (startIdx < 0) return null
-        const actualEndIdx = endIdx >= 0 ? endIdx : week.length - 1
-
-        const span = actualEndIdx - startIdx + 1
-        const leftPct = (startIdx / 7) * 100
-        const widthPct = (span / 7) * 100
+        const startIdx = week.findIndex(c => c.inMonth && c.day === segStartDay)
+        const endIdx = week.findIndex(c => c.inMonth && c.day === segEndDay)
+        if (startIdx < 0 || endIdx < 0) return null
 
         return {
-          leftPct,
-          widthPct,
-          label: evt.label,
-          colorClass: evt.colorClass,
+          startIdx, // 0-6
+          endIdx,   // 0-6
+          span: endIdx - startIdx + 1,
+          leftPct: (startIdx / 7) * 100,
+          widthPct: ((endIdx - startIdx + 1) / 7) * 100,
+          label: evt.title,
+          colorClass: evt.colorHex ? "" : EVENT_COLORS[evt.type] ?? "bg-chart-4",
           colorHex: evt.colorHex,
+          event: evt,
         }
       })
-      .filter(Boolean) as { leftPct: number; widthPct: number; label: string; colorClass: string; colorHex: string | null }[]
+      .filter((s): s is NonNullable<typeof s> => !!s)
+      .sort((a, b) => {
+        // Sort by start index, then span (longer first)
+        if (a.startIdx !== b.startIdx) return a.startIdx - b.startIdx
+        return b.span - a.span
+      })
+
+    // 2. Assign slots to prevent overlap
+    const slots: number[][] = Array(7).fill([]).map(() => []) // 7 days in a week
+    const segmentsWithSlot: (typeof rawSegments[0] & { slot: number })[] = []
+    let maxSlot = -1
+
+    for (const seg of rawSegments) {
+      // Find first available slot for this segment's duration
+      let slot = 0
+      while (true) {
+        let fit = true
+        for (let i = seg.startIdx; i <= seg.endIdx; i++) {
+          if (slots[i][slot]) {
+            fit = false
+            break
+          }
+        }
+        if (fit) break
+        slot++
+      }
+
+      // Mark slot as occupied
+      for (let i = seg.startIdx; i <= seg.endIdx; i++) {
+        slots[i][slot] = 1
+      }
+
+      if (slot > maxSlot) maxSlot = slot
+      segmentsWithSlot.push({ ...seg, slot })
+    }
+
+    return { segments: segmentsWithSlot, maxSlot }
   }
 
   return (
-    <div className="min-h-screen bg-muted/30 p-0 m-0">
-      <div className="w-full max-w-none p-0 m-0 pr-4 sm:pr-6 lg:pr-10 pl-4 sm:pl-6 lg:pl-10">
-        {/* Header */}
-        <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-semibold">Kalender</h1>
-          <p className="text-muted-foreground">Daftar jadwal</p>
+    <div className="min-h-screen bg-muted/30 p-6">
+      <div className="w-full max-w-7xl mx-auto">
+        <div className="flex items-start justify-between">
+          <div className="space-y-1">
+            <h1 className="text-2xl sm:text-3xl font-semibold">Kalender</h1>
+            <p className="text-muted-foreground">Daftar jadwal</p>
+          </div>
         </div>
 
-        {/* Controls */}
-        <div className="mt-4">
+        <div className="mt-4 flex items-center gap-3">
           <div className="relative inline-block">
             <Button
               variant="outline"
@@ -182,18 +219,14 @@ export default function AdminKalenderPage() {
             </Button>
 
             {open && (
-              <div className="absolute z-20 mt-2 w-44 rounded-xl border bg-card shadow-sm">
+              <div className="absolute z-20 mt-2 w-44 rounded-md border bg-card shadow-sm">
                 <ul className="max-h-64 overflow-auto py-1" role="listbox">
                   {MONTHS_ID.map((m, i) => (
                     <li key={m}>
                       <button
                         type="button"
-                        onClick={() => {
-                          setMonth(i)
-                          setOpen(false)
-                        }}
-                        className={`w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer ${i === month ? "bg-accent/50" : ""
-                          }`}
+                        onClick={() => { setMonth(i); setOpen(false) }}
+                        className={`w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer ${i === month ? "bg-accent/50" : ""}`}
                         role="option"
                         aria-selected={i === month}
                       >
@@ -205,91 +238,176 @@ export default function AdminKalenderPage() {
               </div>
             )}
           </div>
+
+          <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
+            <SelectTrigger className="w-28">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[2024, 2025, 2026].map((y) => (
+                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
-        {/* Calendar card */}
-        <section className="mt-4 rounded-2xl border bg-card p-4 sm:p-6">
-          {/* Loading State */}
-          {isLoading && (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="size-8 animate-spin text-muted-foreground" />
-              <span className="ml-2 text-muted-foreground">Memuat kalender...</span>
+        {isLoading ? (
+          <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+            <Spinner /> Memuat kalender...
+          </div>
+        ) : isError ? (
+          <div className="mt-4 flex flex-col items-start gap-2">
+            <div className="text-sm text-destructive">Gagal memuat kalender.</div>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>Coba Lagi</Button>
+          </div>
+        ) : (
+          <section className="mt-4 rounded-2xl border bg-card p-4 sm:p-6">
+            <div className="grid grid-cols-7 rounded-xl overflow-hidden">
+              {WEEKDAYS_ID.map((d) => (
+                <div key={d} className="bg-destructive text-primary-foreground px-3 py-2 text-center font-medium border-r last:border-r-0">
+                  {d}
+                </div>
+              ))}
             </div>
-          )}
 
-          {/* Error State */}
-          {error && (
-            <div className="flex items-center justify-center py-12 text-destructive">
-              <AlertCircle className="size-6 mr-2" />
-              <span>Gagal memuat kalender: {error.message}</span>
-            </div>
-          )}
+            <div className="mt-0">
+              {weeks.map((week, wi) => {
+                const { segments, maxSlot } = getWeekSegments(week)
+                // Calculate dynamic height based on max overlapping events
+                // Base 7rem (28) + extra space per additional slot
+                const heightStyle = maxSlot > 2 ? { height: `${(maxSlot + 2) * 2.5}rem` } : undefined
 
-          {/* Calendar Grid */}
-          {!isLoading && !error && (
-            <>
-              {/* Weekday header */}
-              <div className="grid grid-cols-7 rounded-xl overflow-hidden">
-                {WEEKDAYS_ID.map((d) => (
-                  <div
-                    key={d}
-                    className="bg-destructive text-primary-foreground px-3 py-2 text-center font-medium border-r last:border-r-0"
-                  >
-                    {d}
-                  </div>
-                ))}
-              </div>
-
-              {/* Weeks */}
-              <div className="mt-0">
-                {weeks.map((week, wi) => {
-                  const segments = getWeekSegments(week)
-                  return (
-                    <div key={wi} className="relative">
-                      {/* day cells */}
-                      <div className="grid grid-cols-7">
-                        {week.map((c, ci) => (
-                          <div
-                            key={ci}
-                            className={`h-28 border ${c.inMonth ? "bg-card" : "bg-muted/40"}`}
-                          >
-                            <div className="px-2 pt-2 text-xs text-muted-foreground">{c.day}</div>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* event overlays */}
-                      {segments.map((s, si) => (
+                return (
+                  <div key={wi} className="relative">
+                    <div className="grid grid-cols-7">
+                      {week.map((c, ci) => (
                         <div
-                          key={si}
-                          className={`absolute z-10 pointer-events-none h-7 ${s.colorClass} rounded-full flex items-center justify-center text-xs font-medium text-primary-foreground`}
-                          style={{
-                            top: 34,
-                            left: `${s.leftPct}%`,
-                            width: `${s.widthPct}%`,
-                            paddingLeft: 12,
-                            paddingRight: 12,
-                            backgroundColor: s.colorHex || undefined,
-                          }}
+                          key={ci}
+                          className={`min-h-28 border ${c.inMonth ? "bg-card" : "bg-muted/40"}`}
+                          style={heightStyle}
                         >
-                          {s.label}
+                          <div className="px-2 pt-2 text-xs text-muted-foreground">{c.day}</div>
                         </div>
                       ))}
                     </div>
-                  )
-                })}
-              </div>
 
-              {/* Empty State */}
-              {eventsData?.length === 0 && (
-                <div className="text-center py-12 text-muted-foreground">
-                  Tidak ada event di bulan ini
-                </div>
-              )}
-            </>
-          )}
-        </section>
+                    {segments.map((s, si) => (
+                      <div
+                        key={si}
+                        className={`absolute z-10 h-7 ${s.colorClass} rounded-full flex items-center justify-center text-xs font-medium text-primary-foreground cursor-pointer hover:opacity-90 transition-opacity`}
+                        style={{
+                          top: 34 + (s.slot * 32), // Dynamic top: Base 34 + 32px per slot
+                          left: `${s.leftPct}%`,
+                          width: `${s.widthPct}%`,
+                          paddingLeft: 12,
+                          paddingRight: 12,
+                          backgroundColor: s.colorHex ?? undefined,
+                        }}
+                        onClick={() => handleOpenEdit(s.event as CalendarEvent)}
+                        title="Klik untuk edit"
+                      >
+                        <span className="truncate">{s.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* Event List */}
+        {events && events.length > 0 && (
+          <section className="mt-6">
+            <h2 className="text-lg font-semibold mb-3">Daftar Aktivitas Bulan Ini</h2>
+            <div className="space-y-2">
+              {events.map((event) => {
+                const colorClass = event.colorHex
+                  ? ""
+                  : EVENT_COLORS[event.type] ?? "bg-chart-4"
+                const typeLabel = EVENT_TYPES.find(t => t.value === event.type)?.label ?? event.type
+
+                return (
+                  <div key={event.id} className="bg-card border rounded-xl p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-3 h-3 rounded-full ${colorClass}`}
+                        style={{ backgroundColor: event.colorHex ?? undefined }}
+                      />
+                      <div>
+                        <div className="font-medium">{event.title}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {typeLabel} • {new Date(event.startDate).toLocaleDateString("id-ID")}
+                          {event.dueDate && new Date(event.dueDate).getTime() !== new Date(event.startDate).getTime() && (
+                            <> - {new Date(event.dueDate).toLocaleDateString("id-ID")}</>
+                          )}
+                        </div>
+                        {event.organizerName && (
+                          <div className="text-xs text-muted-foreground">Penyelenggara: {event.organizerName}</div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="ghost" size="icon-sm" onClick={() => handleOpenEdit(event as CalendarEvent)}>
+                        <Pencil className="size-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => handleDelete(event as CalendarEvent)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        )}
       </div>
+
+      {/* Edit Activity Dialog */}
+      <ActivityFormDialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open)
+          if (!open) {
+            setEditingEvent(null)
+          }
+        }}
+        editingEvent={editingEvent}
+        onSuccess={() => {
+          void utils.calendarEvents.listForAdmin.invalidate()
+          setDialogOpen(false)
+        }}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Hapus Event</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Apakah Anda yakin ingin menghapus event &quot;{eventToDelete?.title}&quot;? Tindakan ini tidak dapat dibatalkan.
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
+              Batal
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={confirmDelete}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? <><Spinner className="mr-2" /> Menghapus...</> : "Hapus"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

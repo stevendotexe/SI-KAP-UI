@@ -305,7 +305,7 @@ export const dashboardsRouter = createTRPCRouter({
       };
     }),
 
-  getAttendancePieChart: mentorProcedure
+  getAttendancePieChart: adminOrMentorProcedure
     .meta(docs.getAttendancePieChart)
     .use(requirePermissions({ analytics: ["read"] }))
     .input(z.object({ from: z.date().optional(), to: z.date().optional() }))
@@ -313,17 +313,23 @@ export const dashboardsRouter = createTRPCRouter({
       const range = coerceRange(input);
       const fromDateStr = range.from.toISOString().slice(0, 10);
       const toDateStr = range.to.toISOString().slice(0, 10);
-      const mp = await ctx.db.query.mentorProfile.findFirst({
-        where: eq(mentorProfile.userId, ctx.session.user.id),
-      });
-      if (!mp) throw new TRPCError({ code: "FORBIDDEN" });
+
+      let mentorFilterId: number | null = null;
+      if (ctx.session.user.role === "mentor") {
+        const mp = await ctx.db.query.mentorProfile.findFirst({
+          where: eq(mentorProfile.userId, ctx.session.user.id),
+        });
+        if (!mp) throw new TRPCError({ code: "FORBIDDEN" });
+        mentorFilterId = mp.id;
+      }
+
       const rows = await ctx.db
         .select({ status: attendanceLog.status, value: sql<number>`count(*)` })
         .from(attendanceLog)
         .innerJoin(placement, eq(attendanceLog.placementId, placement.id))
         .where(
           and(
-            eq(placement.mentorId, mp.id),
+            mentorFilterId ? eq(placement.mentorId, mentorFilterId) : undefined,
             gte(attendanceLog.date, fromDateStr),
             lte(attendanceLog.date, toDateStr),
           ),

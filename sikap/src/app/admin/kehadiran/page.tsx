@@ -1,218 +1,205 @@
-"use client";
+"use client"
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Search, Download, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
-import { api } from "@/trpc/react";
-import { Spinner } from "@/components/ui/spinner";
+import React from "react"
+import { Button } from "@/components/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Spinner } from "@/components/ui/spinner"
+import Link from "next/link"
+import { api } from "@/trpc/react"
 
-const statusConfig: Record<string, string> = {
-  present: "bg-emerald-100 text-emerald-700",
-  absent: "bg-red-100 text-red-700",
-  excused: "bg-blue-100 text-blue-700",
-  late: "bg-amber-100 text-amber-700",
-};
+export default function Page() {
+  const [month, setMonth] = React.useState("Semua Tanggal")
 
-const statusLabel: Record<string, string> = {
-  present: "Hadir",
-  absent: "Tidak Hadir",
-  excused: "Izin",
-  late: "Terlambat",
-};
+  // Get date range from month filter
+  const dateRange = React.useMemo(() => {
+    if (month === "Semua Tanggal") {
+      return {}
+    }
+    const [year, monthNum] = month.split("-").map(Number)
+    if (!year || !monthNum) return {}
 
-export default function AdminKehadiranPage() {
-  const [search, setSearch] = useState("");
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
+    const from = new Date(year, monthNum - 1, 1)
+    const to = new Date(year, monthNum, 0) // Last day of the month
+    to.setHours(23, 59, 59, 999)
 
-  // TODO: Add company selector UI - hardcoded to company 1 for now
-  const companyId = 1;
+    return { from, to }
+  }, [month])
 
-  // Validate date before query
-  const dateObj = new Date(selectedDate);
-  const isValidDate = !isNaN(dateObj.getTime());
+  // For admin, we don't filter by company to show all data
+  const { data, isLoading, isError, refetch } = api.attendances.list.useQuery({
+    from: dateRange.from,
+    to: dateRange.to,
+    limit: 100,
+    offset: 0,
+  })
 
-  const { data, isLoading, isError } = api.attendances.detail.useQuery({
-    companyId,
-    date: dateObj,
-    search: search || undefined,
-    limit: 200,
-  }, {
-    enabled: isValidDate,
-  });
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return new Intl.DateTimeFormat("id-ID", {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    }).format(date);
-  };
-
-  const formatTime = (isoString: string | null) => {
-    if (!isoString) return "-";
-    const date = new Date(isoString);
-    return date.toLocaleTimeString("id-ID", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  const summary = {
-    hadir: data?.items.filter((a) => a.status === "present").length ?? 0,
-    tidakHadir: data?.items.filter((a) => a.status === "absent").length ?? 0,
-    izin: data?.items.filter((a) => a.status === "excused").length ?? 0,
-
-  };
+  const items = data?.items ?? []
+  const summary = data?.summary ?? { date: new Date().toISOString().slice(0, 10), presentCount: 0, absentCount: 0, total: 0, attendancePercent: 0 }
 
   return (
-    <main className="min-h-screen bg-muted/30 p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <main className="min-h-screen bg-muted text-foreground">
+      <div className="max-w-[1200px] mx-auto px-4 py-4 md:px-6 md:py-8">
+        <div className="mb-4">
+          <h1 className="text-2xl font-semibold">Kehadiran</h1>
+          <p className="text-sm text-muted-foreground">Akumulasi Kehadiran Siswa PKL</p>
+        </div>
+
+        <div className="bg-card border rounded-xl shadow-sm p-4 md:p-6 flex items-start justify-between">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-semibold">Kehadiran Siswa</h1>
-            <p className="text-muted-foreground mt-1">Rekap kehadiran harian siswa PKL/Prakerin</p>
+            <div className="text-sm font-medium">Ringkasan Hari Ini</div>
+            <div className="text-4xl font-semibold mt-2">{summary.presentCount}</div>
+            <div className="text-sm text-muted-foreground mt-2">Siswa hadir dari total {summary.total}</div>
+            <div className="text-sm text-muted-foreground">{summary.absentCount} tidak hadir</div>
           </div>
-          <Button variant="outline">
-            <Download className="w-4 h-4 mr-2" />
-            Ekspor Data
-          </Button>
+          <div className="text-right">
+            <div className="text-xs text-muted-foreground">Tanggal</div>
+            <div className="text-sm font-medium">{summary.date}</div>
+            <div className="text-xs text-muted-foreground mt-1">Kehadiran: {summary.attendancePercent}%</div>
+          </div>
         </div>
 
-        {/* Date Navigation */}
-        <div className="flex items-center justify-center gap-4">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => {
-              const d = new Date(selectedDate);
-              d.setDate(d.getDate() - 1);
-              setSelectedDate(d.toISOString().slice(0, 10));
-            }}
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-card border">
-            <Calendar className="w-4 h-4 text-muted-foreground" />
-            <span className="font-medium">{formatDate(selectedDate)}</span>
-          </div>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => {
-              const d = new Date(selectedDate);
-              d.setDate(d.getDate() + 1);
-              setSelectedDate(d.toISOString().slice(0, 10));
-            }}
-          >
-            <ChevronRight className="w-4 h-4" />
-          </Button>
+        <div className="mt-4">
+          <Select value={month} onValueChange={setMonth}>
+            <SelectTrigger className="min-w-[240px] w-full sm:w-fit" aria-label="Filter Tanggal">
+              <SelectValue placeholder="Semua Tanggal" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Semua Tanggal">Semua Tanggal</SelectItem>
+              <SelectItem value="2025-01">Januari 2025</SelectItem>
+              <SelectItem value="2025-02">Februari 2025</SelectItem>
+              <SelectItem value="2025-03">Maret 2025</SelectItem>
+              <SelectItem value="2025-04">April 2025</SelectItem>
+              <SelectItem value="2025-05">Mei 2025</SelectItem>
+              <SelectItem value="2025-06">Juni 2025</SelectItem>
+              <SelectItem value="2025-07">Juli 2025</SelectItem>
+              <SelectItem value="2025-08">Agustus 2025</SelectItem>
+              <SelectItem value="2025-09">September 2025</SelectItem>
+              <SelectItem value="2025-10">Oktober 2025</SelectItem>
+              <SelectItem value="2025-11">November 2025</SelectItem>
+              <SelectItem value="2025-12">Desember 2025</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="rounded-2xl border bg-card p-4 shadow-sm text-center">
-            <div className="text-3xl font-semibold text-emerald-600">{summary.hadir}</div>
-            <div className="text-sm text-muted-foreground mt-1">Hadir</div>
-          </div>
-          <div className="rounded-2xl border bg-card p-4 shadow-sm text-center">
-            <div className="text-3xl font-semibold text-red-600">{summary.tidakHadir}</div>
-            <div className="text-sm text-muted-foreground mt-1">Tidak Hadir</div>
-          </div>
-          <div className="rounded-2xl border bg-card p-4 shadow-sm text-center">
-            <div className="text-3xl font-semibold text-blue-600">{summary.izin}</div>
-            <div className="text-sm text-muted-foreground mt-1">Izin</div>
-          </div>
-
-        </div>
-
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Cari nama siswa atau sekolah..."
-            className="pl-10 rounded-full"
-          />
-        </div>
-
-        {/* Table */}
-        <div className="rounded-2xl border bg-card shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            {isLoading ? (
-              <div className="flex justify-center py-12">
-                <Spinner className="size-8" />
+        <div className="mt-4 bg-card border rounded-xl shadow-sm p-4">
+          {isLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground"><Spinner /> Memuat data kehadiran...</div>
+          ) : isError ? (
+            <div className="flex flex-col items-start gap-2">
+              <div className="text-sm text-destructive">Gagal memuat data kehadiran.</div>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>Coba Lagi</Button>
+            </div>
+          ) : items.length === 0 ? (
+            <div className="text-sm text-muted-foreground">Tidak ada data kehadiran.</div>
+          ) : (
+            <div className="space-y-3">
+              <div className="grid grid-cols-3 gap-2 px-2">
+                <div className="text-sm font-medium">Tanggal</div>
+                <div className="text-sm font-medium">Kehadiran</div>
+                <div className="text-sm font-medium">Detail</div>
               </div>
-            ) : isError ? (
-              <div className="text-center py-12 text-destructive">
-                Gagal memuat data kehadiran. Silakan coba lagi.
-              </div>
-            ) : !data?.items.length ? (
-              <div className="text-center py-12 text-muted-foreground">
-                Tidak ada data kehadiran untuk tanggal ini.
-              </div>
-            ) : (
-              <table className="w-full">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">No</th>
-                    <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">Nama Siswa</th>
-                    <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">Sekolah</th>
-                    <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">Status Hari Ini</th>
-                    <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">Jam Masuk</th>
-                    <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">Jam Keluar</th>
-                    <th className="text-center text-sm font-medium text-emerald-700 px-4 py-3 bg-emerald-50">H</th>
-                    <th className="text-center text-sm font-medium text-red-700 px-4 py-3 bg-red-50">TH</th>
-                    <th className="text-center text-sm font-medium text-blue-700 px-4 py-3 bg-blue-50">I</th>
-
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.items.map((attendance, index) => (
-                    <tr key={attendance.id} className="border-t hover:bg-muted/30 transition-colors">
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{index + 1}</td>
-                      <td className="px-4 py-3 font-medium">{attendance.student.name}</td>
-                      <td className="px-4 py-3 text-sm">{attendance.student.school || "-"}</td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusConfig[attendance.status] ?? "bg-gray-100 text-gray-700"
-                            }`}
-                        >
-                          {statusLabel[attendance.status] ?? attendance.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm font-mono">{formatTime(attendance.checkInAt)}</td>
-                      <td className="px-4 py-3 text-sm font-mono">{formatTime(attendance.checkOutAt)}</td>
-                      <td className="px-4 py-3 text-center text-sm font-semibold text-emerald-700">
-                        {attendance.counters.hadir}
-                      </td>
-                      <td className="px-4 py-3 text-center text-sm font-semibold text-red-700">
-                        {attendance.counters.tidakHadir}
-                      </td>
-                      <td className="px-4 py-3 text-center text-sm font-semibold text-blue-700">
-                        {attendance.counters.izin}
-                      </td>
-
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+              {items.map((d, i) => (
+                <div key={i} className="grid grid-cols-3 items-center gap-2 px-2 py-2 rounded-md">
+                  <div className="text-sm">{d.date}</div>
+                  <div className="text-sm">{d.attendancePercent}%</div>
+                  <div className="text-sm">
+                    <Link href={`/admin/kehadiran/${d.date}`}>
+                      <Button variant="destructive" size="sm" className="rounded-full">Detail</Button>
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Footer */}
-        {!isLoading && !isError && (
-          <div className="text-sm text-muted-foreground text-center">
-            Total: {data?.items.length ?? 0} siswa
-          </div>
-        )}
+        <AccumulationTable />
       </div>
     </main>
-  );
+  )
 }
 
+function AccumulationTable() {
+  // For admin, we don't filter by company to show all data
+  const { data, isLoading, isError, refetch } = api.attendances.listStudentAccumulation.useQuery({
+    limit: 200,
+    offset: 0,
+  })
+
+  const [page, setPage] = React.useState(1)
+  const [q, setQ] = React.useState("")
+  const perPage = 10
+
+  const studentSummary = data?.items ?? []
+
+  const filtered = React.useMemo(() => studentSummary.filter((r) => (q ? r.name.toLowerCase().includes(q.toLowerCase()) : true)), [studentSummary, q])
+  const totalPages = Math.ceil(filtered.length / perPage) || 1
+  const start = (page - 1) * perPage
+  const rows = filtered.slice(start, start + perPage)
+
+  return (
+    <div className="mt-6 bg-card border rounded-xl shadow-sm p-4">
+      <h3 className="text-sm font-medium mb-4">Tabel Akumulasi Kehadiran Siswa Satu Periode</h3>
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <input
+          list="accNames"
+          className="border rounded-(--radius-sm) px-3 py-2 text-sm w-full sm:w-64"
+          placeholder="Cari Nama Siswa"
+          value={q}
+          onChange={(e) => {
+            setPage(1)
+            setQ(e.target.value)
+          }}
+        />
+        <datalist id="accNames">
+          {studentSummary.map((r: { name: string }, i: number) => (
+            <option key={i} value={r.name} />
+          ))}
+        </datalist>
+      </div>
+      <div className="overflow-x-auto">
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground py-4"><Spinner /> Memuat data...</div>
+        ) : rows.length === 0 ? (
+          <div className="text-sm text-muted-foreground py-4">Tidak ada data akumulasi kehadiran siswa.</div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-muted-foreground text-xs">
+                <th className="text-left py-2 px-2">No</th>
+                <th className="text-left py-2 px-2">Nama Siswa</th>
+                <th className="text-left py-2 px-2">Hadir</th>
+                <th className="text-left py-2 px-2">Izin</th>
+                <th className="text-left py-2 px-2">Tidak Hadir</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r: { no: number; name: string; present: number; excused: number; absent: number }, idx: number) => (
+                <tr key={idx} className={idx % 2 === 0 ? "bg-transparent" : "bg-muted/20"}>
+                  <td className="py-2 px-2">{r.no}</td>
+                  <td className="py-2 px-2">{r.name}</td>
+                  <td className="py-2 px-2">
+                    <span className="inline-flex items-center justify-center rounded-(--radius-sm) px-2 py-0.5 text-xs bg-green-100 text-green-800">{r.present}</span>
+                  </td>
+                  <td className="py-2 px-2">
+                    <span className="inline-flex items-center justify-center rounded-(--radius-sm) px-2 py-0.5 text-xs bg-yellow-100 text-yellow-800">{r.excused}</span>
+                  </td>
+                  <td className="py-2 px-2">
+                    <span className="inline-flex items-center justify-center rounded-(--radius-sm) px-2 py-0.5 text-xs bg-red-100 text-red-800">{r.absent}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+      <div className="flex items-center justify-between mt-3">
+        <div className="text-xs text-muted-foreground">Halaman {page} dari {totalPages}</div>
+        <div className="flex items-center gap-2">
+          <button className="px-3 py-1 rounded-(--radius-sm) border disabled:opacity-50" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Sebelumnya</button>
+          <button className="px-3 py-1 rounded-(--radius-sm) border disabled:opacity-50" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>Berikutnya</button>
+        </div>
+      </div>
+    </div>
+  )
+}

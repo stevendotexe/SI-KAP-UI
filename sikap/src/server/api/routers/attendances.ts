@@ -54,7 +54,7 @@ export const attendancesRouter = createTRPCRouter({
     )
     .input(
       z.object({
-        companyId: z.number(),
+        companyId: z.number().optional(),
         from: z.date().optional(),
         to: z.date().optional(),
         summaryDate: z.date().optional(),
@@ -68,16 +68,22 @@ export const attendancesRouter = createTRPCRouter({
       const toDateStr = range.to.toISOString().slice(0, 10);
 
       let mentorFilterId: number | null = null;
+      let effectiveCompanyId = input.companyId;
+
       if (ctx.session.user.role === "mentor") {
         const mp = await ctx.db.query.mentorProfile.findFirst({
           where: eq(mentorProfile.userId, ctx.session.user.id),
         });
         if (!mp) throw new TRPCError({ code: "FORBIDDEN" });
         mentorFilterId = mp.id;
+        // For mentors, use their company if not provided
+        if (!effectiveCompanyId && mp.companyId) {
+          effectiveCompanyId = mp.companyId;
+        }
       }
 
       const baseWhere = and(
-        eq(placement.companyId, input.companyId),
+        effectiveCompanyId ? eq(placement.companyId, effectiveCompanyId) : undefined,
         gte(attendanceLog.date, fromDateStr),
         lte(attendanceLog.date, toDateStr),
         mentorFilterId ? eq(placement.mentorId, mentorFilterId) : undefined,
@@ -118,7 +124,7 @@ export const attendancesRouter = createTRPCRouter({
         .innerJoin(placement, eq(attendanceLog.placementId, placement.id))
         .where(
           and(
-            eq(placement.companyId, input.companyId),
+            effectiveCompanyId ? eq(placement.companyId, effectiveCompanyId) : undefined,
             eq(attendanceLog.date, summaryDate),
             mentorFilterId ? eq(placement.mentorId, mentorFilterId) : undefined,
           ),
