@@ -36,7 +36,7 @@ const EVENT_TYPES = [
 
 type EventType = typeof EVENT_TYPES[number]["value"]
 
-const EVENT_COLORS: Record<EventType, string> = {
+const EVENT_COLORS: Record<string, string> = {
   in_class: "bg-blue-500",
   field_trip: "bg-green-500",
   meet_greet: "bg-purple-500",
@@ -62,7 +62,7 @@ function buildWeeks(year: number, month: number) {
 type CalendarEvent = {
   id: number
   title: string
-  type: EventType
+  type: string
   startDate: Date
   dueDate: Date
   organizerName: string | null
@@ -176,7 +176,7 @@ export default function Page() {
       while (true) {
         let fit = true
         for (let i = seg.startIdx; i <= seg.endIdx; i++) {
-          if (slots[i][slot]) {
+          if (slots[i]?.[slot]) {
             fit = false
             break
           }
@@ -187,7 +187,7 @@ export default function Page() {
 
       // Mark slot as occupied
       for (let i = seg.startIdx; i <= seg.endIdx; i++) {
-        slots[i][slot] = 1
+        if (slots[i]) slots[i]![slot] = 1
       }
 
       if (slot > maxSlot) maxSlot = slot

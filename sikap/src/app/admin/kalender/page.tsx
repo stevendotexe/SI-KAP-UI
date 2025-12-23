@@ -174,7 +174,7 @@ export default function Page() {
       while (true) {
         let fit = true
         for (let i = seg.startIdx; i <= seg.endIdx; i++) {
-          if (slots[i][slot]) {
+          if (slots[i]?.[slot]) {
             fit = false
             break
           }
@@ -185,7 +185,7 @@ export default function Page() {
 
       // Mark slot as occupied
       for (let i = seg.startIdx; i <= seg.endIdx; i++) {
-        slots[i][slot] = 1
+        if (slots[i]) slots[i]![slot] = 1
       }
 
       if (slot > maxSlot) maxSlot = slot
