@@ -80,8 +80,8 @@ export default function DaftarTugasSiswaPage() {
                   <DropdownMenuItem
                     onClick={() => setSelectedStatus("todo")}
                     className={`w-full px-3 py-2 text-left text-sm justify-start ${selectedStatus === "todo"
-                        ? "bg-accent/50"
-                        : "hover:bg-accent hover:text-accent-foreground"
+                      ? "bg-accent/50"
+                      : "hover:bg-accent hover:text-accent-foreground"
                       }`}
                   >
                     Belum Dikerjakan
@@ -89,8 +89,8 @@ export default function DaftarTugasSiswaPage() {
                   <DropdownMenuItem
                     onClick={() => setSelectedStatus("in_progress")}
                     className={`w-full px-3 py-2 text-left text-sm justify-start ${selectedStatus === "in_progress"
-                        ? "bg-accent/50"
-                        : "hover:bg-accent hover:text-accent-foreground"
+                      ? "bg-accent/50"
+                      : "hover:bg-accent hover:text-accent-foreground"
                       }`}
                   >
                     Sedang Dikerjakan
@@ -98,8 +98,8 @@ export default function DaftarTugasSiswaPage() {
                   <DropdownMenuItem
                     onClick={() => setSelectedStatus("rejected")}
                     className={`w-full px-3 py-2 text-left text-sm justify-start ${selectedStatus === "rejected"
-                        ? "bg-accent/50"
-                        : "hover:bg-accent hover:text-accent-foreground"
+                      ? "bg-accent/50"
+                      : "hover:bg-accent hover:text-accent-foreground"
                       }`}
                   >
                     Ditolak
@@ -171,7 +171,7 @@ export default function DaftarTugasSiswaPage() {
                           </span>
                         </div>
                         {task.description && (
-                          <p className="text-muted-foreground">{task.description}</p>
+                          <div className="text-muted-foreground" dangerouslySetInnerHTML={{ __html: task.description }} />
                         )}
                         <p className="text-destructive font-semibold">
                           Tenggat waktu : {formatDate(task.dueDate)}

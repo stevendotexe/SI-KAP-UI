@@ -59,7 +59,12 @@ export default function LaporanSiswaPage() {
       updatedAt: t.updatedAt,
       originalStatus: t.status
     })) ?? [])
-  ].sort(() => 0)
+  ].sort((a, b) => {
+    // Sort by submittedAt date in descending order (newest first)
+    const dateA = a.submittedAt ? new Date(a.submittedAt).getTime() : 0
+    const dateB = b.submittedAt ? new Date(b.submittedAt).getTime() : 0
+    return dateB - dateA
+  })
 
   // Filter merged items based on client-side filters if needed (e.g. if API filters don't cover everything perfectly)
   const filteredItems = mergedItems.filter(item => {

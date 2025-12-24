@@ -871,7 +871,6 @@ export const attendancesRouter = createTRPCRouter({
           message: "You are not authorized to delete this attendance",
         });
       }
-
       await ctx.db.delete(attendanceLog).where(eq(attendanceLog.id, input.id));
 
       return { success: true };

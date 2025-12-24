@@ -90,27 +90,39 @@ export default function CalendarPage() {
   function getWeekSegments(week: DayCell[]) {
     if (!events || events.length === 0) return []
 
-    const minDay = Math.min(...week.filter(w => w.inMonth).map(w => w.day))
-    const maxDay = Math.max(...week.filter(w => w.inMonth).map(w => w.day))
-    if (!isFinite(minDay) || !isFinite(maxDay)) return []
+    // Get the actual date range for this week
+    const weekStart = week[0]?.date
+    const weekEnd = week[6]?.date
+    if (!weekStart || !weekEnd) return []
 
-    return events
+    const segments = events
       .map(evt => {
         const startDate = evt.startDate
         const endDate = evt.endDate ?? evt.startDate
 
-        // Check if event is in current month
-        if (startDate.getMonth() !== month && endDate.getMonth() !== month) return null
+        // Convert to date-only strings for comparison (ignore time)
+        const evtStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate())
+        const evtEnd = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate())
+        const wkStart = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate())
+        const wkEnd = new Date(weekEnd.getFullYear(), weekEnd.getMonth(), weekEnd.getDate())
 
-        const startDay = startDate.getMonth() === month ? startDate.getDate() : 1
-        const endDay = endDate.getMonth() === month ? endDate.getDate() : new Date(year, month + 1, 0).getDate()
+        // Check if event overlaps with this week
+        if (evtEnd < wkStart || evtStart > wkEnd) return null
 
-        const segStartDay = Math.max(startDay, minDay)
-        const segEndDay = Math.min(endDay, maxDay)
-        if (segStartDay > segEndDay) return null
+        // Calculate which days in the week to show the event
+        const segStart = evtStart > wkStart ? evtStart : wkStart
+        const segEnd = evtEnd < wkEnd ? evtEnd : wkEnd
 
-        const startIdx = week.findIndex(c => c.inMonth && c.day === segStartDay)
-        const endIdx = week.findIndex(c => c.inMonth && c.day === segEndDay)
+        // Find indices in the week array
+        const startIdx = week.findIndex(c => {
+          const cellDate = new Date(c.date.getFullYear(), c.date.getMonth(), c.date.getDate())
+          return cellDate.getTime() === segStart.getTime()
+        })
+        const endIdx = week.findIndex(c => {
+          const cellDate = new Date(c.date.getFullYear(), c.date.getMonth(), c.date.getDate())
+          return cellDate.getTime() === segEnd.getTime()
+        })
+
         if (startIdx < 0 || endIdx < 0) return null
 
         const span = endIdx - startIdx + 1
@@ -121,6 +133,8 @@ export default function CalendarPage() {
         const backgroundColor = evt.colorHex ?? EVENT_TYPE_COLORS[evt.type] ?? "#6b7280"
 
         return {
+          startIdx,
+          endIdx,
           leftPct,
           widthPct,
           label: evt.title,
@@ -128,7 +142,36 @@ export default function CalendarPage() {
           event: evt,
         }
       })
-      .filter(Boolean) as { leftPct: number; widthPct: number; label: string; backgroundColor: string; event: CalendarEvent }[]
+      .filter(Boolean) as Array<{
+        startIdx: number
+        endIdx: number
+        leftPct: number
+        widthPct: number
+        label: string
+        backgroundColor: string
+        event: CalendarEvent
+      }>
+
+    // Assign row indices to segments to prevent overlapping
+    const segmentsWithRows: Array<typeof segments[0] & { rowIndex: number }> = []
+
+    for (const seg of segments) {
+      // Find the lowest available row for this segment
+      let rowIndex = 0
+      while (true) {
+        // Check if this row has conflicting segments (overlapping days)
+        const conflict = segmentsWithRows.some(
+          existing =>
+            existing.rowIndex === rowIndex &&
+            !(seg.endIdx < existing.startIdx || seg.startIdx > existing.endIdx)
+        )
+        if (!conflict) break
+        rowIndex++
+      }
+      segmentsWithRows.push({ ...seg, rowIndex })
+    }
+
+    return segmentsWithRows
   }
 
   return (
@@ -225,7 +268,7 @@ export default function CalendarPage() {
                   <div key={wi} className="relative">
                     <div className="grid grid-cols-7">
                       {week.map((c, ci) => (
-                        <div key={ci} className={`h-28 border ${c.inMonth ? "bg-card" : "bg-muted/40"}`}>
+                        <div key={ci} className={`h-40 border ${c.inMonth ? "bg-card" : "bg-muted/40"}`}>
                           <div className="px-2 pt-2 text-xs text-muted-foreground">{c.day}</div>
                         </div>
                       ))}
@@ -236,7 +279,7 @@ export default function CalendarPage() {
                         key={si}
                         className="absolute z-10 h-7 rounded-full flex items-center justify-center text-xs font-medium text-white cursor-default"
                         style={{
-                          top: 34,
+                          top: 34 + (s.rowIndex * 32),
                           left: `${s.leftPct}%`,
                           width: `${s.widthPct}%`,
                           paddingLeft: 12,

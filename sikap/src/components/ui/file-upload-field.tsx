@@ -565,54 +565,102 @@ export function FileUploadField({
                     : "border-border bg-card"
               )}
             >
-              {/* File icon or preview */}
-              <div className="flex-shrink-0">
-                {fileState.url && isImageFile(fileState.mimeType ?? "") ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={fileState.url}
-                    alt={fileState.filename}
-                    className="size-10 rounded object-cover"
-                  />
-                ) : (
-                  <div
-                    className={cn(
-                      "flex size-10 items-center justify-center rounded",
-                      fileState.status === "error"
-                        ? "bg-destructive/10 text-destructive"
-                        : "bg-muted text-muted-foreground"
-                    )}
-                  >
-                    <FileTypeIcon
-                      mimeType={fileState.mimeType}
-                      className="size-5"
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* File info */}
-              <div className="flex-1 min-w-0">
-                <p
-                  className={cn(
-                    "text-sm font-medium truncate",
-                    fileState.status === "error"
-                      ? "text-destructive"
-                      : "text-foreground"
-                  )}
+              {/* Clickable file link wrapper */}
+              {fileState.url && fileState.status === "success" ? (
+                <a
+                  href={fileState.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity"
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  {fileState.filename}
-                </p>
-                {fileState.status === "error" && fileState.error ? (
-                  <p className="text-xs text-destructive">
-                    {fileState.error}
-                  </p>
-                ) : fileState.size ? (
-                  <p className="text-xs text-muted-foreground">
-                    {formatFileSize(fileState.size)}
-                  </p>
-                ) : null}
-              </div>
+                  {/* File icon or preview */}
+                  <div className="flex-shrink-0">
+                    {isImageFile(fileState.mimeType ?? "") ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={fileState.url}
+                        alt={fileState.filename}
+                        className="size-10 rounded object-cover"
+                      />
+                    ) : (
+                      <div
+                        className={cn(
+                          "flex size-10 items-center justify-center rounded bg-muted text-muted-foreground"
+                        )}
+                      >
+                        <FileTypeIcon
+                          mimeType={fileState.mimeType}
+                          className="size-5"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* File info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate text-foreground">
+                      {fileState.filename}
+                    </p>
+                    {fileState.size && (
+                      <p className="text-xs text-muted-foreground">
+                        {formatFileSize(fileState.size)}
+                      </p>
+                    )}
+                  </div>
+                </a>
+              ) : (
+                <>
+                  {/* File icon or preview (non-clickable for uploading/error states) */}
+                  <div className="flex-shrink-0">
+                    {fileState.url && isImageFile(fileState.mimeType ?? "") ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={fileState.url}
+                        alt={fileState.filename}
+                        className="size-10 rounded object-cover"
+                      />
+                    ) : (
+                      <div
+                        className={cn(
+                          "flex size-10 items-center justify-center rounded",
+                          fileState.status === "error"
+                            ? "bg-destructive/10 text-destructive"
+                            : "bg-muted text-muted-foreground"
+                        )}
+                      >
+                        <FileTypeIcon
+                          mimeType={fileState.mimeType}
+                          className="size-5"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* File info */}
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className={cn(
+                        "text-sm font-medium truncate",
+                        fileState.status === "error"
+                          ? "text-destructive"
+                          : "text-foreground"
+                      )}
+                    >
+                      {fileState.filename}
+                    </p>
+                    {fileState.status === "error" && fileState.error ? (
+                      <p className="text-xs text-destructive">
+                        {fileState.error}
+                      </p>
+                    ) : fileState.size ? (
+                      <p className="text-xs text-muted-foreground">
+                        {formatFileSize(fileState.size)}
+                      </p>
+                    ) : null}
+                  </div>
+                </>
+              )}
 
               {/* Status / Delete button */}
               <div className="flex-shrink-0">

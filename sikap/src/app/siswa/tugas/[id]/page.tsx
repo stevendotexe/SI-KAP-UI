@@ -168,9 +168,16 @@ export default function DetailTugasSiswaPage() {
         <section className="mt-6">
           <div className="bg-card rounded-[20px] border p-6 shadow-sm sm:p-8">
             <h3 className="font-semibold">Deskripsi Tugas</h3>
-            <p className="text-foreground/90 mt-2 text-sm leading-relaxed sm:text-base">
-              {data.description ?? "Tidak ada deskripsi"}
-            </p>
+            {data.description ? (
+              <div
+                className="text-foreground/90 mt-2 text-sm leading-relaxed sm:text-base"
+                dangerouslySetInnerHTML={{ __html: data.description }}
+              />
+            ) : (
+              <p className="text-foreground/90 mt-2 text-sm leading-relaxed sm:text-base">
+                Tidak ada deskripsi
+              </p>
+            )}
 
             {/* Task Attachments */}
             {data.attachments && data.attachments.length > 0 && (
