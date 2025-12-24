@@ -52,7 +52,10 @@ export default async function DashboardPage() {
         granularity: "month",
         from: sixMonthsAgo,
       }),
-      caller.dashboards.getAttendancePieChart({}),
+      caller.dashboards.getAttendancePieChart({
+        from: new Date(new Date().setHours(0, 0, 0, 0)),
+        to: new Date(new Date().setHours(23, 59, 59, 999)),
+      }),
       caller.attendances.detail({ date: new Date() }),
     ]);
 
