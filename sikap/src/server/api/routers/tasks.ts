@@ -194,12 +194,17 @@ export const tasksRouter = createTRPCRouter({
       // Compute isLate: true if due date has passed and task is not yet submitted/approved
       const now = new Date();
       const dueDate = t.dueDate ? new Date(t.dueDate) : null;
-      const isLate = dueDate
-        ? now > dueDate &&
+
+      let isLate = false;
+      if (dueDate) {
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const due = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+
+        isLate = today > due &&
           (t.status === "todo" ||
             t.status === "in_progress" ||
-            t.status === "rejected")
-        : false;
+            t.status === "rejected");
+      }
 
       return {
         id: t.id,
