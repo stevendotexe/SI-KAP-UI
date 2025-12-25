@@ -18,6 +18,8 @@ const statements = {
   mentorProfile: ["read", "update"],
   calendarEvent: ["create", "read", "update", "delete"],
   analytics: ["read"],
+  finalReport: ["read", "create", "update", "delete"],
+  certificate: ["read", "create", "update"],
 } as const;
 
 const ac = createAccessControl(statements);
@@ -33,6 +35,8 @@ const adminRole = ac.newRole({
   mentorProfile: ["read", "update"],
   calendarEvent: ["create", "read", "update", "delete"],
   analytics: ["read"],
+  finalReport: ["read", "create", "update", "delete"],
+  certificate: ["read", "create", "update"],
 });
 
 const mentorRole = ac.newRole({
@@ -46,6 +50,8 @@ const mentorRole = ac.newRole({
   mentorProfile: ["read", "update"],
   calendarEvent: ["create", "read", "update"],
   analytics: ["read"],
+  finalReport: ["read", "create", "update", "delete"],
+  certificate: ["read", "create", "update"],
 });
 
 const studentRole = ac.newRole({
@@ -56,6 +62,8 @@ const studentRole = ac.newRole({
   report: ["create", "read"],
   studentProfile: ["read"],
   calendarEvent: ["read"],
+  finalReport: ["read"],
+  certificate: ["read"],
 });
 
 export const auth = betterAuth({

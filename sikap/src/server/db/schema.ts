@@ -73,7 +73,12 @@ export const eventType = pgEnum("event_type", [
  */
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
-  code: text("code").notNull().unique().$defaultFn(() => `TEMP-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`),
+  code: text("code")
+    .notNull()
+    .unique()
+    .$defaultFn(
+      () => `TEMP-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    ),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   role: userRole("role").notNull().default("student"),
@@ -530,13 +535,34 @@ export const finalReport = createTable("final_report", (d) => ({
   grade: d.text(),
   totalScore: d.numeric({ precision: 10, scale: 2 }),
   averageScore: d.numeric({ precision: 5, scale: 2 }),
+  // Snapshot fields for the report
+  studentName: d.text("student_name"),
+  studentNis: d.text("student_nis"),
+  studentMajor: d.text("student_major"), // e.g., "Teknik Komputer dan Jaringan"
+  studentGrade: d.text("student_grade"), // e.g., "XII (Dua Belas)"
+  schoolName: d.text("school_name"),
+  schoolLogoUrl: d.text("school_logo_url"),
+  companyName: d.text("company_name"),
+  companyLogoUrl: d.text("company_logo_url"),
+  mentorName: d.text("mentor_name"),
+  mentorSignatureUrl: d.text("mentor_signature_url"),
+  programKeahlian: d.text("program_keahlian"),
+  konsentrasiKeahlian: d.text("konsentrasi_keahlian"),
+  bidangKeahlian: d.text("bidang_keahlian"),
+  academicYear: d.text("academic_year"), // e.g., "2024/2025"
+  place: d.text("place"), // e.g., "Tasikmalaya"
+  issuedAt: d.date("issued_at"),
+  // Status for draft/finalized
+  status: d.text().default("draft"), // "draft" | "finalized"
+  currentStep: d.integer().default(1), // Track wizard progress for resume
   createdAt: d
     .timestamp({ withTimezone: true })
     .$defaultFn(() => new Date())
     .notNull(),
+  updatedAt: d.timestamp({ withTimezone: true }).$onUpdate(() => new Date()),
 }));
 
-export const finalReportRelations = relations(finalReport, ({ one }) => ({
+export const finalReportRelations = relations(finalReport, ({ one, many }) => ({
   placement: one(placement, {
     fields: [finalReport.placementId],
     references: [placement.id],
@@ -545,6 +571,9 @@ export const finalReportRelations = relations(finalReport, ({ one }) => ({
     fields: [finalReport.approvedByMentorId],
     references: [mentorProfile.id],
   }),
+  scores: many(finalReportScore),
+  certificate: one(certificate),
+  attachments: many(attachment),
 }));
 
 export const competencyTemplate = createTable("competency_template", (d) => ({
@@ -563,14 +592,14 @@ export const competencyTemplate = createTable("competency_template", (d) => ({
 export const finalReportScore = createTable("final_report_score", (d) => ({
   id: d.integer().primaryKey().generatedByDefaultAsIdentity(),
   finalReportId: d
-    .integer()
+    .integer("final_report_id")
     .notNull()
     .references(() => finalReport.id, { onDelete: "cascade" }),
   competencyTemplateId: d
-    .integer()
+    .integer("competency_template_id")
     .notNull()
     .references(() => competencyTemplate.id, { onDelete: "cascade" }),
-  score: d.numeric({ precision: 5, scale: 2 }),
+  score: d.numeric("score", { precision: 5, scale: 2 }),
 }));
 
 export const finalReportScoreRelations = relations(
@@ -586,6 +615,45 @@ export const finalReportScoreRelations = relations(
     }),
   }),
 );
+
+/**
+ * Certificate
+ * Linked to FinalReport (1:1). Stores certificate-specific data.
+ */
+export const certificate = createTable("certificate", (d) => ({
+  id: d.integer().primaryKey().generatedByDefaultAsIdentity(),
+  finalReportId: d
+    .integer()
+    .notNull()
+    .unique()
+    .references(() => finalReport.id, { onDelete: "cascade" }),
+  // Certificate numbering: <Seq>/<CompanyCode>/PKL/<Month>/<Year>
+  sequenceNumber: d.integer("sequence_number").notNull(), // e.g., 24
+  companyCode: d.text("company_code").notNull(), // e.g., "PUSAT-LAPTOP"
+  month: d.integer("month").notNull(), // 1-12
+  year: d.integer("year").notNull(), // e.g., 2025
+  // Derived: certificateNumber = `${seq}/${companyCode}/PKL/${month}/${year}`
+  predicate: d.text("predicate"), // e.g., "BAIK", "SANGAT BAIK", "CUKUP"
+  startDate: d.date("start_date"), // PKL start
+  endDate: d.date("end_date"), // PKL end
+  durationMonths: d.integer("duration_months"), // e.g., 3
+  issuedAt: d.date("issued_at"),
+  place: d.text("place"), // e.g., "Tasikmalaya"
+  signerName: d.text("signer_name"),
+  signerRole: d.text("signer_role"), // e.g., "Pembimbing"
+  createdAt: d
+    .timestamp({ withTimezone: true })
+    .$defaultFn(() => new Date())
+    .notNull(),
+  updatedAt: d.timestamp({ withTimezone: true }).$onUpdate(() => new Date()),
+}));
+
+export const certificateRelations = relations(certificate, ({ one }) => ({
+  finalReport: one(finalReport, {
+    fields: [certificate.finalReportId],
+    references: [finalReport.id],
+  }),
+}));
 
 /**
  * Assessment
@@ -808,3 +876,5 @@ export type Notification = typeof notification.$inferSelect;
 export type NotificationInsert = typeof notification.$inferInsert;
 export type CalendarEvent = typeof calendarEvent.$inferSelect;
 export type CalendarEventInsert = typeof calendarEvent.$inferInsert;
+export type Certificate = typeof certificate.$inferSelect;
+export type CertificateInsert = typeof certificate.$inferInsert;
