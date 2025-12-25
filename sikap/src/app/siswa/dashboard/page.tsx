@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/trpc/react";
+import { uploadFilesAction } from "@/server/storage";
 
 // Review status constant aligned with backend enum
 const REVIEW_STATUS = {
@@ -147,6 +148,11 @@ export default function DashboardPage() {
   const [isIzinSaved, setIsIzinSaved] = useState(false);
   const izinFileInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Selfie blobs for upload
+  const [masukSelfieBlob, setMasukSelfieBlob] = useState<Blob | null>(null);
+  const [keluarSelfieBlob, setKeluarSelfieBlob] = useState<Blob | null>(null);
+  const [isUploadingSelfie, setIsUploadingSelfie] = useState(false);
+
   // Query reverse geocode
   const masukGeo = useReverseGeocode(
     masukCoords?.latitude,
@@ -264,7 +270,11 @@ export default function DashboardPage() {
       console.log("[Geolocation] Requesting location...");
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          console.log("[Geolocation] Success:", pos.coords.latitude, pos.coords.longitude);
+          console.log(
+            "[Geolocation] Success:",
+            pos.coords.latitude,
+            pos.coords.longitude,
+          );
           resolve({
             latitude: pos.coords.latitude,
             longitude: pos.coords.longitude,
@@ -322,14 +332,16 @@ export default function DashboardPage() {
     );
     if (!blob) return;
 
-    const fileName = `capture-${Date.now()}.png`;
+    const fileName = `selfie-${forWhich}-${Date.now()}.png`;
 
     if (forWhich === "masuk") {
       setMasukImageName(fileName);
       setMasukAt(formatTs());
+      setMasukSelfieBlob(blob); // Save blob for later upload
     } else {
       setKeluarImageName(fileName);
       setKeluarAt(formatTs());
+      setKeluarSelfieBlob(blob); // Save blob for later upload
     }
 
     setCameraOpenFor(null);
@@ -357,14 +369,40 @@ export default function DashboardPage() {
     const ts = formatTs();
     setMasukAt(ts);
     setAttendanceError(null);
+    setIsUploadingSelfie(true);
+
     try {
+      // Upload selfie photo first if available
+      let selfieUrl: string | undefined;
+      if (masukSelfieBlob) {
+        const formData = new FormData();
+        formData.append("ownerType", "attendance_log");
+        formData.append("ownerId", "0");
+        const file = new File(
+          [masukSelfieBlob],
+          masukImageName || `selfie-masuk-${Date.now()}.png`,
+          { type: "image/png" },
+        );
+        formData.append("file", file);
+
+        const uploadResponse = await uploadFilesAction(formData);
+        if (
+          uploadResponse.status === "success" &&
+          uploadResponse.data?.[0]?.url
+        ) {
+          selfieUrl = uploadResponse.data[0].url;
+        }
+      }
+
       await checkInMutation.mutateAsync({
         timestamp: new Date(),
         latitude: masukCoords?.latitude,
         longitude: masukCoords?.longitude,
         locationNote: masukLocation,
+        selfieUrl,
       });
       setIsMasukSaved(true);
+      setMasukSelfieBlob(null); // Clear blob after successful upload
     } catch (err) {
       const message =
         err instanceof Error
@@ -372,6 +410,8 @@ export default function DashboardPage() {
           : "Terjadi kesalahan saat menyimpan presensi masuk";
       setAttendanceError(message);
       alert(message);
+    } finally {
+      setIsUploadingSelfie(false);
     }
   };
 
@@ -402,6 +442,7 @@ export default function DashboardPage() {
     setMasukLocation("");
     setMasukAt("");
     setMasukCoords(null);
+    setMasukSelfieBlob(null); // Clear selfie blob
     setIsMasukSaved(false);
     if (masukInputRef.current) masukInputRef.current.value = "";
     if (cameraOpenFor === "masuk") {
@@ -415,6 +456,7 @@ export default function DashboardPage() {
     setKeluarLocation("");
     setKeluarAt("");
     setKeluarCoords(null);
+    setKeluarSelfieBlob(null); // Clear selfie blob
     setIsKeluarSaved(false);
     if (keluarInputRef.current) keluarInputRef.current.value = "";
     if (cameraOpenFor === "keluar") {
@@ -469,21 +511,21 @@ export default function DashboardPage() {
                     >
                       {now
                         ? new Intl.DateTimeFormat("en-GB", {
-                          weekday: "long",
-                          day: "numeric",
-                          month: "long",
-                          year: "numeric",
-                        }).format(now)
+                            weekday: "long",
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric",
+                          }).format(now)
                         : "—"}
                       <br />
                       <span className="text-muted-foreground">
                         {now
                           ? new Intl.DateTimeFormat("en-GB", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            second: "2-digit",
-                            hour12: false,
-                          }).format(now)
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              second: "2-digit",
+                              hour12: false,
+                            }).format(now)
                           : "—"}
                       </span>
                     </div>
@@ -524,10 +566,11 @@ export default function DashboardPage() {
                         }}
                       />
                       <div
-                        className={`mt-4 flex items-center gap-2 ${masukImageName && !isMasukSaved
-                          ? "w-full justify-between md:justify-start"
-                          : ""
-                          }`}
+                        className={`mt-4 flex items-center gap-2 ${
+                          masukImageName && !isMasukSaved
+                            ? "w-full justify-between md:justify-start"
+                            : ""
+                        }`}
                       >
                         <Button
                           variant={
@@ -536,10 +579,11 @@ export default function DashboardPage() {
                               : "destructive"
                           }
                           disabled={isMasukSaved || isIzinSaved}
-                          className={`inline-flex h-9 items-center gap-2 rounded-md px-5 ${isMasukSaved || isIzinSaved
-                            ? "bg-muted text-muted-foreground hover:bg-muted cursor-not-allowed border"
-                            : ""
-                            }`}
+                          className={`inline-flex h-9 items-center gap-2 rounded-md px-5 ${
+                            isMasukSaved || isIzinSaved
+                              ? "bg-muted text-muted-foreground hover:bg-muted cursor-not-allowed border"
+                              : ""
+                          }`}
                           onClick={() => {
                             setCameraOpenFor("masuk");
                             setTimeout(() => {
@@ -572,10 +616,11 @@ export default function DashboardPage() {
                           <Button
                             type="button"
                             variant={isIzinSaved ? "outline" : "secondary"}
-                            className={`inline-flex h-9 items-center gap-2 rounded-md px-5 ${isIzinSaved
-                              ? "bg-muted text-muted-foreground cursor-not-allowed border"
-                              : ""
-                              }`}
+                            className={`inline-flex h-9 items-center gap-2 rounded-md px-5 ${
+                              isIzinSaved
+                                ? "bg-muted text-muted-foreground cursor-not-allowed border"
+                                : ""
+                            }`}
                             onClick={() => setIzinOpen(true)}
                             disabled={isIzinSaved}
                             title="Ajukan Izin"
@@ -613,13 +658,17 @@ export default function DashboardPage() {
                                 void handleCatatMasuk();
                               }}
                               className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md px-5 shadow-sm"
-                              disabled={checkInMutation.isPending}
+                              disabled={
+                                checkInMutation.isPending || isUploadingSelfie
+                              }
                             >
                               <LogIn className="h-4 w-4" />
                               <span className="text-sm font-semibold">
-                                {checkInMutation.isPending
-                                  ? "Menyimpan..."
-                                  : "Catat Jam Masuk"}
+                                {isUploadingSelfie
+                                  ? "Mengunggah foto..."
+                                  : checkInMutation.isPending
+                                    ? "Menyimpan..."
+                                    : "Catat Jam Masuk"}
                               </span>
                             </Button>
                           )}
@@ -659,10 +708,11 @@ export default function DashboardPage() {
                         }}
                       />
                       <div
-                        className={`mt-4 flex items-center gap-2 ${keluarImageName && !isKeluarSaved
-                          ? "w-full justify-between md:justify-start"
-                          : ""
-                          }`}
+                        className={`mt-4 flex items-center gap-2 ${
+                          keluarImageName && !isKeluarSaved
+                            ? "w-full justify-between md:justify-start"
+                            : ""
+                        }`}
                       >
                         <Button
                           variant={
@@ -678,10 +728,11 @@ export default function DashboardPage() {
                               ? "Lakukan presensi masuk terlebih dahulu"
                               : "Ambil Foto"
                           }
-                          className={`inline-flex h-9 items-center gap-2 rounded-md px-5 ${!isMasukSaved || isKeluarSaved || isIzinSaved
-                            ? "bg-muted text-muted-foreground hover:bg-muted cursor-not-allowed border"
-                            : ""
-                            }`}
+                          className={`inline-flex h-9 items-center gap-2 rounded-md px-5 ${
+                            !isMasukSaved || isKeluarSaved || isIzinSaved
+                              ? "bg-muted text-muted-foreground hover:bg-muted cursor-not-allowed border"
+                              : ""
+                          }`}
                           onClick={() => {
                             if (!isMasukSaved) return;
                             setCameraOpenFor("keluar");

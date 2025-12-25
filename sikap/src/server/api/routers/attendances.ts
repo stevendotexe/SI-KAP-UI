@@ -12,12 +12,19 @@ import {
 import {
   attendanceLog,
   attendanceStatus,
+  attachment,
   mentorProfile,
   placement,
   placementStatus,
   studentProfile,
   user,
 } from "@/server/db/schema";
+
+// Helper function to extract filename from URL
+function extractFilenameFromUrl(url: string): string {
+  const parts = url.split("/");
+  return parts[parts.length - 1] ?? url;
+}
 
 const docs = {
   list: {
@@ -83,7 +90,9 @@ export const attendancesRouter = createTRPCRouter({
       }
 
       const baseWhere = and(
-        effectiveCompanyId ? eq(placement.companyId, effectiveCompanyId) : undefined,
+        effectiveCompanyId
+          ? eq(placement.companyId, effectiveCompanyId)
+          : undefined,
         gte(attendanceLog.date, fromDateStr),
         lte(attendanceLog.date, toDateStr),
         mentorFilterId ? eq(placement.mentorId, mentorFilterId) : undefined,
@@ -124,7 +133,9 @@ export const attendancesRouter = createTRPCRouter({
         .innerJoin(placement, eq(attendanceLog.placementId, placement.id))
         .where(
           and(
-            effectiveCompanyId ? eq(placement.companyId, effectiveCompanyId) : undefined,
+            effectiveCompanyId
+              ? eq(placement.companyId, effectiveCompanyId)
+              : undefined,
             eq(attendanceLog.date, summaryDate),
             mentorFilterId ? eq(placement.mentorId, mentorFilterId) : undefined,
           ),
@@ -148,26 +159,26 @@ export const attendancesRouter = createTRPCRouter({
       return {
         summary: summaryRow
           ? (() => {
-            const present = Number(summaryRow.present ?? 0);
-            const absent = Number(summaryRow.absent ?? 0);
-            const total = Number(summaryRow.total ?? 0);
-            const attendancePercent =
-              total === 0 ? 0 : Math.round((present / total) * 100);
-            return {
-              date: summaryDate,
-              presentCount: present,
-              absentCount: absent,
-              total,
-              attendancePercent,
-            };
-          })()
+              const present = Number(summaryRow.present ?? 0);
+              const absent = Number(summaryRow.absent ?? 0);
+              const total = Number(summaryRow.total ?? 0);
+              const attendancePercent =
+                total === 0 ? 0 : Math.round((present / total) * 100);
+              return {
+                date: summaryDate,
+                presentCount: present,
+                absentCount: absent,
+                total,
+                attendancePercent,
+              };
+            })()
           : {
-            date: summaryDate,
-            presentCount: 0,
-            absentCount: 0,
-            total: 0,
-            attendancePercent: 0,
-          },
+              date: summaryDate,
+              presentCount: 0,
+              absentCount: 0,
+              total: 0,
+              attendancePercent: 0,
+            },
         items: rows.map(formatRow),
         pagination: {
           total: Number(totalDays ?? 0),
@@ -245,6 +256,7 @@ export const attendancesRouter = createTRPCRouter({
           mentorName: mentorUser.name,
           verifiedAt: attendanceLog.verifiedAt,
           verifiedByMentorId: attendanceLog.verifiedByMentorId,
+          selfieUrl: attendanceLog.selfieUrl,
         })
         .from(attendanceLog)
         .innerJoin(placement, eq(attendanceLog.placementId, placement.id))
@@ -324,6 +336,7 @@ export const attendancesRouter = createTRPCRouter({
             : null,
           verifiedAt: r.verifiedAt ? r.verifiedAt.toISOString() : null,
           verifiedByMentorId: r.verifiedByMentorId,
+          selfieUrl: r.selfieUrl ?? null,
           counters: countersMap.get(r.placementId) ?? {
             hadir: 0,
             tidakHadir: 0,
@@ -483,6 +496,7 @@ export const attendancesRouter = createTRPCRouter({
         latitude: z.number().optional(),
         longitude: z.number().optional(),
         locationNote: z.string().optional(),
+        selfieUrl: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -541,10 +555,42 @@ export const attendancesRouter = createTRPCRouter({
             latitude: input.latitude?.toString(),
             longitude: input.longitude?.toString(),
             locationNote: input.locationNote,
+            selfieUrl: input.selfieUrl,
             status: "present",
           })
           .where(eq(attendanceLog.id, existing.id))
           .returning();
+
+        // Track selfie attachment if provided
+        if (input.selfieUrl && updated) {
+          // Check if attachment already exists for this attendance
+          const existingAttachment = await ctx.db.query.attachment.findFirst({
+            where: and(
+              eq(attachment.ownerType, "attendance_log"),
+              eq(attachment.ownerId, updated.id),
+            ),
+          });
+
+          if (!existingAttachment) {
+            await ctx.db.insert(attachment).values({
+              ownerType: "attendance_log",
+              ownerId: updated.id,
+              url: input.selfieUrl,
+              filename: extractFilenameFromUrl(input.selfieUrl),
+              mimeType: "image/png",
+              createdById: ctx.session.user.id,
+            });
+          } else {
+            // Update existing attachment with new URL
+            await ctx.db
+              .update(attachment)
+              .set({
+                url: input.selfieUrl,
+                filename: extractFilenameFromUrl(input.selfieUrl),
+              })
+              .where(eq(attachment.id, existingAttachment.id));
+          }
+        }
 
         return updated;
       } else {
@@ -558,9 +604,22 @@ export const attendancesRouter = createTRPCRouter({
             latitude: input.latitude?.toString(),
             longitude: input.longitude?.toString(),
             locationNote: input.locationNote,
+            selfieUrl: input.selfieUrl,
             status: "present",
           })
           .returning();
+
+        // Track selfie attachment if provided
+        if (input.selfieUrl && created) {
+          await ctx.db.insert(attachment).values({
+            ownerType: "attendance_log",
+            ownerId: created.id,
+            url: input.selfieUrl,
+            filename: extractFilenameFromUrl(input.selfieUrl),
+            mimeType: "image/png",
+            createdById: ctx.session.user.id,
+          });
+        }
 
         return created;
       }

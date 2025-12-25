@@ -59,9 +59,31 @@ function mapStatusFilterToApi(
   }
 }
 
+// Map API status to Indonesian status value for Select
+function getApiStatusValue(
+  status: string,
+): "present" | "absent" | "excused" | "late" {
+  switch (status) {
+    case "present":
+      return "present";
+    case "absent":
+      return "absent";
+    case "excused":
+      return "excused";
+    case "late":
+      return "late";
+    default:
+      return "absent";
+  }
+}
+
 export default function AttendanceDetailClient({ date }: { date: string }) {
   const [q, setQ] = React.useState("");
   const [status, setStatus] = React.useState("Semua Status");
+  // Track selected status for each attendance item (for changing status during verification)
+  const [selectedStatuses, setSelectedStatuses] = React.useState<
+    Record<number, "present" | "absent" | "excused" | "late">
+  >({});
 
   // Parse date string to Date object for API
   const dateObj = React.useMemo(() => {
@@ -84,12 +106,12 @@ export default function AttendanceDetailClient({ date }: { date: string }) {
     },
   );
 
-  const verifyMutation = api.attendances.verify.useMutation({
+  const updateStatusMutation = api.attendances.verify.useMutation({
     onSuccess: async () => {
       await refetch();
     },
     onError: (err) => {
-      alert("Gagal memverifikasi: " + err.message);
+      alert("Gagal mengubah status: " + err.message);
     },
   });
 
@@ -102,14 +124,30 @@ export default function AttendanceDetailClient({ date }: { date: string }) {
     },
   });
 
-  const handleVerify = (id: number) => {
-    verifyMutation.mutate({ id });
+  const handleUpdateStatus = (
+    id: number,
+    newStatus: "present" | "absent" | "excused" | "late",
+  ) => {
+    updateStatusMutation.mutate({ id, status: newStatus });
   };
 
   const handleDelete = (id: number) => {
     if (confirm("Apakah Anda yakin ingin menghapus data kehadiran ini?")) {
       deleteMutation.mutate({ id });
     }
+  };
+
+  // Get selected status for an item (defaults to current status)
+  const getSelectedStatus = (id: number, currentStatus: string) => {
+    return selectedStatuses[id] ?? getApiStatusValue(currentStatus);
+  };
+
+  // Update selected status for an item
+  const setSelectedStatus = (
+    id: number,
+    status: "present" | "absent" | "excused" | "late",
+  ) => {
+    setSelectedStatuses((prev) => ({ ...prev, [id]: status }));
   };
 
   const list = data?.items ?? [];
@@ -234,6 +272,33 @@ export default function AttendanceDetailClient({ date }: { date: string }) {
                               </span>
                             </div>
 
+                            {/* Foto Selfie Section */}
+                            {e.selfieUrl ? (
+                              <div className="space-y-2">
+                                <p className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+                                  Foto Selfie Check-In
+                                </p>
+                                <div className="relative overflow-hidden rounded-lg border">
+                                  <img
+                                    src={e.selfieUrl}
+                                    alt={`Selfie ${e.student.name}`}
+                                    className="h-48 w-full object-cover"
+                                  />
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="space-y-2">
+                                <p className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+                                  Foto Selfie Check-In
+                                </p>
+                                <div className="bg-muted/30 flex h-32 items-center justify-center rounded-lg border border-dashed">
+                                  <p className="text-muted-foreground text-sm">
+                                    Tidak ada foto selfie
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+
                             <div className="grid grid-cols-2 gap-x-8 gap-y-4">
                               <div className="space-y-1">
                                 <p className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
@@ -323,6 +388,43 @@ export default function AttendanceDetailClient({ date }: { date: string }) {
 
                             <Separator />
 
+                            {/* Ubah Status Kehadiran Section */}
+                            <div className="space-y-3 pt-2">
+                              <div className="space-y-2">
+                                <p className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+                                  Ubah Status Kehadiran
+                                </p>
+                                <Select
+                                  value={getSelectedStatus(e.id, e.status)}
+                                  onValueChange={(
+                                    value:
+                                      | "present"
+                                      | "absent"
+                                      | "excused"
+                                      | "late",
+                                  ) => setSelectedStatus(e.id, value)}
+                                >
+                                  <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Pilih Status" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="present">
+                                      Hadir
+                                    </SelectItem>
+                                    <SelectItem value="absent">
+                                      Tidak Hadir
+                                    </SelectItem>
+                                    <SelectItem value="excused">
+                                      Izin
+                                    </SelectItem>
+                                    <SelectItem value="late">
+                                      Terlambat
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+
                             <div className="flex items-center justify-between pt-2">
                               <Button
                                 variant="destructive"
@@ -335,19 +437,24 @@ export default function AttendanceDetailClient({ date }: { date: string }) {
                                   : "Hapus Kehadiran"}
                               </Button>
 
-                              {!e.verifiedAt && (
+                              <div className="flex items-center gap-2">
                                 <Button
                                   variant="default"
-                                  size="sm"
                                   className="bg-green-600 text-white hover:bg-green-700"
-                                  onClick={() => handleVerify(e.id)}
-                                  disabled={verifyMutation.isPending}
+                                  size="sm"
+                                  onClick={() =>
+                                    handleUpdateStatus(
+                                      e.id,
+                                      getSelectedStatus(e.id, e.status),
+                                    )
+                                  }
+                                  disabled={updateStatusMutation.isPending}
                                 >
-                                  {verifyMutation.isPending
-                                    ? "Memverifikasi..."
-                                    : "Verifikasi Sekarang"}
+                                  {updateStatusMutation.isPending
+                                    ? "Menyimpan..."
+                                    : "Simpan dan Verifikasi"}
                                 </Button>
-                              )}
+                              </div>
                             </div>
                           </div>
                         </DialogContent>

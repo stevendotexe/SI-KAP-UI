@@ -306,9 +306,12 @@ export function FileUploadField({
         const response = await uploadFilesAction(formData);
 
         if (response.status === "success" && response.data) {
-          // Update file states with successful uploads
-          const uploadedUrls: string[] = [];
+          // Collect uploaded URLs first, before state update
+          const uploadedUrls: string[] = response.data
+            .filter((item): item is NonNullable<typeof item> => !!item?.url)
+            .map((item) => item.url);
 
+          // Update file states with successful uploads
           setFiles((prev) => {
             const updated = [...prev];
 
@@ -327,19 +330,28 @@ export function FileUploadField({
                   mimeType: uploadItem.mimetype,
                   status: "success",
                 };
-                uploadedUrls.push(uploadItem.url);
+              } else {
+                // Pending file not found in state, add it directly
+                updated.push({
+                  id: uploadItem.url,
+                  filename: uploadItem.filename,
+                  url: uploadItem.url,
+                  mimeType: uploadItem.mimetype,
+                  status: "success",
+                });
               }
             }
 
             if (process.env.NODE_ENV !== "production") {
               console.debug("[upload-ui] uploaded", {
                 count: response.data.length,
+                urls: uploadedUrls,
               });
             }
             return updated;
           });
 
-          // Notify parent of new values
+          // Notify parent of new values - use uploadedUrls collected from response directly
           if (onChange && uploadedUrls.length > 0) {
             const newValues: FileUploadValue[] = uploadedUrls.map((url) => ({
               url,

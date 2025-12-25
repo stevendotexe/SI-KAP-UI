@@ -448,6 +448,7 @@ export const attendanceLog = createTable(
     latitude: d.numeric({ precision: 9, scale: 6 }),
     longitude: d.numeric({ precision: 9, scale: 6 }),
     locationNote: d.text(),
+    selfieUrl: d.text(), // URL to selfie photo taken during check-in
     verifiedByMentorId: d
       .integer()
       .references(() => mentorProfile.id, { onDelete: "set null" }),

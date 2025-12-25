@@ -10,7 +10,7 @@ const statements = {
   ...defaultStatements,
   ...adminAc.statements,
   placement: ["create", "read", "update"],
-  attendanceLog: ["create", "read", "verify"],
+  attendanceLog: ["create", "read", "verify", "update", "delete"],
   assessment: ["create", "read", "update", "delete"],
   task: ["create", "read", "update", "delete", "review"],
   report: ["create", "read", "update", "review"],
@@ -27,7 +27,7 @@ const ac = createAccessControl(statements);
 const adminRole = ac.newRole({
   ...adminAc.statements,
   placement: ["create", "read", "update"],
-  attendanceLog: ["read", "verify"],
+  attendanceLog: ["read", "verify", "update", "delete"],
   assessment: ["create", "read", "update", "delete"],
   task: ["create", "read", "update", "delete", "review"],
   report: ["create", "read", "update", "review"],
@@ -41,7 +41,7 @@ const adminRole = ac.newRole({
 
 const mentorRole = ac.newRole({
   placement: ["read", "update"],
-  attendanceLog: ["read", "verify"],
+  attendanceLog: ["read", "verify", "update", "delete"],
   assessment: ["create", "read", "update"],
   task: ["create", "read", "update", "review"],
   report: ["read", "review"],

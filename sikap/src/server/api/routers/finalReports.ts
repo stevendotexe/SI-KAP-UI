@@ -868,6 +868,67 @@ export const finalReportsRouter = createTRPCRouter({
         };
       });
 
+      // --- Calculate next sequence number for certificate preview ---
+      const now = new Date();
+      const currentMonth = now.getMonth() + 1;
+      const currentYear = now.getFullYear();
+
+      // Default company code from mentor's previous reports or company name
+      const defaultCompanyCode = mentorReport?.companyName
+        ? mentorReport.companyName
+            .toUpperCase()
+            .replace(/\s+/g, "-")
+            .slice(0, 20)
+        : p.companyName.toUpperCase().replace(/\s+/g, "-").slice(0, 20);
+
+      // Check if existing report has a certificate already
+      let nextSequenceNumber = 1;
+      let existingCompanyCode = defaultCompanyCode;
+
+      if (existingReport) {
+        // Check if certificate exists for this report
+        const existingCert = await ctx.db.query.certificate.findFirst({
+          where: eq(certificate.finalReportId, existingReport.id),
+        });
+
+        if (existingCert) {
+          // Use existing certificate data
+          nextSequenceNumber = existingCert.sequenceNumber;
+          existingCompanyCode = existingCert.companyCode;
+        } else {
+          // Calculate next sequence for this company/month/year
+          const lastCert = await ctx.db
+            .select({ seq: certificate.sequenceNumber })
+            .from(certificate)
+            .where(
+              and(
+                eq(certificate.companyCode, defaultCompanyCode),
+                eq(certificate.month, currentMonth),
+                eq(certificate.year, currentYear),
+              ),
+            )
+            .orderBy(sql`${certificate.sequenceNumber} DESC`)
+            .limit(1);
+          nextSequenceNumber = (lastCert[0]?.seq ?? 0) + 1;
+        }
+      } else {
+        // No existing report, calculate next sequence
+        const lastCert = await ctx.db
+          .select({ seq: certificate.sequenceNumber })
+          .from(certificate)
+          .where(
+            and(
+              eq(certificate.companyCode, defaultCompanyCode),
+              eq(certificate.month, currentMonth),
+              eq(certificate.year, currentYear),
+            ),
+          )
+          .orderBy(sql`${certificate.sequenceNumber} DESC`)
+          .limit(1);
+        nextSequenceNumber = (lastCert[0]?.seq ?? 0) + 1;
+      }
+      // ---------------------------------------------------------------
+
       return {
         placement: {
           id: p.placementId,
@@ -890,6 +951,13 @@ export const finalReportsRouter = createTRPCRouter({
           name: mentorUser?.name ?? "",
         },
         reportId: existingReport?.id ?? null,
+        // Certificate preview data
+        certificatePreview: {
+          nextSequenceNumber,
+          companyCode: existingCompanyCode,
+          month: currentMonth,
+          year: currentYear,
+        },
         existingSnapshot: existingReport
           ? {
               companyLogoUrl: existingReport.companyLogoUrl ?? "",

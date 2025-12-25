@@ -168,6 +168,7 @@ export function useReportWizard() {
     if (draftData && !editId && !isInitialized.current) {
       console.log("[useReportWizard] initializing from draftData", {
         hasExistingSnapshot: !!draftData.existingSnapshot,
+        certificatePreview: draftData.certificatePreview,
       });
       if (draftData.reportId) {
         setReportId(draftData.reportId);
@@ -214,11 +215,17 @@ export function useReportWizard() {
           score: s.calculatedScore,
         })),
       );
+      // Use certificatePreview for sequenceNumber and companyCode
       setCertificateData((prev) => ({
         ...prev,
         signerName: draftData.mentor.name,
         startDate: draftData.placement.startDate ?? "",
         endDate: draftData.placement.endDate ?? "",
+        sequenceNumber:
+          draftData.certificatePreview?.nextSequenceNumber ??
+          prev.sequenceNumber,
+        companyCode:
+          draftData.certificatePreview?.companyCode ?? prev.companyCode,
       }));
       isInitialized.current = true;
     }
