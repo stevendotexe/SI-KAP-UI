@@ -81,6 +81,8 @@ export interface FileUploadFieldProps {
   error?: string;
   /** Additional class names for the container */
   className?: string;
+  /** Callback when loading/uploading status changes */
+  onLoading?: (isLoading: boolean) => void;
 }
 
 /**
@@ -175,6 +177,7 @@ export function FileUploadField({
   description,
   error,
   className,
+  onLoading,
 }: FileUploadFieldProps) {
   const inputId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -226,6 +229,11 @@ export function FileUploadField({
   const acceptString = accept ?? DEFAULT_ALLOWED_MIME_TYPES.join(",");
 
   const isUploading = files.some((f) => f.status === "uploading");
+
+  useEffect(() => {
+    onLoading?.(isUploading);
+  }, [isUploading, onLoading]);
+
   const hasReachedLimit = multiple
     ? files.length >= maxFiles
     : files.length >= 1;
@@ -338,9 +346,7 @@ export function FileUploadField({
               filename: extractFilenameFromUrl(url),
             }));
             // If multiple is false, replace existing files; otherwise append
-            onChange(
-              multiple ? [...(value ?? []), ...newValues] : newValues,
-            );
+            onChange(multiple ? [...(value ?? []), ...newValues] : newValues);
           }
         }
       } catch (err) {
