@@ -130,7 +130,11 @@ function EditRubricDialog({
   const [category, setCategory] = React.useState<"personality" | "technical">(
     rubric.category,
   );
-  const [major, setMajor] = React.useState(rubric.major);
+  const [majors, setMajors] = React.useState<("RPL" | "TKJ")[]>(
+    rubric.major
+      .split(",")
+      .filter((m): m is "RPL" | "TKJ" => m === "RPL" || m === "TKJ"),
+  );
   const [weight, setWeight] = React.useState(
     rubric.weight !== null ? String(rubric.weight) : "",
   );
@@ -140,11 +144,21 @@ function EditRubricDialog({
     if (open) {
       setName(rubric.name);
       setCategory(rubric.category);
-      setMajor(rubric.major);
+      setMajors(
+        rubric.major
+          .split(",")
+          .filter((m): m is "RPL" | "TKJ" => m === "RPL" || m === "TKJ"),
+      );
       setWeight(rubric.weight !== null ? String(rubric.weight) : "");
       setError(null);
     }
   }, [open, rubric]);
+
+  function toggleMajor(m: "RPL" | "TKJ") {
+    setMajors((prev) =>
+      prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m],
+    );
+  }
 
   const utils = api.useUtils();
   const updateRubric = api.rubrics.update.useMutation({
@@ -165,13 +179,17 @@ function EditRubricDialog({
       setError("Nama rubrik wajib diisi");
       return;
     }
+    if (majors.length === 0) {
+      setError("Minimal satu jurusan harus dipilih");
+      return;
+    }
     setError(null);
 
     updateRubric.mutate({
       id: rubric.id,
       name: name.trim(),
       category,
-      major,
+      major: majors.join(","),
       weight: weight ? Number(weight) : undefined,
     });
   }
@@ -218,17 +236,24 @@ function EditRubricDialog({
             </Field>
 
             <Field orientation="vertical">
-              <FieldTitle>Jurusan *</FieldTitle>
+              <FieldTitle>Pilih Jurusan *</FieldTitle>
               <FieldContent>
-                <Select value={major} onValueChange={setMajor}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="RPL">RPL</SelectItem>
-                    <SelectItem value="TKJ">TKJ</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="grid grid-cols-2 gap-3">
+                  {(["RPL", "TKJ"] as const).map((m) => (
+                    <label
+                      key={m}
+                      className={`flex cursor-pointer items-center justify-between gap-2 rounded-sm border px-3 py-2 transition-transform active:scale-[0.98] ${majors.includes(m) ? "ring-primary bg-secondary ring-1" : "bg-card"}`}
+                    >
+                      <span className="text-sm">{m}</span>
+                      <input
+                        type="checkbox"
+                        className="size-4"
+                        checked={majors.includes(m)}
+                        onChange={() => toggleMajor(m)}
+                      />
+                    </label>
+                  ))}
+                </div>
               </FieldContent>
             </Field>
 
@@ -257,7 +282,7 @@ function EditRubricDialog({
           <Button
             variant="destructive"
             onClick={submit}
-            disabled={!name || updateRubric.isPending}
+            disabled={!name || majors.length === 0 || updateRubric.isPending}
           >
             {updateRubric.isPending ? "Menyimpan..." : "Simpan"}
           </Button>

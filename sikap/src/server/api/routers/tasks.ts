@@ -17,6 +17,7 @@ import {
   placement,
   studentProfile,
   task,
+  taskCompetencyImpact,
   taskStatus,
   user,
 } from "@/server/db/schema";
@@ -195,9 +196,9 @@ export const tasksRouter = createTRPCRouter({
       const dueDate = t.dueDate ? new Date(t.dueDate) : null;
       const isLate = dueDate
         ? now > dueDate &&
-        (t.status === "todo" ||
-          t.status === "in_progress" ||
-          t.status === "rejected")
+          (t.status === "todo" ||
+            t.status === "in_progress" ||
+            t.status === "rejected")
         : false;
 
       return {
@@ -417,7 +418,8 @@ export const tasksRouter = createTRPCRouter({
           ? sql`${task.dueDate} <= ${input.to.toISOString()}`
           : undefined,
         input.search
-          ? sql`(lower(${task.title}) like ${"%" + input.search.toLowerCase() + "%"} or lower(${task.description}) like ${"%" + input.search.toLowerCase() + "%"
+          ? sql`(lower(${task.title}) like ${"%" + input.search.toLowerCase() + "%"} or lower(${task.description}) like ${
+              "%" + input.search.toLowerCase() + "%"
             })`
           : undefined,
       );
@@ -478,6 +480,7 @@ export const tasksRouter = createTRPCRouter({
         dueDate: z.date(),
         targetMajor: z.string().optional(),
         placementIds: z.array(z.number()).optional(),
+        rubricIds: z.array(z.number()).optional(),
         attachments: z
           .array(z.object({ url: z.string(), filename: z.string().optional() }))
           .optional(),
@@ -507,9 +510,9 @@ export const tasksRouter = createTRPCRouter({
             input.targetMajor
               ? input.targetMajor.includes(",")
                 ? // Handle comma-separated majors (e.g., "RPL,TKJ")
-                inArray(studentProfile.major, input.targetMajor.split(","))
+                  inArray(studentProfile.major, input.targetMajor.split(","))
                 : // Single major
-                eq(studentProfile.major, input.targetMajor)
+                  eq(studentProfile.major, input.targetMajor)
               : undefined,
             input.placementIds
               ? inArray(placement.id, input.placementIds)
@@ -547,6 +550,16 @@ export const tasksRouter = createTRPCRouter({
                 url: att.url,
                 filename: att.filename,
                 createdById: ctx.session.user.id,
+              });
+            }
+          }
+
+          // Insert task-rubric relationships
+          if (input.rubricIds && input.rubricIds.length > 0 && newTask) {
+            for (const rubricId of input.rubricIds) {
+              await tx.insert(taskCompetencyImpact).values({
+                taskId: newTask.id,
+                competencyTemplateId: rubricId,
               });
             }
           }
@@ -672,11 +685,11 @@ export const tasksRouter = createTRPCRouter({
       const attachments =
         taskIds.length > 0
           ? await ctx.db.query.attachment.findMany({
-            where: and(
-              eq(attachment.ownerType, "task"),
-              inArray(attachment.ownerId, taskIds),
-            ),
-          })
+              where: and(
+                eq(attachment.ownerType, "task"),
+                inArray(attachment.ownerId, taskIds),
+              ),
+            })
           : [];
 
       // 4. Calculate stats
