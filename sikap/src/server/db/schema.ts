@@ -489,6 +489,8 @@ export const report = createTable(
     type: reportType("type").notNull(),
     title: d.text(),
     content: d.text(),
+    activityDate: d.date(), // The date of the journal entry
+    durationMinutes: d.integer(), // Activity duration in minutes (e.g., 440 = 7h 20m)
     periodStart: d.date(),
     periodEnd: d.date(),
     submittedAt: d.timestamp({ withTimezone: true }),
@@ -505,6 +507,7 @@ export const report = createTable(
   (t) => [
     index("report_type_idx").on(t.type),
     index("report_placement_idx").on(t.placementId),
+    index("report_activity_date_idx").on(t.activityDate),
   ],
 );
 
