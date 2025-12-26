@@ -88,12 +88,12 @@ export default function CalendarPage() {
 
   // Get events for a specific week to render on calendar
   function getWeekSegments(week: DayCell[]) {
-    if (!events || events.length === 0) return []
+    if (!events || events.length === 0) return { segments: [], maxRowIndex: -1 }
 
     // Get the actual date range for this week
     const weekStart = week[0]?.date
     const weekEnd = week[6]?.date
-    if (!weekStart || !weekEnd) return []
+    if (!weekStart || !weekEnd) return { segments: [], maxRowIndex: -1 }
 
     const segments = events
       .map(evt => {
@@ -154,6 +154,7 @@ export default function CalendarPage() {
 
     // Assign row indices to segments to prevent overlapping
     const segmentsWithRows: Array<typeof segments[0] & { rowIndex: number }> = []
+    let maxRowIndex = -1
 
     for (const seg of segments) {
       // Find the lowest available row for this segment
@@ -169,9 +170,10 @@ export default function CalendarPage() {
         rowIndex++
       }
       segmentsWithRows.push({ ...seg, rowIndex })
+      if (rowIndex > maxRowIndex) maxRowIndex = rowIndex
     }
 
-    return segmentsWithRows
+    return { segments: segmentsWithRows, maxRowIndex }
   }
 
   return (
@@ -263,12 +265,19 @@ export default function CalendarPage() {
             {/* Weeks */}
             <div className="mt-0">
               {weeks.map((week, wi) => {
-                const segments = getWeekSegments(week)
+                const { segments, maxRowIndex } = getWeekSegments(week)
+                // Calculate dynamic height based on max overlapping events
+                // Base 7rem (28) + extra space per additional slot
+                const heightStyle = maxRowIndex > 2 ? { height: `${(maxRowIndex + 2) * 2.5}rem` } : undefined
+
                 return (
                   <div key={wi} className="relative">
                     <div className="grid grid-cols-7">
                       {week.map((c, ci) => (
-                        <div key={ci} className={`h-40 border ${c.inMonth ? "bg-card" : "bg-muted/40"}`}>
+                        <div key={ci}
+                          className={`min-h-28 border ${c.inMonth ? "bg-card" : "bg-muted/40"}`}
+                          style={heightStyle}
+                        >
                           <div className="px-2 pt-2 text-xs text-muted-foreground">{c.day}</div>
                         </div>
                       ))}

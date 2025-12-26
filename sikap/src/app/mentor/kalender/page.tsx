@@ -32,6 +32,9 @@ const EVENT_TYPES = [
   { value: "in_class", label: "In-Class" },
   { value: "field_trip", label: "Field Trip" },
   { value: "meet_greet", label: "Meet & Greet" },
+  { value: "meeting", label: "Meeting" },
+  { value: "deadline", label: "Deadline" },
+  { value: "milestone", label: "Milestone" },
 ] as const
 
 type EventType = typeof EVENT_TYPES[number]["value"]
@@ -176,7 +179,8 @@ export default function Page() {
       while (true) {
         let fit = true
         for (let i = seg.startIdx; i <= seg.endIdx; i++) {
-          if (slots[i][slot]) {
+          const daySlots = slots[i]
+          if (daySlots && daySlots[slot]) {
             fit = false
             break
           }
@@ -187,7 +191,8 @@ export default function Page() {
 
       // Mark slot as occupied
       for (let i = seg.startIdx; i <= seg.endIdx; i++) {
-        slots[i][slot] = 1
+        const row = slots[i]
+        if (row) row[slot] = 1
       }
 
       if (slot > maxSlot) maxSlot = slot

@@ -147,7 +147,7 @@ export const calendarEventsRouter = createTRPCRouter({
               : undefined,
           ),
         )
-        .orderBy(calendarEvent.scheduledAt);
+        .orderBy(sql`${calendarEvent.createdAt} desc`);
 
       return rows.map((r) => ({
         id: r.id,
@@ -428,7 +428,7 @@ export const calendarEventsRouter = createTRPCRouter({
             input.type ? eq(calendarEvent.type, input.type) : undefined,
           ),
         )
-        .orderBy(calendarEvent.scheduledAt);
+        .orderBy(sql`${calendarEvent.createdAt} desc`);
 
       return {
         items: rows.map((r) => ({
@@ -496,7 +496,7 @@ export const calendarEventsRouter = createTRPCRouter({
               : undefined,
           ),
         )
-        .orderBy(calendarEvent.scheduledAt);
+        .orderBy(sql`${calendarEvent.createdAt} desc`);
 
       return rows.map((r) => ({
         id: r.id,

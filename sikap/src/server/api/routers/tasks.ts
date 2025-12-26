@@ -113,7 +113,7 @@ export const tasksRouter = createTRPCRouter({
         .from(task)
         .innerJoin(placement, eq(task.placementId, placement.id))
         .where(where)
-        .orderBy(task.dueDate)
+        .orderBy(sql`${task.createdAt} desc`)
         .limit(input.limit)
         .offset(input.offset);
 
