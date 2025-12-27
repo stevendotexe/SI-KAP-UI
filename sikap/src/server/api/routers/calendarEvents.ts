@@ -509,4 +509,60 @@ export const calendarEventsRouter = createTRPCRouter({
         companyName: r.companyName,
       }));
     }),
+
+  // New endpoint for students to see all events (read-only)
+  listAllForStudent: protectedProcedure
+    .input(
+      z.object({
+        month: z.number().min(1).max(12).optional(),
+        year: z.number().optional(),
+        type: z.enum(eventType.enumValues).optional(),
+        search: z.string().optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const range = monthRange({ month: input.month, year: input.year });
+      const startStr = range.start.toISOString().slice(0, 10);
+      const endStr = range.end.toISOString().slice(0, 10);
+
+      const startDateExpr = sql`(${calendarEvent.scheduledAt})::date`;
+      const dueDateExpr = sql`coalesce(${calendarEvent.endDate}, ${calendarEvent.scheduledAt})::date`;
+      const overlapWhere = and(lte(startDateExpr, endStr), gte(dueDateExpr, startStr));
+
+      const rows = await ctx.db
+        .select({
+          id: calendarEvent.id,
+          title: calendarEvent.title,
+          description: calendarEvent.description,
+          type: calendarEvent.type,
+          startDate: calendarEvent.scheduledAt,
+          endDate: calendarEvent.endDate,
+          organizerName: calendarEvent.organizerName,
+          organizerLogoUrl: calendarEvent.organizerLogoUrl,
+          colorHex: calendarEvent.colorHex,
+        })
+        .from(calendarEvent)
+        .where(
+          and(
+            overlapWhere,
+            input.type ? eq(calendarEvent.type, input.type) : undefined,
+            input.search
+              ? sql`(lower(${calendarEvent.title}) like ${"%" + input.search.toLowerCase() + "%"} or lower(${calendarEvent.organizerName}) like ${"%" + input.search.toLowerCase() + "%"})`
+              : undefined,
+          ),
+        )
+        .orderBy(sql`${calendarEvent.createdAt} desc`);
+
+      return rows.map((r) => ({
+        id: r.id,
+        title: r.title,
+        description: r.description ?? null,
+        type: r.type,
+        startDate: r.startDate,
+        dueDate: r.endDate ?? r.startDate,
+        organizerName: r.organizerName ?? null,
+        organizerLogoUrl: r.organizerLogoUrl ?? null,
+        colorHex: r.colorHex ?? null,
+      }));
+    }),
 });

@@ -34,6 +34,26 @@ const EVENT_TYPE_COLORS: Record<string, string> = {
   milestone: "#ec4899",     // pink
 }
 
+const EVENT_TYPE_LABELS: Record<string, string> = {
+  in_class: "In-Class",
+  field_trip: "Field Trip",
+  meet_greet: "Meet & Greet",
+  meeting: "Meeting",
+  deadline: "Deadline",
+  milestone: "Milestone",
+}
+
+// Helper function to determine text color based on background luminance
+function getContrastTextColor(hexColor: string): string {
+  const hex = hexColor.replace('#', '')
+  const r = parseInt(hex.substr(0, 2), 16)
+  const g = parseInt(hex.substr(2, 2), 16)
+  const b = parseInt(hex.substr(4, 2), 16)
+  // Calculate luminance using perceived brightness formula
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  return luminance > 0.5 ? '#1f2937' : '#ffffff'
+}
+
 type CalendarEvent = {
   id: number
   title: string
@@ -63,25 +83,26 @@ export default function CalendarPage() {
   const [year] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth()) // 0-based
   const [open, setOpen] = useState(false)
+  const [hoveredEvent, setHoveredEvent] = useState<{ event: CalendarEvent; position: { x: number; y: number } } | null>(null)
 
   const weeks = useMemo(() => buildWeeks(year, month), [year, month])
 
-  // Fetch calendar events from API
-  const { data, isLoading, isError, refetch } = api.calendarEvents.listForStudent.useQuery({
+  // Fetch calendar events from API - using listAllForStudent to show all activities
+  const { data, isLoading, isError, refetch } = api.calendarEvents.listAllForStudent.useQuery({
     month: month + 1, // API expects 1-12
     year,
   })
 
   // Transform API events to CalendarEvent format
   const events: CalendarEvent[] = useMemo(() => {
-    if (!data?.items) return []
+    if (!data) return []
 
-    return data.items.map((event) => ({
+    return data.map((event) => ({
       id: event.id,
       title: event.title,
       type: event.type,
       startDate: new Date(event.startDate),
-      endDate: event.endDate ? new Date(event.endDate) : null,
+      endDate: event.dueDate ? new Date(event.dueDate) : null,
       colorHex: event.colorHex,
     }))
   }, [data])
@@ -131,6 +152,7 @@ export default function CalendarPage() {
 
         // Use colorHex if available, otherwise use default color for event type
         const backgroundColor = evt.colorHex ?? EVENT_TYPE_COLORS[evt.type] ?? "#6b7280"
+        const textColor = getContrastTextColor(backgroundColor)
 
         return {
           startIdx,
@@ -139,6 +161,7 @@ export default function CalendarPage() {
           widthPct,
           label: evt.title,
           backgroundColor,
+          textColor,
           event: evt,
         }
       })
@@ -149,6 +172,7 @@ export default function CalendarPage() {
         widthPct: number
         label: string
         backgroundColor: string
+        textColor: string
         event: CalendarEvent
       }>
 
@@ -177,11 +201,11 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="min-h-screen bg-muted/30 p-0 m-0">
-      <div className="w-full max-w-none p-5 m-0 pr-4 sm:pr-6 lg:pr-10 pl-4 sm:pl-6 lg:pl-10">
+    <main className="bg-muted text-foreground min-h-screen">
+      <div className="mx-auto max-w-[1200px] px-6 py-8">
         {/* Header */}
-        <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-semibold">Kalender</h1>
+        <div className="space-y-1 mb-6">
+          <h1 className="text-2xl font-semibold">Kalender</h1>
           <p className="text-muted-foreground">Daftar jadwal</p>
         </div>
 
@@ -286,16 +310,24 @@ export default function CalendarPage() {
                     {segments.map((s, si) => (
                       <div
                         key={si}
-                        className="absolute z-10 h-7 rounded-full flex items-center justify-center text-xs font-medium text-white cursor-default"
+                        className="absolute z-10 h-6 rounded flex items-center text-xs font-medium cursor-pointer shadow-sm overflow-hidden hover:opacity-90 transition-opacity"
                         style={{
-                          top: 34 + (s.rowIndex * 32),
-                          left: `${s.leftPct}%`,
-                          width: `${s.widthPct}%`,
-                          paddingLeft: 12,
-                          paddingRight: 12,
+                          top: 28 + (s.rowIndex * 28),
+                          left: `calc(${s.leftPct}% + 4px)`,
+                          width: `calc(${s.widthPct}% - 8px)`,
+                          paddingLeft: 8,
+                          paddingRight: 8,
                           backgroundColor: s.backgroundColor,
+                          color: s.textColor,
                         }}
-                        title={s.label}
+                        onMouseEnter={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect()
+                          setHoveredEvent({
+                            event: s.event,
+                            position: { x: rect.left + rect.width / 2, y: rect.bottom + 8 }
+                          })
+                        }}
+                        onMouseLeave={() => setHoveredEvent(null)}
                       >
                         <span className="truncate">{s.label}</span>
                       </div>
@@ -304,9 +336,39 @@ export default function CalendarPage() {
                 )
               })}
             </div>
+
+            {/* Hover Popover for Event Details */}
+            {hoveredEvent && (
+              <div
+                className="fixed z-50 w-72 bg-card border rounded-xl shadow-lg p-4 pointer-events-none"
+                style={{
+                  left: Math.min(hoveredEvent.position.x - 144, typeof window !== 'undefined' ? window.innerWidth - 300 : 0),
+                  top: hoveredEvent.position.y,
+                }}
+              >
+                <div className="space-y-2">
+                  <div className="font-semibold text-lg">{hoveredEvent.event.title}</div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="inline-block w-3 h-3 rounded-full"
+                      style={{ backgroundColor: hoveredEvent.event.colorHex ?? EVENT_TYPE_COLORS[hoveredEvent.event.type] ?? "#6b7280" }}
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      {EVENT_TYPE_LABELS[hoveredEvent.event.type] ?? hoveredEvent.event.type}
+                    </span>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {new Date(hoveredEvent.event.startDate).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
+                    {hoveredEvent.event.endDate && new Date(hoveredEvent.event.endDate).getTime() !== new Date(hoveredEvent.event.startDate).getTime() && (
+                      <> - {new Date(hoveredEvent.event.endDate).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </section>
         )}
       </div>
-    </div>
+    </main>
   )
 }

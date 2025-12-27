@@ -7,10 +7,10 @@ export default function LogAbsensiPage() {
   const { data, isLoading, isError } = api.attendances.myLog.useQuery({ limit: 100 })
 
   return (
-    <div className="min-h-screen bg-muted/30">
-      <div className="w-full max-w-none p-5 pr-4 sm:pr-6 lg:pr-10 pl-4 sm:pl-6 lg:pl-10 space-y-6">
-        <div className="space-y-2">
-          <h1 className="text-2xl sm:text-3xl font-semibold">Log Absensi</h1>
+    <main className="bg-muted text-foreground min-h-screen">
+      <div className="mx-auto max-w-[1200px] px-6 py-8">
+        <div className="space-y-2 mb-6">
+          <h1 className="text-2xl font-semibold">Log Absensi</h1>
           <p className="text-muted-foreground">Log histori absen Anda</p>
         </div>
 
@@ -78,6 +78,6 @@ export default function LogAbsensiPage() {
           </div>
         </div>
       </div>
-    </div>
+    </main>
   )
 }

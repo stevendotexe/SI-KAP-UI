@@ -16,7 +16,7 @@ import { Spinner } from "@/components/ui/spinner";
 import Link from "next/link";
 import Image from "next/image";
 
-const typeColors = {
+const typeColors: Record<string, string> = {
     in_class: "bg-blue-100 text-blue-700 border-blue-200",
     field_trip: "bg-green-100 text-green-700 border-green-200",
     meet_greet: "bg-amber-100 text-amber-700 border-amber-200",
@@ -25,7 +25,7 @@ const typeColors = {
     milestone: "bg-indigo-100 text-indigo-700 border-indigo-200",
 };
 
-const typeLabels = {
+const typeLabels: Record<string, string> = {
     in_class: "In-Class",
     field_trip: "Field Trip",
     meet_greet: "Meet & Greet",
@@ -47,31 +47,27 @@ export default function SiswaAktivitasPage() {
     const [search, setSearch] = useState("");
     const [filterType, setFilterType] = useState<string>("all");
 
-    const { data, isLoading, error } = api.calendarEvents.listForStudent.useQuery(
-        filterType === "all"
-            ? {}
-            : { type: filterType as "in_class" | "field_trip" | "meet_greet" | "meeting" | "deadline" | "milestone" }
-    );
+    // Get current month/year for query
+    const now = new Date();
+    const [month] = useState(now.getMonth() + 1);
+    const [year] = useState(now.getFullYear());
 
-    const events = data?.items ?? [];
-
-    // Client-side search filter
-    const filteredEvents = events.filter((event) => {
-        if (!search) return true;
-        const searchLower = search.toLowerCase();
-        return (
-            event.title.toLowerCase().includes(searchLower) ||
-            (event.description?.toLowerCase().includes(searchLower) ?? false) ||
-            (event.organizerName?.toLowerCase().includes(searchLower) ?? false)
-        );
+    // Use listAllForStudent to show all activities (read-only for students)
+    const { data, isLoading, error } = api.calendarEvents.listAllForStudent.useQuery({
+        month,
+        year,
+        type: filterType !== "all" ? (filterType as any) : undefined,
+        search: search || undefined,
     });
 
+    const events = data ?? [];
+
     return (
-        <main className="space-y-6 p-5 pr-4 sm:pr-6 lg:pr-10 pl-4 sm:pl-6 lg:pl-10">
-            <div className="w-full max-w-none p-0 m-0">
+        <main className="bg-muted text-foreground min-h-screen">
+            <div className="mx-auto max-w-[1200px] px-6 py-8">
                 {/* Header */}
                 <div className="mb-6">
-                    <h1 className="text-2xl sm:text-3xl font-semibold">Aktivitas</h1>
+                    <h1 className="text-2xl font-semibold">Aktivitas</h1>
                     <p className="text-muted-foreground mt-1">
                         Lihat semua kegiatan dan tugas PKL
                     </p>
@@ -80,12 +76,12 @@ export default function SiswaAktivitasPage() {
                 {/* Search */}
                 <div className="mb-4">
                     <div className="relative">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                         <Input
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             placeholder="Cari berdasarkan nama atau penyelenggara"
-                            className="pl-11 rounded-full bg-white border-gray-200"
+                            className="pl-11 bg-background border"
                         />
                     </div>
                 </div>
@@ -93,7 +89,7 @@ export default function SiswaAktivitasPage() {
                 {/* Filter */}
                 <div className="mb-6">
                     <Select value={filterType} onValueChange={setFilterType}>
-                        <SelectTrigger className="w-[200px] rounded-full bg-white">
+                        <SelectTrigger className="w-[200px] bg-background">
                             <SelectValue placeholder="Semua Tipe" />
                         </SelectTrigger>
                         <SelectContent>
@@ -127,10 +123,10 @@ export default function SiswaAktivitasPage() {
                 {/* Cards Grid */}
                 {!isLoading && !error && (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {filteredEvents.map((event) => (
+                        {events.map((event) => (
                             <div
                                 key={event.id}
-                                className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden"
+                                className="bg-card rounded-xl border shadow-sm hover:shadow-md transition-shadow overflow-hidden"
                             >
                                 {/* Color bar */}
                                 <div
@@ -141,7 +137,7 @@ export default function SiswaAktivitasPage() {
                                 {/* Card content */}
                                 <div className="p-5">
                                     {/* Event title */}
-                                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                                    <h3 className="text-lg font-semibold mb-2">
                                         {event.title}
                                     </h3>
 
@@ -156,13 +152,13 @@ export default function SiswaAktivitasPage() {
                                     </div>
 
                                     {/* Description */}
-                                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                                    <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
                                         {event.description ?? "Tidak ada deskripsi"}
                                     </p>
 
                                     {/* Date */}
-                                    <div className="flex items-center gap-2 text-sm text-gray-700 mb-2">
-                                        <Calendar className="w-4 h-4 text-gray-400" />
+                                    <div className="flex items-center gap-2 text-sm mb-2">
+                                        <Calendar className="w-4 h-4 text-muted-foreground" />
                                         <span>
                                             {new Date(event.startDate).toLocaleDateString("id-ID", {
                                                 day: "numeric",
@@ -173,8 +169,8 @@ export default function SiswaAktivitasPage() {
                                     </div>
 
                                     {/* Time */}
-                                    <div className="flex items-center gap-2 text-sm text-gray-700 mb-4">
-                                        <Clock className="w-4 h-4 text-gray-400" />
+                                    <div className="flex items-center gap-2 text-sm mb-4">
+                                        <Clock className="w-4 h-4 text-muted-foreground" />
                                         <span>
                                             {new Date(event.startDate).toLocaleTimeString("id-ID", {
                                                 hour: "2-digit",
@@ -185,23 +181,23 @@ export default function SiswaAktivitasPage() {
 
                                     {/* Organizer with logo */}
                                     {event.organizerName && (
-                                        <div className="flex items-center gap-3 text-sm text-gray-700 pt-3 mb-4 border-t border-gray-100">
+                                        <div className="flex items-center gap-3 text-sm pt-3 mb-4 border-t">
                                             {event.organizerLogoUrl ? (
                                                 <Image
                                                     src={event.organizerLogoUrl}
                                                     alt={event.organizerName}
                                                     width={40}
                                                     height={40}
-                                                    className="rounded-lg object-cover border border-gray-200"
+                                                    className="rounded-lg object-cover border"
                                                 />
                                             ) : (
-                                                <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center border border-gray-200">
-                                                    <Building2 className="w-5 h-5 text-gray-400" />
+                                                <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center border">
+                                                    <Building2 className="w-5 h-5 text-muted-foreground" />
                                                 </div>
                                             )}
                                             <div className="flex-1">
-                                                <div className="text-xs text-gray-500">Penyelenggara</div>
-                                                <div className="font-medium text-gray-900">{event.organizerName}</div>
+                                                <div className="text-xs text-muted-foreground">Penyelenggara</div>
+                                                <div className="font-medium">{event.organizerName}</div>
                                             </div>
                                         </div>
                                     )}
@@ -223,9 +219,9 @@ export default function SiswaAktivitasPage() {
                 )}
 
                 {/* No results */}
-                {!isLoading && !error && filteredEvents.length === 0 && (
+                {!isLoading && !error && events.length === 0 && (
                     <div className="text-center py-12">
-                        <p className="text-gray-500">Tidak ada aktivitas yang ditemukan</p>
+                        <p className="text-muted-foreground">Tidak ada aktivitas yang ditemukan</p>
                     </div>
                 )}
             </div>
