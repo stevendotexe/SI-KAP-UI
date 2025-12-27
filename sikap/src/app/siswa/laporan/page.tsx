@@ -57,33 +57,13 @@ export default function LaporanSiswaPage() {
     },
   });
 
-  // Merge and sort data
-  const mergedItems = [
-    ...(reportsData?.items.map((r) => ({
-      ...r,
-      itemType: "report" as const,
-    })) ?? []),
-    ...(tasksData?.items
-      .filter((t) => t.status === "submitted" || t.status === "approved")
-      .map((t) => ({
-        id: t.id,
-        title: t.title,
-        type: "task",
-        score: null,
-        periodStart: null,
-        periodEnd: null,
-        reviewStatus: t.status === "submitted" ? "pending" : t.status, // Map task status to report review status
-        itemType: "task" as const,
-        submittedAt: t.submittedAt,
-        updatedAt: t.updatedAt,
-        originalStatus: t.status,
-      })) ?? []),
-  ].sort((a, b) => {
-    // Sort by submittedAt date in descending order (newest first)
-    const dateA = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
-    const dateB = b.submittedAt ? new Date(b.submittedAt).getTime() : 0;
-    return dateB - dateA;
-  });
+  const entries = data?.items ?? [];
+  const stats = data?.stats ?? {
+    total: 0,
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+  };
 
   // Apply filter and sorting
   const filteredEntries = useMemo(() => {
