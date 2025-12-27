@@ -7,8 +7,47 @@ import { Spinner } from "@/components/ui/spinner"
 import Link from "next/link"
 import { api } from "@/trpc/react"
 
+// Helper function to map status to Indonesian label
+function getStatusLabel(status: string): string {
+  switch (status) {
+    case "present":
+      return "Hadir"
+    case "absent":
+      return "Tidak Hadir"
+    case "excused":
+      return "Izin"
+    case "late":
+      return "Terlambat"
+    default:
+      return status
+  }
+}
+
+// Helper function to format time from ISO string
+function formatTime(isoString: string | null): string {
+  if (!isoString) return "-"
+  const date = new Date(isoString)
+  return date.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })
+}
+
+// Helper function to escape CSV values
+function escapeCSV(value: string | null | undefined): string {
+  if (value == null) return ""
+  const stringValue = String(value)
+  // If value contains comma, quote, or newline, wrap in quotes and escape quotes
+  if (stringValue.includes(",") || stringValue.includes('"') || stringValue.includes("\n")) {
+    return `"${stringValue.replace(/"/g, '""')}"`
+  }
+  return stringValue
+}
+
 export default function Page() {
   const [month, setMonth] = React.useState("Semua Tanggal")
+  const [exportStartDate, setExportStartDate] = React.useState(() => new Date().toISOString().slice(0, 10))
+  const [exportEndDate, setExportEndDate] = React.useState(() => new Date().toISOString().slice(0, 10))
+  const [isExporting, setIsExporting] = React.useState(false)
+
+  const utils = api.useUtils()
 
   // Get date range from month filter
   const dateRange = React.useMemo(() => {
@@ -36,6 +75,104 @@ export default function Page() {
   const items = data?.items ?? []
   const summary = data?.summary ?? { date: new Date().toISOString().slice(0, 10), presentCount: 0, absentCount: 0, total: 0, attendancePercent: 0 }
 
+  // Handle CSV export for date range
+  const handleExportCSV = async () => {
+    if (isExporting) return
+
+    setIsExporting(true)
+    try {
+      const startDate = new Date(exportStartDate)
+      const endDate = new Date(exportEndDate)
+
+      // Validate date range
+      if (startDate > endDate) {
+        alert("Tanggal mulai harus sebelum atau sama dengan tanggal akhir.")
+        return
+      }
+
+      // Limit to 31 days to prevent too many requests
+      const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+      if (daysDiff > 31) {
+        alert("Rentang tanggal maksimal 31 hari.")
+        return
+      }
+
+      // Collect all attendance data for the date range
+      const allRows: string[][] = []
+      let rowNumber = 1
+
+      // Iterate through each date in the range
+      const currentDate = new Date(startDate)
+      while (currentDate <= endDate) {
+        const dateStr = currentDate.toISOString().slice(0, 10)
+
+        try {
+          const detailData = await utils.attendances.detail.fetch({
+            date: new Date(dateStr),
+            limit: 200,
+            offset: 0,
+          })
+
+          if (detailData && detailData.items.length > 0) {
+            for (const item of detailData.items) {
+              allRows.push([
+                String(rowNumber++),
+                escapeCSV(dateStr),
+                escapeCSV(item.student.name),
+                escapeCSV(item.student.school),
+                escapeCSV(getStatusLabel(item.status)),
+                escapeCSV(formatTime(item.checkInAt)),
+                escapeCSV(formatTime(item.checkOutAt)),
+                escapeCSV(item.mentor?.name ?? "-"),
+              ])
+            }
+          }
+        } catch (err) {
+          console.warn(`Failed to fetch data for ${dateStr}:`, err)
+        }
+
+        // Move to next day
+        currentDate.setDate(currentDate.getDate() + 1)
+      }
+
+      if (allRows.length === 0) {
+        alert("Tidak ada data kehadiran untuk rentang tanggal tersebut.")
+        return
+      }
+
+      // Generate CSV content with date column
+      const headers = ["No", "Tanggal", "Nama Siswa", "Sekolah", "Status", "Jam Masuk", "Jam Keluar", "Mentor"]
+      const csvContent = [
+        headers.join(","),
+        ...allRows.map(row => row.join(","))
+      ].join("\n")
+
+      // Add BOM for Excel UTF-8 compatibility
+      const BOM = "\uFEFF"
+      const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" })
+      const url = URL.createObjectURL(blob)
+
+      // Generate filename based on range
+      const filename = exportStartDate === exportEndDate
+        ? `kehadiran-${exportStartDate}.csv`
+        : `kehadiran-${exportStartDate}_to_${exportEndDate}.csv`
+
+      // Trigger download
+      const link = document.createElement("a")
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error("Export error:", error)
+      alert("Gagal mengekspor data. Silakan coba lagi.")
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   return (
     <main className="min-h-screen bg-muted text-foreground">
       <div className="max-w-[1200px] mx-auto px-4 py-4 md:px-6 md:py-8">
@@ -58,7 +195,7 @@ export default function Page() {
           </div>
         </div>
 
-        <div className="mt-4">
+        <div className="mt-4 flex flex-wrap items-center gap-4">
           <Select value={month} onValueChange={setMonth}>
             <SelectTrigger className="min-w-[240px] w-full sm:w-fit" aria-label="Filter Tanggal">
               <SelectValue placeholder="Semua Tanggal" />
@@ -79,6 +216,46 @@ export default function Page() {
               <SelectItem value="2025-12">Desember 2025</SelectItem>
             </SelectContent>
           </Select>
+
+          {/* Export CSV Controls */}
+          <div className="flex items-center gap-2 ml-auto flex-wrap">
+            <span className="text-sm text-muted-foreground whitespace-nowrap">
+              Export:
+            </span>
+            <input
+              id="exportStartDate"
+              type="date"
+              value={exportStartDate}
+              onChange={(e) => setExportStartDate(e.target.value)}
+              className="border rounded-md px-3 py-2 text-sm bg-background"
+              title="Tanggal Mulai"
+            />
+            <span className="text-sm text-muted-foreground">s/d</span>
+            <input
+              id="exportEndDate"
+              type="date"
+              value={exportEndDate}
+              onChange={(e) => setExportEndDate(e.target.value)}
+              className="border rounded-md px-3 py-2 text-sm bg-background"
+              title="Tanggal Akhir"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportCSV}
+              disabled={isExporting}
+              className="whitespace-nowrap"
+            >
+              {isExporting ? (
+                <>
+                  <Spinner className="mr-2 h-4 w-4" />
+                  Mengekspor...
+                </>
+              ) : (
+                "Export CSV"
+              )}
+            </Button>
+          </div>
         </div>
 
         <div className="mt-4 bg-card border rounded-xl shadow-sm p-4">

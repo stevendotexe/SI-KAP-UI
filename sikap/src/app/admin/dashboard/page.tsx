@@ -51,7 +51,7 @@ export default async function AdminDashboardPage() {
         granularity: "month",
         from: sixMonthsAgo,
       }),
-      caller.dashboards.getAttendancePieChart({}),
+      caller.dashboards.getAttendancePieChart({ from: new Date(), to: new Date() }),
       caller.attendances.detail({ date: new Date() }),
     ]);
 

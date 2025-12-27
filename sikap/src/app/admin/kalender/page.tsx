@@ -44,6 +44,26 @@ const EVENT_COLORS: Record<string, string> = {
   milestone: "bg-yellow-500",
 }
 
+// Calculate contrast text color (white or black) based on background hex color
+function getContrastTextColor(hexColor: string | null): string {
+  if (!hexColor) return "text-white" // Default for class-based colors
+
+  // Remove # if present
+  const hex = hexColor.replace('#', '')
+
+  // Parse RGB values
+  const r = parseInt(hex.substring(0, 2), 16)
+  const g = parseInt(hex.substring(2, 4), 16)
+  const b = parseInt(hex.substring(4, 6), 16)
+
+  // Calculate relative luminance using sRGB
+  // https://www.w3.org/TR/WCAG20/#relativeluminancedef
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+
+  // Return white text for dark backgrounds, black for light backgrounds
+  return luminance > 0.5 ? "text-gray-900" : "text-white"
+}
+
 function buildWeeks(year: number, month: number) {
   const first = new Date(year, month, 1)
   const offset = first.getFullYear() === 1970 ? 4 : first.getDay()
@@ -81,6 +101,7 @@ export default function Page() {
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [eventToDelete, setEventToDelete] = useState<CalendarEvent | null>(null)
+  const [hoveredEvent, setHoveredEvent] = useState<{ event: CalendarEvent; position: { x: number; y: number } } | null>(null)
 
   const weeks = useMemo(() => buildWeeks(year, month), [year, month])
 
@@ -103,6 +124,7 @@ export default function Page() {
   function handleOpenEdit(event: CalendarEvent) {
     setEditingEvent(event)
     setDialogOpen(true)
+    setHoveredEvent(null)
   }
 
   function handleDelete(event: CalendarEvent) {
@@ -294,17 +316,24 @@ export default function Page() {
                     {segments.map((s, si) => (
                       <div
                         key={si}
-                        className={`absolute z-10 h-7 ${s.colorClass} rounded-full flex items-center justify-center text-xs font-medium text-primary-foreground cursor-pointer hover:opacity-90 transition-opacity`}
+                        className={`absolute z-10 h-7 ${s.colorClass} rounded-full flex items-center justify-center text-xs font-medium ${getContrastTextColor(s.colorHex)} cursor-pointer hover:opacity-90 transition-opacity`}
                         style={{
-                          top: 34 + (s.slot * 32), // Dynamic top: Base 34 + 32px per slot
+                          top: 34 + (s.slot * 32),
                           left: `${s.leftPct}%`,
                           width: `${s.widthPct}%`,
                           paddingLeft: 12,
                           paddingRight: 12,
                           backgroundColor: s.colorHex ?? undefined,
                         }}
+                        onMouseEnter={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect()
+                          setHoveredEvent({
+                            event: s.event as CalendarEvent,
+                            position: { x: rect.left + rect.width / 2, y: rect.bottom + 8 }
+                          })
+                        }}
+                        onMouseLeave={() => setHoveredEvent(null)}
                         onClick={() => handleOpenEdit(s.event as CalendarEvent)}
-                        title="Klik untuk edit"
                       >
                         <span className="truncate">{s.label}</span>
                       </div>
@@ -313,6 +342,43 @@ export default function Page() {
                 )
               })}
             </div>
+
+            {/* Hover Popover for Event Details */}
+            {hoveredEvent && (
+              <div
+                className="fixed z-50 w-72 bg-card border rounded-xl shadow-lg p-4 pointer-events-none"
+                style={{
+                  left: Math.min(hoveredEvent.position.x - 144, window.innerWidth - 300),
+                  top: hoveredEvent.position.y,
+                }}
+              >
+                <div className="space-y-2">
+                  <div className="font-semibold text-lg">{hoveredEvent.event.title}</div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-block w-3 h-3 rounded-full ${!hoveredEvent.event.colorHex ? EVENT_COLORS[hoveredEvent.event.type] ?? "bg-gray-400" : ""}`}
+                      style={{ backgroundColor: hoveredEvent.event.colorHex ?? undefined }}
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      {EVENT_TYPES.find(t => t.value === hoveredEvent.event.type)?.label ?? hoveredEvent.event.type}
+                    </span>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {new Date(hoveredEvent.event.startDate).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
+                    {hoveredEvent.event.dueDate && new Date(hoveredEvent.event.dueDate).getTime() !== new Date(hoveredEvent.event.startDate).getTime() && (
+                      <> - {new Date(hoveredEvent.event.dueDate).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</>
+                    )}
+                  </div>
+                  {hoveredEvent.event.organizerName && (
+                    <div className="text-sm"><span className="text-muted-foreground">Penyelenggara:</span> {hoveredEvent.event.organizerName}</div>
+                  )}
+                  {hoveredEvent.event.description && (
+                    <div className="text-sm text-muted-foreground line-clamp-3">{hoveredEvent.event.description}</div>
+                  )}
+                  <div className="text-xs text-muted-foreground/70 pt-1">Klik untuk edit</div>
+                </div>
+              </div>
+            )}
           </section>
         )}
 

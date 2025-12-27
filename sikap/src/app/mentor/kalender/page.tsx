@@ -4,11 +4,8 @@ import { useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { ChevronDown, Pencil, Trash2 } from "lucide-react"
+import { ChevronDown } from "lucide-react"
 import { api } from "@/trpc/react"
-import { useMentorCompany } from "@/components/mentor/useMentorCompany"
-import ActivityFormDialog from "@/components/mentor/ActivityFormDialog"
 
 type DayCell = { date: Date; inMonth: boolean; day: number }
 
@@ -45,6 +42,25 @@ const EVENT_COLORS: Record<string, string> = {
   milestone: "bg-yellow-500",
 }
 
+// Calculate contrast text color (white or black) based on background hex color
+function getContrastTextColor(hexColor: string | null): string {
+  if (!hexColor) return "text-white" // Default for class-based colors
+
+  // Remove # if present
+  const hex = hexColor.replace('#', '')
+
+  // Parse RGB values
+  const r = parseInt(hex.substring(0, 2), 16)
+  const g = parseInt(hex.substring(2, 4), 16)
+  const b = parseInt(hex.substring(4, 6), 16)
+
+  // Calculate relative luminance using sRGB
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+
+  // Return white text for dark backgrounds, black for light backgrounds
+  return luminance > 0.5 ? "text-gray-900" : "text-white"
+}
+
 function buildWeeks(year: number, month: number) {
   const first = new Date(year, month, 1)
   const offset = first.getFullYear() === 1970 ? 4 : first.getDay()
@@ -78,45 +94,15 @@ export default function Page() {
   const [year, setYear] = useState(2025)
   const [month, setMonth] = useState(new Date().getMonth())
   const [open, setOpen] = useState(false)
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
-  const [eventToDelete, setEventToDelete] = useState<CalendarEvent | null>(null)
+  const [hoveredEvent, setHoveredEvent] = useState<{ event: CalendarEvent; position: { x: number; y: number } } | null>(null)
 
   const weeks = useMemo(() => buildWeeks(year, month), [year, month])
 
-  const utils = api.useUtils()
-
-  const { companyId, isLoading: isMentorLoading, isError: isMentorError } = useMentorCompany()
+  // Mentor calendar - no companyId needed, API will auto-detect from mentor profile
   const { data: events, isLoading, isError, refetch } = api.calendarEvents.list.useQuery({
-    companyId: companyId!,
     month: month + 1, // API expects 1-12
     year: year,
-  }, { enabled: !!companyId })
-
-  const deleteMutation = api.calendarEvents.delete.useMutation({
-    onSuccess: () => {
-      void utils.calendarEvents.list.invalidate()
-      setDeleteConfirmOpen(false)
-      setEventToDelete(null)
-    },
   })
-
-  function handleOpenEdit(event: CalendarEvent) {
-    setEditingEvent(event)
-    setDialogOpen(true)
-  }
-
-  function handleDelete(event: CalendarEvent) {
-    setEventToDelete(event)
-    setDeleteConfirmOpen(true)
-  }
-
-  function confirmDelete() {
-    if (eventToDelete) {
-      deleteMutation.mutate({ eventId: eventToDelete.id })
-    }
-  }
 
   // Get events for a specific week to render on calendar
   function getWeekSegments(week: DayCell[]) {
@@ -197,8 +183,6 @@ export default function Page() {
     return { segments: segmentsWithSlot, maxSlot }
   }
 
-  // const isSubmitting = createMutation.isPending || updateMutation.isPending
-
   return (
     <div className="min-h-screen bg-muted/30 p-6">
       <div className="w-full max-w-7xl mx-auto">
@@ -255,13 +239,7 @@ export default function Page() {
           </Select>
         </div>
 
-        {isMentorLoading ? (
-          <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
-            <Spinner /> Memuat profil mentor...
-          </div>
-        ) : isMentorError ? (
-          <div className="mt-4 text-sm text-destructive">Gagal memuat profil mentor.</div>
-        ) : isLoading ? (
+        {isLoading ? (
           <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
             <Spinner /> Memuat kalender...
           </div>
@@ -284,7 +262,6 @@ export default function Page() {
               {weeks.map((week, wi) => {
                 const { segments, maxSlot } = getWeekSegments(week)
                 // Calculate dynamic height based on max overlapping events
-                // Base 7rem (28) + extra space per additional slot
                 const heightStyle = maxSlot > 2 ? { height: `${(maxSlot + 2) * 2.5}rem` } : undefined
 
                 return (
@@ -304,17 +281,23 @@ export default function Page() {
                     {segments.map((s, si) => (
                       <div
                         key={si}
-                        className={`absolute z-10 h-7 ${s.colorClass} rounded-full flex items-center justify-center text-xs font-medium text-primary-foreground cursor-pointer hover:opacity-90 transition-opacity`}
+                        className={`absolute z-10 h-7 ${s.colorClass} rounded-full flex items-center justify-center text-xs font-medium ${getContrastTextColor(s.colorHex)} cursor-default hover:opacity-90 transition-opacity`}
                         style={{
-                          top: 34 + (s.slot * 32), // Dynamic top: Base 34 + 32px per slot
+                          top: 34 + (s.slot * 32),
                           left: `${s.leftPct}%`,
                           width: `${s.widthPct}%`,
                           paddingLeft: 12,
                           paddingRight: 12,
                           backgroundColor: s.colorHex ?? undefined,
                         }}
-                        onClick={() => handleOpenEdit(s.event)}
-                        title="Klik untuk edit"
+                        onMouseEnter={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect()
+                          setHoveredEvent({
+                            event: s.event as CalendarEvent,
+                            position: { x: rect.left + rect.width / 2, y: rect.bottom + 8 }
+                          })
+                        }}
+                        onMouseLeave={() => setHoveredEvent(null)}
                       >
                         <span className="truncate">{s.label}</span>
                       </div>
@@ -323,6 +306,42 @@ export default function Page() {
                 )
               })}
             </div>
+
+            {/* Hover Popover for Event Details */}
+            {hoveredEvent && (
+              <div
+                className="fixed z-50 w-72 bg-card border rounded-xl shadow-lg p-4 pointer-events-none"
+                style={{
+                  left: Math.min(hoveredEvent.position.x - 144, window.innerWidth - 300),
+                  top: hoveredEvent.position.y,
+                }}
+              >
+                <div className="space-y-2">
+                  <div className="font-semibold text-lg">{hoveredEvent.event.title}</div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-block w-3 h-3 rounded-full ${!hoveredEvent.event.colorHex ? EVENT_COLORS[hoveredEvent.event.type] ?? "bg-gray-400" : ""}`}
+                      style={{ backgroundColor: hoveredEvent.event.colorHex ?? undefined }}
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      {EVENT_TYPES.find(t => t.value === hoveredEvent.event.type)?.label ?? hoveredEvent.event.type}
+                    </span>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {new Date(hoveredEvent.event.startDate).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
+                    {hoveredEvent.event.dueDate && new Date(hoveredEvent.event.dueDate).getTime() !== new Date(hoveredEvent.event.startDate).getTime() && (
+                      <> - {new Date(hoveredEvent.event.dueDate).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</>
+                    )}
+                  </div>
+                  {hoveredEvent.event.organizerName && (
+                    <div className="text-sm"><span className="text-muted-foreground">Penyelenggara:</span> {hoveredEvent.event.organizerName}</div>
+                  )}
+                  {hoveredEvent.event.description && (
+                    <div className="text-sm text-muted-foreground line-clamp-3">{hoveredEvent.event.description}</div>
+                  )}
+                </div>
+              </div>
+            )}
           </section>
         )}
 
@@ -357,19 +376,6 @@ export default function Page() {
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="icon-sm" onClick={() => handleOpenEdit(event)}>
-                        <Pencil className="size-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => handleDelete(event)}
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </div>
                   </div>
                 )
               })}
@@ -377,47 +383,6 @@ export default function Page() {
           </section>
         )}
       </div>
-
-      {/* Edit Activity Dialog */}
-      <ActivityFormDialog
-        open={dialogOpen}
-        onOpenChange={(open) => {
-          setDialogOpen(open)
-          if (!open) {
-            setEditingEvent(null)
-          }
-        }}
-        editingEvent={editingEvent}
-        onSuccess={() => {
-          void utils.calendarEvents.list.invalidate()
-          setDialogOpen(false)
-        }}
-      />
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Hapus Event</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Apakah Anda yakin ingin menghapus event &quot;{eventToDelete?.title}&quot;? Tindakan ini tidak dapat dibatalkan.
-          </p>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
-              Batal
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={confirmDelete}
-              disabled={deleteMutation.isPending}
-            >
-              {deleteMutation.isPending ? <><Spinner className="mr-2" /> Menghapus...</> : "Hapus"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

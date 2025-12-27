@@ -72,10 +72,11 @@ export default function ActivityFormDialog({ open, onOpenChange, editingEvent, o
     const utils = api.useUtils()
 
     // Query full details when editing to ensure we have attachments, description, and proper logo url
+    const eventId = editingEvent?.id ?? 0
     const { data: detailData, isLoading: isLoadingDetail } = api.calendarEvents.detail.useQuery(
-        { eventId: editingEvent?.id ?? 0 },
+        { eventId },
         {
-            enabled: open && !!editingEvent,
+            enabled: open && !!editingEvent && eventId > 0,
             refetchOnWindowFocus: false
         }
     )

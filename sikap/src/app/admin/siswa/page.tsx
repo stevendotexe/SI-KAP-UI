@@ -123,7 +123,7 @@ export default function AdminSiswaPage() {
                     Nama
                   </th>
                   <th className="text-left text-sm font-medium px-4 py-3">
-                    Kode
+                    Mentor
                   </th>
                   <th className="text-left text-sm font-medium px-4 py-3">
                     Asal Sekolah
@@ -159,7 +159,7 @@ export default function AdminSiswaPage() {
                       className={`border-t ${index % 2 === 0 ? "bg-background" : "bg-muted/30"}`}
                     >
                       <td className="px-4 py-3 text-sm">{student.name}</td>
-                      <td className="px-4 py-3 text-sm">{student.nis ?? "-"}</td>
+                      <td className="px-4 py-3 text-sm">{student.mentorName ?? "-"}</td>
                       <td className="px-4 py-3 text-sm">{student.school ?? "-"}</td>
                       <td className="px-4 py-3 text-sm">{student.cohort ?? "-"}</td>
                       <td className="px-4 py-3 text-sm capitalize">

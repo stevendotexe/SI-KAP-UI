@@ -132,15 +132,18 @@ export const calendarEventsRouter = createTRPCRouter({
           organizerLogoUrl: calendarEvent.organizerLogoUrl,
         })
         .from(calendarEvent)
-        .innerJoin(placement, eq(calendarEvent.placementId, placement.id))
+        .leftJoin(placement, eq(calendarEvent.placementId, placement.id))
         .where(
           and(
-            effectiveCompanyId ? eq(placement.companyId, effectiveCompanyId) : undefined,
-            mentorFilterId ? eq(placement.mentorId, mentorFilterId) : undefined,
             overlapWhere,
             input.type ? eq(calendarEvent.type, input.type) : undefined,
             input.search
               ? sql`(lower(${calendarEvent.title}) like ${"%" + input.search.toLowerCase() + "%"} or lower(${calendarEvent.organizerName}) like ${"%" + input.search.toLowerCase() + "%"})`
+              : undefined,
+            // For mentors: show events without placement OR where placement matches mentor's company
+            // For admins: require matching companyId when placement exists
+            effectiveCompanyId || mentorFilterId
+              ? sql`(${calendarEvent.placementId} IS NULL OR (${effectiveCompanyId ? sql`${placement.companyId} = ${effectiveCompanyId}` : sql`TRUE`} AND ${mentorFilterId ? sql`${placement.mentorId} = ${mentorFilterId}` : sql`TRUE`}))`
               : undefined,
           ),
         )
@@ -176,13 +179,13 @@ export const calendarEventsRouter = createTRPCRouter({
           organizerName: calendarEvent.organizerName,
           organizerLogoUrl: calendarEvent.organizerLogoUrl,
           colorHex: calendarEvent.colorHex,
-          placementId: placement.id,
+          placementId: calendarEvent.placementId,
           createdById: calendarEvent.createdById,
           createdByName: creatorUser.name,
           createdByEmail: creatorUser.email,
         })
         .from(calendarEvent)
-        .innerJoin(placement, eq(calendarEvent.placementId, placement.id))
+        .leftJoin(placement, eq(calendarEvent.placementId, placement.id))
         .leftJoin(creatorUser, eq(calendarEvent.createdById, creatorUser.id))
         .where(eq(calendarEvent.id, input.eventId))
         .limit(1);
@@ -190,7 +193,9 @@ export const calendarEventsRouter = createTRPCRouter({
       const ev = rows[0];
       if (!ev) throw new TRPCError({ code: "NOT_FOUND" });
 
-      if (ctx.session.user.role === "mentor") {
+      // For mentors, check if they have access to this event
+      // Events without placementId are visible to all mentors
+      if (ctx.session.user.role === "mentor" && ev.placementId) {
         const mp = await ctx.db.query.mentorProfile.findFirst({
           where: eq(mentorProfile.userId, ctx.session.user.id),
         });
@@ -476,8 +481,8 @@ export const calendarEventsRouter = createTRPCRouter({
           companyName: company.name,
         })
         .from(calendarEvent)
-        .innerJoin(placement, eq(calendarEvent.placementId, placement.id))
-        .innerJoin(company, eq(placement.companyId, company.id))
+        .leftJoin(placement, eq(calendarEvent.placementId, placement.id))
+        .leftJoin(company, eq(placement.companyId, company.id))
         .where(
           and(
             overlapWhere,

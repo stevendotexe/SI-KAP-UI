@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { alias } from "drizzle-orm/pg-core";
 import { and, eq, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
@@ -56,6 +57,9 @@ const docs = {
   },
 };
 
+// Alias for mentor's user table to get mentor name in list query
+const mentorUser = alias(user, "mentor_user");
+
 export const studentsRouter = createTRPCRouter({
   list: adminOrMentorProcedure
     .meta(docs.list)
@@ -97,10 +101,13 @@ export const studentsRouter = createTRPCRouter({
           >`date_part('year', ${placement.startDate}::timestamp)`,
           status: placement.status,
           nis: studentProfile.nis,
+          mentorName: mentorUser.name,
         })
         .from(studentProfile)
         .innerJoin(user, eq(studentProfile.userId, user.id))
         .leftJoin(placement, eq(placement.studentId, studentProfile.id))
+        .leftJoin(mentorProfile, eq(placement.mentorId, mentorProfile.id))
+        .leftJoin(mentorUser, eq(mentorProfile.userId, mentorUser.id))
         .where(
           and(
             mentorId ? eq(placement.mentorId, mentorId) : undefined,
@@ -148,6 +155,7 @@ export const studentsRouter = createTRPCRouter({
           status: r.status ? String(r.status) : "active", // Default to "active" if no placement
           nis: r.nis ?? null,
           code: r.code ?? null,
+          mentorName: r.mentorName ?? null,
         })),
         pagination: {
           total: Number(total),

@@ -323,22 +323,56 @@ export const dashboardsRouter = createTRPCRouter({
         mentorFilterId = mp.id;
       }
 
+      // Get total count of active students (placements)
+      const [totalStudentsRow] = await ctx.db
+        .select({ count: sql<number>`count(distinct ${placement.studentId})` })
+        .from(placement)
+        .where(
+          and(
+            eq(placement.status, "active"),
+            mentorFilterId ? eq(placement.mentorId, mentorFilterId) : undefined,
+          ),
+        );
+      const totalStudents = Number(totalStudentsRow?.count ?? 0);
+
+      // Get attendance records for the date range
       const rows = await ctx.db
         .select({ status: attendanceLog.status, value: sql<number>`count(*)` })
         .from(attendanceLog)
         .innerJoin(placement, eq(attendanceLog.placementId, placement.id))
         .where(
           and(
+            eq(placement.status, "active"),
             mentorFilterId ? eq(placement.mentorId, mentorFilterId) : undefined,
             gte(attendanceLog.date, fromDateStr),
             lte(attendanceLog.date, toDateStr),
           ),
         )
         .groupBy(attendanceLog.status);
-      return rows.map((r) => ({
-        name: String(r.status),
-        value: Number(r.value ?? 0),
-      }));
+
+      // Build result with all status types
+      const statusCounts: Record<string, number> = {
+        present: 0,
+        absent: 0,
+        excused: 0,
+        late: 0,
+      };
+
+      let studentsWithRecords = 0;
+      for (const r of rows) {
+        const status = String(r.status);
+        const count = Number(r.value ?? 0);
+        statusCounts[status] = count;
+        studentsWithRecords += count;
+      }
+
+      // Students without any attendance record for today are considered absent
+      const studentsWithoutRecords = Math.max(0, totalStudents - studentsWithRecords);
+      statusCounts.absent = (statusCounts.absent ?? 0) + studentsWithoutRecords;
+
+      return Object.entries(statusCounts)
+        .filter(([_, value]) => value > 0)
+        .map(([name, value]) => ({ name, value }));
     }),
 
   getAttendanceTable: mentorProcedure

@@ -75,11 +75,11 @@ export default function AdminLaporanPage() {
     }
   );
 
-  const reports = reportsData?.items ?? [];
+  const reports = useMemo(() => reportsData?.items ?? [], [reportsData]);
 
   // Filter to show only daily reports (journals)
   const filtered = useMemo(() => {
-    let result = reports.filter((r) => {
+    const result = reports.filter((r) => {
       const matchSearch =
         !search ||
         r.student.name.toLowerCase().includes(search.toLowerCase()) ||
