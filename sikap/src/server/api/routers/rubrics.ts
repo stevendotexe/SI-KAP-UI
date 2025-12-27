@@ -40,7 +40,9 @@ export const rubricsRouter = createTRPCRouter({
         .from(competencyTemplate)
         .where(
           and(
-            input.major ? eq(competencyTemplate.major, input.major) : undefined,
+            input.major
+              ? sql`${competencyTemplate.major} like ${"%" + input.major + "%"}`
+              : undefined,
             input.category
               ? eq(competencyTemplate.category, input.category)
               : undefined,

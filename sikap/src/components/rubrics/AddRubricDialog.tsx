@@ -39,7 +39,7 @@ export default function AddRubricDialog({ onSuccess }: AddRubricDialogProps) {
   const [category, setCategory] = React.useState<"personality" | "technical">(
     "technical",
   );
-  const [major, setMajor] = React.useState("RPL");
+  const [majors, setMajors] = React.useState<("RPL" | "TKJ")[]>(["RPL"]);
   const [weight, setWeight] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
 
@@ -61,9 +61,15 @@ export default function AddRubricDialog({ onSuccess }: AddRubricDialogProps) {
   function resetForm() {
     setName("");
     setCategory("technical");
-    setMajor("RPL");
+    setMajors(["RPL"]);
     setWeight("");
     setError(null);
+  }
+
+  function toggleMajor(m: "RPL" | "TKJ") {
+    setMajors((prev) =>
+      prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m],
+    );
   }
 
   function submit() {
@@ -71,8 +77,8 @@ export default function AddRubricDialog({ onSuccess }: AddRubricDialogProps) {
       setError("Nama rubrik wajib diisi");
       return;
     }
-    if (!major) {
-      setError("Jurusan wajib dipilih");
+    if (majors.length === 0) {
+      setError("Minimal satu jurusan harus dipilih");
       return;
     }
     setError(null);
@@ -80,7 +86,7 @@ export default function AddRubricDialog({ onSuccess }: AddRubricDialogProps) {
     createRubric.mutate({
       name: name.trim(),
       category,
-      major,
+      major: majors.join(","),
       weight: weight ? Number(weight) : undefined,
     });
   }
@@ -135,17 +141,24 @@ export default function AddRubricDialog({ onSuccess }: AddRubricDialogProps) {
             </Field>
 
             <Field orientation="vertical">
-              <FieldTitle>Jurusan *</FieldTitle>
+              <FieldTitle>Pilih Jurusan *</FieldTitle>
               <FieldContent>
-                <Select value={major} onValueChange={setMajor}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih jurusan" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="RPL">RPL</SelectItem>
-                    <SelectItem value="TKJ">TKJ</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="grid grid-cols-2 gap-3">
+                  {(["RPL", "TKJ"] as const).map((m) => (
+                    <label
+                      key={m}
+                      className={`flex cursor-pointer items-center justify-between gap-2 rounded-sm border px-3 py-2 transition-transform active:scale-[0.98] ${majors.includes(m) ? "ring-primary bg-secondary ring-1" : "bg-card"}`}
+                    >
+                      <span className="text-sm">{m}</span>
+                      <input
+                        type="checkbox"
+                        className="size-4"
+                        checked={majors.includes(m)}
+                        onChange={() => toggleMajor(m)}
+                      />
+                    </label>
+                  ))}
+                </div>
               </FieldContent>
             </Field>
 
@@ -177,7 +190,7 @@ export default function AddRubricDialog({ onSuccess }: AddRubricDialogProps) {
           <Button
             variant="destructive"
             onClick={submit}
-            disabled={!name || !major || createRubric.isPending}
+            disabled={!name || majors.length === 0 || createRubric.isPending}
           >
             {createRubric.isPending ? "Menyimpan..." : "Simpan"}
           </Button>

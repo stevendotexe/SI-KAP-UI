@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { alias } from "drizzle-orm/pg-core";
-import { and, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import { and, eq, gte, lte, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 import { adminOrMentorProcedure, createTRPCRouter, protectedProcedure, requirePermissions } from "@/server/api/trpc";
@@ -109,11 +109,15 @@ export const calendarEventsRouter = createTRPCRouter({
         }
       }
 
+      // Admin must provide companyId
+      if (ctx.session.user.role === "admin" && !effectiveCompanyId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "companyId is required for admin" });
+      }
+
       const startDateExpr = sql`(${calendarEvent.scheduledAt})::date`;
       const dueDateExpr = sql`coalesce(${calendarEvent.endDate}, ${calendarEvent.scheduledAt})::date`;
       const overlapWhere = and(lte(startDateExpr, endStr), gte(dueDateExpr, startStr));
 
-      // Use LEFT JOIN to include company-wide events (placementId = null)
       const rows = await ctx.db
         .select({
           id: calendarEvent.id,
@@ -131,19 +135,15 @@ export const calendarEventsRouter = createTRPCRouter({
         .leftJoin(placement, eq(calendarEvent.placementId, placement.id))
         .where(
           and(
-            // For admin: if companyId provided, show events for that company OR company-wide events (placementId is null)
-            // For admin without companyId: show all events
-            // For mentor: filter by their company OR company-wide events
-            effectiveCompanyId
-              ? sql`(${calendarEvent.placementId} IS NULL OR ${placement.companyId} = ${effectiveCompanyId})`
-              : undefined,
-            mentorFilterId
-              ? sql`(${calendarEvent.placementId} IS NULL OR ${placement.mentorId} = ${mentorFilterId})`
-              : undefined,
             overlapWhere,
             input.type ? eq(calendarEvent.type, input.type) : undefined,
             input.search
-              ? sql`(lower(${calendarEvent.title}) like ${"%" + input.search.toLowerCase() + "%"} or lower(coalesce(${calendarEvent.organizerName}, '')) like ${"%" + input.search.toLowerCase() + "%"})`
+              ? sql`(lower(${calendarEvent.title}) like ${"%" + input.search.toLowerCase() + "%"} or lower(${calendarEvent.organizerName}) like ${"%" + input.search.toLowerCase() + "%"})`
+              : undefined,
+            // For mentors: show events without placement OR where placement matches mentor's company
+            // For admins: require matching companyId when placement exists
+            effectiveCompanyId || mentorFilterId
+              ? sql`(${calendarEvent.placementId} IS NULL OR (${effectiveCompanyId ? sql`${placement.companyId} = ${effectiveCompanyId}` : sql`TRUE`} AND ${mentorFilterId ? sql`${placement.mentorId} = ${mentorFilterId}` : sql`TRUE`}))`
               : undefined,
           ),
         )
@@ -159,7 +159,7 @@ export const calendarEventsRouter = createTRPCRouter({
         organizerName: r.organizerName ?? null,
         organizerLogoUrl: r.organizerLogoUrl ?? null,
         colorHex: r.colorHex ?? null,
-        placementId: r.placementId ?? null,
+        placementId: r.placementId,
       }));
     }),
 
@@ -185,6 +185,7 @@ export const calendarEventsRouter = createTRPCRouter({
           createdByEmail: creatorUser.email,
         })
         .from(calendarEvent)
+        .leftJoin(placement, eq(calendarEvent.placementId, placement.id))
         .leftJoin(creatorUser, eq(calendarEvent.createdById, creatorUser.id))
         .where(eq(calendarEvent.id, input.eventId))
         .limit(1);
@@ -192,7 +193,8 @@ export const calendarEventsRouter = createTRPCRouter({
       const ev = rows[0];
       if (!ev) throw new TRPCError({ code: "NOT_FOUND" });
 
-      // For mentors, check access only if event has a placementId
+      // For mentors, check if they have access to this event
+      // Events without placementId are visible to all mentors
       if (ctx.session.user.role === "mentor" && ev.placementId) {
         const mp = await ctx.db.query.mentorProfile.findFirst({
           where: eq(mentorProfile.userId, ctx.session.user.id),
@@ -383,18 +385,14 @@ export const calendarEventsRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const sp = await requireStudentPlacement(ctx);
 
-      // Get ALL student's placements (not just the first one)
-      const placements = await ctx.db.query.placement.findMany({
+      // Get student's placement
+      const placementRow = await ctx.db.query.placement.findFirst({
         where: eq(placement.studentId, sp.id),
       });
-
-      if (placements.length === 0) {
-        // Student has no placements, return empty events
+      if (!placementRow) {
+        // Student has no placement, return empty events
         return { items: [] };
       }
-
-      // Extract all placement IDs
-      const placementIds = placements.map((p) => p.id);
 
       const range = monthRange({ month: input.month, year: input.year });
       const startStr = range.start.toISOString().slice(0, 10);
@@ -420,10 +418,7 @@ export const calendarEventsRouter = createTRPCRouter({
         .from(calendarEvent)
         .where(
           and(
-            or(
-              inArray(calendarEvent.placementId, placementIds),
-              isNull(calendarEvent.placementId),
-            ),
+            eq(calendarEvent.placementId, placementRow.id),
             overlapWhere,
             input.type ? eq(calendarEvent.type, input.type) : undefined,
           ),
@@ -470,15 +465,16 @@ export const calendarEventsRouter = createTRPCRouter({
       const dueDateExpr = sql`coalesce(${calendarEvent.endDate}, ${calendarEvent.scheduledAt})::date`;
       const overlapWhere = and(lte(startDateExpr, endStr), gte(dueDateExpr, startStr));
 
-      // Use LEFT JOIN to include company-wide events (placementId = null)
       const rows = await ctx.db
         .select({
           id: calendarEvent.id,
           title: calendarEvent.title,
+          description: calendarEvent.description,
           type: calendarEvent.type,
           startDate: calendarEvent.scheduledAt,
           endDate: calendarEvent.endDate,
           organizerName: calendarEvent.organizerName,
+          organizerLogoUrl: calendarEvent.organizerLogoUrl,
           colorHex: calendarEvent.colorHex,
           placementId: placement.id,
           companyId: placement.companyId,
@@ -492,7 +488,7 @@ export const calendarEventsRouter = createTRPCRouter({
             overlapWhere,
             input.type ? eq(calendarEvent.type, input.type) : undefined,
             input.search
-              ? sql`(lower(${calendarEvent.title}) like ${"%" + input.search.toLowerCase() + "%"} or lower(coalesce(${calendarEvent.organizerName}, '')) like ${"%" + input.search.toLowerCase() + "%"})`
+              ? sql`(lower(${calendarEvent.title}) like ${"%" + input.search.toLowerCase() + "%"} or lower(${calendarEvent.organizerName}) like ${"%" + input.search.toLowerCase() + "%"})`
               : undefined,
           ),
         )
@@ -501,14 +497,16 @@ export const calendarEventsRouter = createTRPCRouter({
       return rows.map((r) => ({
         id: r.id,
         title: r.title,
+        description: r.description ?? null,
         type: r.type,
         startDate: r.startDate,
-        endDate: r.endDate ?? r.startDate,
+        dueDate: r.endDate ?? r.startDate,
         organizerName: r.organizerName ?? null,
+        organizerLogoUrl: r.organizerLogoUrl ?? null,
         colorHex: r.colorHex ?? null,
-        placementId: r.placementId ?? null,
-        companyId: r.companyId ?? null,
-        companyName: r.companyName ?? null,
+        placementId: r.placementId,
+        companyId: r.companyId,
+        companyName: r.companyName,
       }));
     }),
 });

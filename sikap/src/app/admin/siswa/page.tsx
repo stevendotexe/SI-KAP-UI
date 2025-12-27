@@ -65,44 +65,52 @@ export default function AdminSiswaPage() {
         </div>
 
         {/* Filters */}
-        <div className="flex gap-3 mb-6">
-          <Select value={filterCohort} onValueChange={setFilterCohort}>
-            <SelectTrigger className="w-[180px] rounded-full bg-background">
-              <SelectValue placeholder="Semua Angkatan" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua Angkatan</SelectItem>
-              <SelectItem value="2025">2025</SelectItem>
-              <SelectItem value="2024">2024</SelectItem>
-              <SelectItem value="2023">2023</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex gap-3">
+            <Select value={filterCohort} onValueChange={setFilterCohort}>
+              <SelectTrigger className="w-[180px] rounded-full bg-background">
+                <SelectValue placeholder="Semua Angkatan" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Angkatan</SelectItem>
+                <SelectItem value="2025">2025</SelectItem>
+                <SelectItem value="2024">2024</SelectItem>
+                <SelectItem value="2023">2023</SelectItem>
+              </SelectContent>
+            </Select>
 
-          <Select value={filterSchool} onValueChange={setFilterSchool}>
-            <SelectTrigger className="w-[180px] rounded-full bg-background">
-              <SelectValue placeholder="Semua Sekolah" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua Sekolah</SelectItem>
-              <SelectItem value="SMK 13 Tasikmalaya">
-                SMK 13 Tasikmalaya
-              </SelectItem>
-              <SelectItem value="SMK Negeri 1">SMK Negeri 1</SelectItem>
-              <SelectItem value="SMK Negeri 2">SMK Negeri 2</SelectItem>
-            </SelectContent>
-          </Select>
+            <Select value={filterSchool} onValueChange={setFilterSchool}>
+              <SelectTrigger className="w-[180px] rounded-full bg-background">
+                <SelectValue placeholder="Semua Sekolah" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Sekolah</SelectItem>
+                <SelectItem value="SMK 13 Tasikmalaya">
+                  SMK 13 Tasikmalaya
+                </SelectItem>
+                <SelectItem value="SMK Negeri 1">SMK Negeri 1</SelectItem>
+                <SelectItem value="SMK Negeri 2">SMK Negeri 2</SelectItem>
+              </SelectContent>
+            </Select>
 
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-[180px] rounded-full bg-background">
-              <SelectValue placeholder="Semua Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua Status</SelectItem>
-              <SelectItem value="Aktif">Aktif</SelectItem>
-              <SelectItem value="Selesai">Selesai</SelectItem>
-              <SelectItem value="Dibatalkan">Dibatalkan</SelectItem>
-            </SelectContent>
-          </Select>
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger className="w-[180px] rounded-full bg-background">
+                <SelectValue placeholder="Semua Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Status</SelectItem>
+                <SelectItem value="Aktif">Aktif</SelectItem>
+                <SelectItem value="Selesai">Selesai</SelectItem>
+                <SelectItem value="Dibatalkan">Dibatalkan</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Student counter */}
+          <div className="bg-card border rounded-lg px-4 py-2 shadow-sm text-sm">
+            <span className="text-muted-foreground">Total Siswa PKL: </span>
+            <span className="font-semibold">{students.length}</span>
+          </div>
         </div>
 
         {/* Table */}
@@ -115,7 +123,7 @@ export default function AdminSiswaPage() {
                     Nama
                   </th>
                   <th className="text-left text-sm font-medium px-4 py-3">
-                    Kode
+                    Mentor
                   </th>
                   <th className="text-left text-sm font-medium px-4 py-3">
                     Asal Sekolah
@@ -151,7 +159,7 @@ export default function AdminSiswaPage() {
                       className={`border-t ${index % 2 === 0 ? "bg-background" : "bg-muted/30"}`}
                     >
                       <td className="px-4 py-3 text-sm">{student.name}</td>
-                      <td className="px-4 py-3 text-sm">{student.nis ?? "-"}</td>
+                      <td className="px-4 py-3 text-sm">{student.mentorName ?? "-"}</td>
                       <td className="px-4 py-3 text-sm">{student.school ?? "-"}</td>
                       <td className="px-4 py-3 text-sm">{student.cohort ?? "-"}</td>
                       <td className="px-4 py-3 text-sm capitalize">

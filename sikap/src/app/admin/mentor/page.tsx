@@ -18,19 +18,31 @@ export default function AdminMentorPage() {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
 
-  // Query mentors from backend (companyId is optional for admin users)
+  // Fetch the first company to use as companyId
+  const { data: companiesData } = api.companies.list.useQuery({
+    limit: 1,
+    offset: 0,
+  });
+  const companyId = companiesData?.items[0]?.id;
+
+  // Query mentors from backend
   const {
     data: mentorsData,
     isLoading,
     isError,
     refetch,
-  } = api.mentors.list.useQuery({
-    // companyId is optional - admin users will see all mentors
-    search: search || undefined,
-    active: filterStatus === "all" ? undefined : filterStatus === "Aktif",
-    limit: 200,
-    offset: 0,
-  });
+  } = api.mentors.list.useQuery(
+    {
+      companyId: companyId!,
+      search: search || undefined,
+      active: filterStatus === "all" ? undefined : filterStatus === "Aktif",
+      limit: 200,
+      offset: 0,
+    },
+    {
+      enabled: !!companyId, // Only run query when companyId is available
+    }
+  );
 
   const mentors = mentorsData?.items ?? [];
 
@@ -67,7 +79,7 @@ export default function AdminMentorPage() {
         </div>
 
         {/* Filter */}
-        <div className="mb-6">
+        <div className="flex items-center justify-between mb-6">
           <Select value={filterStatus} onValueChange={setFilterStatus}>
             <SelectTrigger className="w-[180px] rounded-full bg-background">
               <SelectValue placeholder="Semua Status" />
@@ -78,6 +90,20 @@ export default function AdminMentorPage() {
               <SelectItem value="Nonaktif">Nonaktif</SelectItem>
             </SelectContent>
           </Select>
+
+          {/* Summary counters */}
+          <div className="flex gap-6 text-sm">
+            <div className="bg-card border rounded-lg px-4 py-2 shadow-sm">
+              <span className="text-muted-foreground">Total Mentor: </span>
+              <span className="font-semibold">{mentors.length}</span>
+            </div>
+            <div className="bg-card border rounded-lg px-4 py-2 shadow-sm">
+              <span className="text-muted-foreground">Total Siswa PKL: </span>
+              <span className="font-semibold">
+                {mentors.reduce((sum, m) => sum + (m.studentCount ?? 0), 0)}
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Table */}

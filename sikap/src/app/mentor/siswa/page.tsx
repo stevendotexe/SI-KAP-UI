@@ -1,25 +1,184 @@
-import React from "react"
-export const revalidate = 0
+"use client";
 
-import AddStudentDialog from "@/components/students/AddStudentDialog"
-import StudentsPageClient from "@/components/students/StudentsPageClient"
+import { useState } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Search, Plus } from "lucide-react";
+import { api } from "@/trpc/react";
+import AddStudentDialog from "@/components/students/AddStudentDialog";
 
-export default async function Page() {
+export default function MentorSiswaPage() {
+  const [search, setSearch] = useState("");
+  const [filterCohort, setFilterCohort] = useState("all");
+  const [filterSchool, setFilterSchool] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
+
+  const { data, isLoading } = api.students.list.useQuery({
+    search: search || undefined,
+    year: filterCohort !== "all" ? parseInt(filterCohort) : undefined,
+    school: filterSchool !== "all" ? filterSchool : undefined,
+    status:
+      filterStatus !== "all"
+        ? (filterStatus.toLowerCase() as "active" | "completed" | "canceled")
+        : undefined,
+  });
+
+  const students = data?.items ?? [];
+
   return (
     <main className="min-h-screen bg-muted text-foreground">
       <div className="max-w-[1200px] mx-auto px-6 py-8">
-        <header className="mb-6">
-          <div className="flex items-start justify-between gap-6">
-            <div>
-              <h1 className="text-2xl font-semibold">Siswa</h1>
-              <p className="text-sm text-muted-foreground mt-1">Daftar Siswa PKL</p>
-            </div>
-            <AddStudentDialog />
+        {/* Header */}
+        <div className="flex items-start justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-semibold">Siswa</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Daftar Siswa PKL
+            </p>
           </div>
-        </header>
+          <AddStudentDialog />
+        </div>
 
-        <StudentsPageClient />
+        {/* Search */}
+        <div className="mb-4">
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Cari Berdasarkan Nama atau ID"
+              className="pl-11 rounded-full bg-background border-border"
+            />
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex gap-3">
+            <Select value={filterCohort} onValueChange={setFilterCohort}>
+              <SelectTrigger className="w-[180px] rounded-full bg-background">
+                <SelectValue placeholder="Semua Angkatan" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Angkatan</SelectItem>
+                <SelectItem value="2025">2025</SelectItem>
+                <SelectItem value="2024">2024</SelectItem>
+                <SelectItem value="2023">2023</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={filterSchool} onValueChange={setFilterSchool}>
+              <SelectTrigger className="w-[180px] rounded-full bg-background">
+                <SelectValue placeholder="Semua Sekolah" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Sekolah</SelectItem>
+                <SelectItem value="SMK 13 Tasikmalaya">
+                  SMK 13 Tasikmalaya
+                </SelectItem>
+                <SelectItem value="SMK Negeri 1">SMK Negeri 1</SelectItem>
+                <SelectItem value="SMK Negeri 2">SMK Negeri 2</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger className="w-[180px] rounded-full bg-background">
+                <SelectValue placeholder="Semua Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Status</SelectItem>
+                <SelectItem value="Aktif">Aktif</SelectItem>
+                <SelectItem value="Selesai">Selesai</SelectItem>
+                <SelectItem value="Dibatalkan">Dibatalkan</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Mentee counter */}
+          <div className="bg-card border rounded-lg px-4 py-2 shadow-sm text-sm">
+            <span className="text-muted-foreground">Jumlah Siswa Bimbingan: </span>
+            <span className="font-semibold">{students.length}</span>
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="rounded-xl overflow-hidden border bg-card shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-destructive text-white">
+                <tr>
+                  <th className="text-left text-sm font-medium px-4 py-3">
+                    Nama
+                  </th>
+                  <th className="text-left text-sm font-medium px-4 py-3">
+                    Kode
+                  </th>
+                  <th className="text-left text-sm font-medium px-4 py-3">
+                    Asal Sekolah
+                  </th>
+                  <th className="text-left text-sm font-medium px-4 py-3">
+                    Angkatan
+                  </th>
+                  <th className="text-left text-sm font-medium px-4 py-3">
+                    Status
+                  </th>
+                  <th className="text-left text-sm font-medium px-4 py-3">
+                    Detail
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                      Memuat data...
+                    </td>
+                  </tr>
+                ) : students.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                      Tidak ada data siswa ditemukan
+                    </td>
+                  </tr>
+                ) : (
+                  students.map((student, index) => (
+                    <tr
+                      key={student.id}
+                      className={`border-t ${index % 2 === 0 ? "bg-background" : "bg-muted/30"}`}
+                    >
+                      <td className="px-4 py-3 text-sm">{student.name}</td>
+                      <td className="px-4 py-3 text-sm">{student.nis ?? "-"}</td>
+                      <td className="px-4 py-3 text-sm">{student.school ?? "-"}</td>
+                      <td className="px-4 py-3 text-sm">{student.cohort ?? "-"}</td>
+                      <td className="px-4 py-3 text-sm capitalize">
+                        {student.status}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Link href={`/mentor/siswa/${student.studentId}`}>
+                          <Button
+                            size="sm"
+                            className="bg-destructive hover:bg-red-700 text-white rounded-full px-6 cursor-pointer transition-colors"
+                          >
+                            Detail
+                          </Button>
+                        </Link>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </main>
-  )
+  );
 }

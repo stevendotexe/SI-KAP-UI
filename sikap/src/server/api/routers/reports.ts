@@ -111,14 +111,19 @@ export const reportsRouter = createTRPCRouter({
       }
 
       const submittedExpr = sql`coalesce(${report.submittedAt}, ${report.createdAt})`;
+
+      // Convert dates to ISO strings for SQL comparison
+      const fromDate = input.from?.toISOString();
+      const toDate = input.to?.toISOString();
+
       const where = and(
         eq(placement.companyId, input.companyId),
-        input.from ? gte(submittedExpr, input.from) : undefined,
-        input.to ? lte(submittedExpr, input.to) : undefined,
+        fromDate ? gte(submittedExpr, fromDate) : undefined,
+        toDate ? lte(submittedExpr, toDate) : undefined,
         mentorFilterId ? eq(placement.mentorId, mentorFilterId) : undefined,
         input.status ? eq(report.reviewStatus, input.status) : undefined,
         input.search
-          ? sql`(lower(${report.title}) like ${"%" + input.search.toLowerCase() + "%"} or lower(${studentUser.name}) like ${"%" + input.search.toLowerCase() + "%"})`
+          ? sql`(lower(${report.title}) like ${`%${input.search.toLowerCase()}%`} or lower(${studentUser.name}) like ${`%${input.search.toLowerCase()}%`})`
           : undefined,
       );
 
@@ -503,4 +508,464 @@ export const reportsRouter = createTRPCRouter({
 
       return { id: reportId };
     }),
+
+  // ========== JOURNAL-SPECIFIC PROCEDURES ==========
+
+  /**
+   * Create a daily journal entry (Student)
+   */
+  createJournal: protectedProcedure
+    .input(
+      z.object({
+        activityDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD format
+        content: z.string().min(1, "Deskripsi kegiatan harus diisi"),
+        durationMinutes: z.number().min(0).max(1440), // 0 to 24 hours
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const sp = await requireStudentPlacement(ctx);
+      const placementRow = await ctx.db.query.placement.findFirst({
+        where: eq(placement.studentId, sp.id),
+      });
+      if (!placementRow) throw new TRPCError({ code: "FORBIDDEN", message: "Placement not found" });
+
+      // Check if entry already exists for this date
+      const existing = await ctx.db.query.report.findFirst({
+        where: and(
+          eq(report.placementId, placementRow.id),
+          eq(report.activityDate, input.activityDate),
+          eq(report.type, "daily"),
+        ),
+      });
+      if (existing) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "Jurnal untuk tanggal ini sudah ada",
+        });
+      }
+
+      // Validate date is not in the future
+      const activityDateObj = new Date(input.activityDate);
+      const today = new Date();
+      today.setHours(23, 59, 59, 999);
+      if (activityDateObj > today) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Tidak dapat membuat jurnal untuk tanggal yang akan datang",
+        });
+      }
+
+      // Validate date is within internship period (5 months from user.createdAt)
+      const userRecord = await ctx.db.query.user.findFirst({
+        where: eq(user.id, ctx.session.user.id),
+      });
+      if (userRecord) {
+        const startDate = new Date(userRecord.createdAt);
+        const endDate = new Date(startDate);
+        endDate.setMonth(endDate.getMonth() + 5);
+
+        if (activityDateObj < startDate || activityDateObj > endDate) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Tanggal harus dalam periode magang (5 bulan sejak pendaftaran)",
+          });
+        }
+      }
+
+      const payload: ReportInsert = {
+        placementId: placementRow.id,
+        type: "daily",
+        title: null, // Daily journals don't need titles
+        content: input.content,
+        activityDate: input.activityDate,
+        durationMinutes: input.durationMinutes,
+        submittedAt: new Date(),
+        reviewStatus: "pending",
+      };
+
+      const inserted = await ctx.db
+        .insert(report)
+        .values(payload)
+        .returning({ id: report.id });
+      const reportId = inserted[0]?.id;
+      if (!reportId) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      return { id: reportId };
+    }),
+
+  /**
+   * List journal entries for current student with calendar data
+   */
+  listJournals: protectedProcedure
+    .input(
+      z.object({
+        month: z.number().min(1).max(12),
+        year: z.number().min(2020).max(2100),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const sp = await requireStudentPlacement(ctx);
+      const placementRow = await ctx.db.query.placement.findFirst({
+        where: eq(placement.studentId, sp.id),
+      });
+      if (!placementRow) return { items: [], stats: { total: 0, pending: 0, approved: 0, rejected: 0 } };
+
+      // Build date range for the month
+      const startOfMonth = `${input.year}-${String(input.month).padStart(2, "0")}-01`;
+      const endOfMonth = new Date(input.year, input.month, 0).toISOString().slice(0, 10);
+
+      const rows = await ctx.db
+        .select({
+          id: report.id,
+          activityDate: report.activityDate,
+          content: report.content,
+          durationMinutes: report.durationMinutes,
+          reviewStatus: report.reviewStatus,
+          reviewNotes: report.reviewNotes,
+          submittedAt: report.submittedAt,
+        })
+        .from(report)
+        .where(
+          and(
+            eq(report.placementId, placementRow.id),
+            eq(report.type, "daily"),
+            gte(report.activityDate, startOfMonth),
+            lte(report.activityDate, endOfMonth),
+          ),
+        )
+        .orderBy(report.activityDate);
+
+      const stats = {
+        total: rows.length,
+        pending: rows.filter((r) => r.reviewStatus === "pending").length,
+        approved: rows.filter((r) => r.reviewStatus === "approved").length,
+        rejected: rows.filter((r) => r.reviewStatus === "rejected").length,
+      };
+
+      return {
+        items: rows.map((r) => ({
+          id: r.id,
+          activityDate: r.activityDate,
+          content: r.content,
+          durationMinutes: r.durationMinutes,
+          reviewStatus: r.reviewStatus,
+          reviewNotes: r.reviewNotes,
+          submittedAt: r.submittedAt,
+        })),
+        stats,
+      };
+    }),
+
+  /**
+   * List mentee journal summaries (Mentor) - grouped by student
+   */
+  listMenteeJournals: mentorProcedure
+    .input(
+      z.object({
+        from: z.date().optional(),
+        to: z.date().optional(),
+        status: z.enum(reviewStatus.enumValues).optional(),
+        studentId: z.number().optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const mp = await ctx.db.query.mentorProfile.findFirst({
+        where: eq(mentorProfile.userId, ctx.session.user.id),
+      });
+      if (!mp) throw new TRPCError({ code: "FORBIDDEN" });
+
+      const range = coerceRange({ from: input.from, to: input.to });
+
+      // Get all placements for this mentor with user creation date
+      const placements = await ctx.db
+        .select({
+          id: placement.id,
+          studentId: studentProfile.id,
+          studentUserId: studentProfile.userId,
+          studentName: studentUser.name,
+          studentSchool: studentProfile.school,
+          userCreatedAt: studentUser.createdAt, // For calculating internship period
+        })
+        .from(placement)
+        .innerJoin(studentProfile, eq(placement.studentId, studentProfile.id))
+        .innerJoin(studentUser, eq(studentProfile.userId, studentUser.id))
+        .where(
+          and(
+            eq(placement.mentorId, mp.id),
+            eq(placement.status, "active"),
+            input.studentId ? eq(studentProfile.id, input.studentId) : undefined,
+          ),
+        );
+
+      // For each placement, count journals
+      const summaries = await Promise.all(
+        placements.map(async (p) => {
+          const journalCounts = await ctx.db
+            .select({
+              reviewStatus: report.reviewStatus,
+              count: sql<number>`count(*)::int`,
+            })
+            .from(report)
+            .where(
+              and(
+                eq(report.placementId, p.id),
+                eq(report.type, "daily"),
+                gte(report.activityDate, range.from.toISOString().slice(0, 10)),
+                lte(report.activityDate, range.to.toISOString().slice(0, 10)),
+                input.status ? eq(report.reviewStatus, input.status) : undefined,
+              ),
+            )
+            .groupBy(report.reviewStatus);
+
+          const pending = journalCounts.find((c) => c.reviewStatus === "pending")?.count ?? 0;
+          const approved = journalCounts.find((c) => c.reviewStatus === "approved")?.count ?? 0;
+          const rejected = journalCounts.find((c) => c.reviewStatus === "rejected")?.count ?? 0;
+          const total = pending + approved + rejected;
+
+          // Calculate expected days based on FULL 5-month internship period
+          const internshipStart = new Date(p.userCreatedAt);
+          const internshipEnd = new Date(p.userCreatedAt);
+          internshipEnd.setMonth(internshipEnd.getMonth() + 5);
+
+          // Total days in the full 5-month internship period
+          const diffTime = Math.max(0, internshipEnd.getTime() - internshipStart.getTime());
+          const totalDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+          // Approximate weekdays (exclude weekends) - roughly 5/7 of total days
+          // 5 months ≈ 150 days → ~107 working days
+          const expectedDays = Math.round(totalDays * 5 / 7);
+
+          return {
+            studentId: p.studentId,
+            studentName: p.studentName,
+            studentSchool: p.studentSchool,
+            placementId: p.id,
+            totalSubmitted: total,
+            expectedDays,
+            pending,
+            approved,
+            rejected,
+          };
+        }),
+      );
+
+      return { items: summaries };
+    }),
+
+  /**
+   * Get journal entries for a specific student (Mentor drilldown)
+   */
+  getMenteeJournalDetails: mentorProcedure
+    .input(
+      z.object({
+        studentId: z.number(),
+        from: z.date().optional(),
+        to: z.date().optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const mp = await ctx.db.query.mentorProfile.findFirst({
+        where: eq(mentorProfile.userId, ctx.session.user.id),
+      });
+      if (!mp) throw new TRPCError({ code: "FORBIDDEN" });
+
+      // Verify this student is assigned to this mentor
+      const placementRow = await ctx.db
+        .select({
+          id: placement.id,
+          studentName: studentUser.name,
+          studentSchool: studentProfile.school,
+        })
+        .from(placement)
+        .innerJoin(studentProfile, eq(placement.studentId, studentProfile.id))
+        .innerJoin(studentUser, eq(studentProfile.userId, studentUser.id))
+        .where(
+          and(
+            eq(placement.mentorId, mp.id),
+            eq(studentProfile.id, input.studentId),
+          ),
+        )
+        .limit(1);
+
+      const p = placementRow[0];
+      if (!p) throw new TRPCError({ code: "NOT_FOUND", message: "Student not found or not assigned to you" });
+
+      const range = coerceRange({ from: input.from, to: input.to });
+
+      const journals = await ctx.db
+        .select({
+          id: report.id,
+          activityDate: report.activityDate,
+          content: report.content,
+          durationMinutes: report.durationMinutes,
+          reviewStatus: report.reviewStatus,
+          reviewNotes: report.reviewNotes,
+          submittedAt: report.submittedAt,
+        })
+        .from(report)
+        .where(
+          and(
+            eq(report.placementId, p.id),
+            eq(report.type, "daily"),
+            gte(report.activityDate, range.from.toISOString().slice(0, 10)),
+            lte(report.activityDate, range.to.toISOString().slice(0, 10)),
+          ),
+        )
+        .orderBy(sql`${report.activityDate} desc`);
+
+      return {
+        student: {
+          id: input.studentId,
+          name: p.studentName,
+          school: p.studentSchool,
+        },
+        items: journals,
+      };
+    }),
+
+  /**
+   * Verify (approve/reject) journal entries (Mentor)
+   */
+  verifyJournal: mentorProcedure
+    .input(
+      z.object({
+        reportIds: z.array(z.number()).min(1),
+        status: z.enum(["approved", "rejected"]),
+        notes: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const mp = await ctx.db.query.mentorProfile.findFirst({
+        where: eq(mentorProfile.userId, ctx.session.user.id),
+      });
+      if (!mp) throw new TRPCError({ code: "FORBIDDEN" });
+
+      // Verify all reports belong to students assigned to this mentor
+      for (const reportId of input.reportIds) {
+        const target = await ctx.db
+          .select({
+            id: report.id,
+            mentorId: placement.mentorId,
+          })
+          .from(report)
+          .innerJoin(placement, eq(report.placementId, placement.id))
+          .where(eq(report.id, reportId))
+          .limit(1);
+
+        const rpt = target[0];
+        if (!rpt) throw new TRPCError({ code: "NOT_FOUND", message: `Report ${reportId} not found` });
+        if (rpt.mentorId !== mp.id) throw new TRPCError({ code: "FORBIDDEN", message: "Not authorized to verify this report" });
+      }
+
+      // Update all reports
+      await ctx.db
+        .update(report)
+        .set({
+          reviewStatus: input.status,
+          reviewNotes: input.notes ?? null,
+          reviewedByMentorId: mp.id,
+          reviewedAt: new Date(),
+        })
+        .where(sql`${report.id} IN (${sql.join(input.reportIds.map((id) => sql`${id}`), sql`, `)})`);
+
+      return { ok: true, count: input.reportIds.length };
+    }),
+
+  /**
+   * Update a journal entry (Student) - only allowed for pending entries
+   */
+  updateJournal: protectedProcedure
+    .input(
+      z.object({
+        reportId: z.number(),
+        content: z.string().min(1, "Deskripsi kegiatan harus diisi"),
+        durationMinutes: z.number().min(0).max(1440),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const sp = await requireStudentPlacement(ctx);
+
+      // Find the report and verify ownership and status
+      const existingReport = await ctx.db
+        .select({
+          id: report.id,
+          placementId: report.placementId,
+          reviewStatus: report.reviewStatus,
+          studentId: placement.studentId,
+        })
+        .from(report)
+        .innerJoin(placement, eq(report.placementId, placement.id))
+        .where(eq(report.id, input.reportId))
+        .limit(1);
+
+      const rpt = existingReport[0];
+      if (!rpt) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Jurnal tidak ditemukan" });
+      }
+      if (rpt.studentId !== sp.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Anda tidak dapat mengedit jurnal ini" });
+      }
+      if (rpt.reviewStatus !== "pending" && rpt.reviewStatus !== "rejected") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Hanya jurnal dengan status menunggu atau ditolak yang dapat diedit" });
+      }
+
+      // Update the report - reset to pending if it was rejected (resubmission)
+      await ctx.db
+        .update(report)
+        .set({
+          content: input.content,
+          durationMinutes: input.durationMinutes,
+          reviewStatus: "pending", // Reset to pending on edit/resubmit
+          reviewNotes: null, // Clear previous review notes
+          reviewedAt: null,
+          reviewedByMentorId: null,
+        })
+        .where(eq(report.id, input.reportId));
+
+      return { ok: true };
+    }),
+
+  /**
+   * Delete a journal entry (Student) - only allowed for pending entries
+   */
+  deleteJournal: protectedProcedure
+    .input(
+      z.object({
+        reportId: z.number(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const sp = await requireStudentPlacement(ctx);
+
+      // Find the report and verify ownership and status
+      const existingReport = await ctx.db
+        .select({
+          id: report.id,
+          reviewStatus: report.reviewStatus,
+          studentId: placement.studentId,
+        })
+        .from(report)
+        .innerJoin(placement, eq(report.placementId, placement.id))
+        .where(eq(report.id, input.reportId))
+        .limit(1);
+
+      const rpt = existingReport[0];
+      if (!rpt) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Jurnal tidak ditemukan" });
+      }
+      if (rpt.studentId !== sp.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Anda tidak dapat menghapus jurnal ini" });
+      }
+      if (rpt.reviewStatus !== "pending") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Hanya jurnal dengan status menunggu yang dapat dihapus" });
+      }
+
+      // Delete the report
+      await ctx.db
+        .delete(report)
+        .where(eq(report.id, input.reportId));
+
+      return { ok: true };
+    }),
 });
+

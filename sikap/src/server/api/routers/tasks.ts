@@ -17,6 +17,7 @@ import {
   placement,
   studentProfile,
   task,
+  taskCompetencyImpact,
   taskStatus,
   user,
 } from "@/server/db/schema";
@@ -160,6 +161,12 @@ export const tasksRouter = createTRPCRouter({
           placementId: placement.id,
           studentId: placement.studentId,
           createdById: task.createdById,
+          createdAt: task.createdAt,
+          targetMajor: task.targetMajor,
+          // Review fields
+          reviewNotes: task.reviewNotes,
+          reviewedAt: task.reviewedAt,
+          score: task.score,
         })
         .from(task)
         .innerJoin(placement, eq(task.placementId, placement.id))
@@ -184,6 +191,20 @@ export const tasksRouter = createTRPCRouter({
       const submissionFiles = allFiles.filter(
         (f) => f.createdById !== t.createdById,
       );
+      // Compute isLate: true if due date has passed and task is not yet submitted/approved
+      const now = new Date();
+      const dueDate = t.dueDate ? new Date(t.dueDate) : null;
+
+      let isLate = false;
+      if (dueDate) {
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const due = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+
+        isLate = today > due &&
+          (t.status === "todo" ||
+            t.status === "in_progress" ||
+            t.status === "rejected");
+      }
 
       return {
         id: t.id,
@@ -191,6 +212,9 @@ export const tasksRouter = createTRPCRouter({
         description: t.description ?? null,
         dueDate: t.dueDate ?? null,
         status: t.status,
+        createdAt: t.createdAt,
+        targetMajor: t.targetMajor ?? null,
+        isLate,
         attachments: taskAttachments.map((f) => ({
           id: f.id,
           url: f.url,
@@ -208,6 +232,12 @@ export const tasksRouter = createTRPCRouter({
             mimeType: f.mimeType ?? null,
             sizeBytes: f.sizeBytes ?? null,
           })),
+        },
+        // Review info (for approved/rejected tasks)
+        review: {
+          notes: t.reviewNotes ?? null,
+          reviewedAt: t.reviewedAt ?? null,
+          score: t.score ? Number(t.score) : null,
         },
       };
     }),
@@ -231,7 +261,10 @@ export const tasksRouter = createTRPCRouter({
         // Check if mentor created this task or has access to the placement
         if (t.createdById !== ctx.session.user.id) {
           const placementData = await ctx.db.query.placement.findFirst({
-            where: and(eq(placement.id, t.placementId), eq(placement.mentorId, mp.id)),
+            where: and(
+              eq(placement.id, t.placementId),
+              eq(placement.mentorId, mp.id),
+            ),
           });
           if (!placementData) throw new TRPCError({ code: "FORBIDDEN" });
         }
@@ -276,6 +309,12 @@ export const tasksRouter = createTRPCRouter({
             sizeBytes: f.sizeBytes ?? null,
           })),
         },
+        // Review info (for approved/rejected tasks)
+        review: {
+          notes: t.reviewNotes ?? null,
+          reviewedAt: t.reviewedAt ?? null,
+          score: t.score ? Number(t.score) : null,
+        },
       };
     }),
 
@@ -307,11 +346,16 @@ export const tasksRouter = createTRPCRouter({
       if (t.placementStudentId !== sp.id)
         throw new TRPCError({ code: "FORBIDDEN" });
 
-      // Validate task status - only allow submission for 'todo' or 'in_progress' tasks
-      if (t.status !== "todo" && t.status !== "in_progress") {
+      // Validate task status - allow submission for 'todo', 'in_progress', or 'rejected' tasks
+      // Rejected tasks can be resubmitted by the student
+      if (
+        t.status !== "todo" &&
+        t.status !== "in_progress" &&
+        t.status !== "rejected"
+      ) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "Tugas ini sudah diserahkan dan tidak dapat diunggah ulang",
+          message: "Tugas ini sudah diserahkan dan sedang dalam proses review",
         });
       }
 
@@ -379,7 +423,8 @@ export const tasksRouter = createTRPCRouter({
           ? sql`${task.dueDate} <= ${input.to.toISOString()}`
           : undefined,
         input.search
-          ? sql`(lower(${task.title}) like ${"%" + input.search.toLowerCase() + "%"} or lower(${task.description}) like ${"%" + input.search.toLowerCase() + "%"
+          ? sql`(lower(${task.title}) like ${"%" + input.search.toLowerCase() + "%"} or lower(${task.description}) like ${
+              "%" + input.search.toLowerCase() + "%"
             })`
           : undefined,
       );
@@ -398,13 +443,8 @@ export const tasksRouter = createTRPCRouter({
         .from(task)
         .innerJoin(placement, eq(task.placementId, placement.id))
         .where(where)
-        .groupBy(
-          task.title,
-          task.description,
-          task.dueDate,
-          task.targetMajor,
-        )
-        .orderBy(sql`min(${task.createdAt}) desc`)
+        .groupBy(task.title, task.description, task.dueDate, task.targetMajor)
+        .orderBy(sql`${task.dueDate} desc`)
         .limit(input.limit)
         .offset(input.offset);
 
@@ -445,6 +485,7 @@ export const tasksRouter = createTRPCRouter({
         dueDate: z.date(),
         targetMajor: z.string().optional(),
         placementIds: z.array(z.number()).optional(),
+        rubricIds: z.array(z.number()).optional(),
         attachments: z
           .array(z.object({ url: z.string(), filename: z.string().optional() }))
           .optional(),
@@ -474,9 +515,9 @@ export const tasksRouter = createTRPCRouter({
             input.targetMajor
               ? input.targetMajor.includes(",")
                 ? // Handle comma-separated majors (e.g., "RPL,TKJ")
-                inArray(studentProfile.major, input.targetMajor.split(","))
+                  inArray(studentProfile.major, input.targetMajor.split(","))
                 : // Single major
-                eq(studentProfile.major, input.targetMajor)
+                  eq(studentProfile.major, input.targetMajor)
               : undefined,
             input.placementIds
               ? inArray(placement.id, input.placementIds)
@@ -514,6 +555,16 @@ export const tasksRouter = createTRPCRouter({
                 url: att.url,
                 filename: att.filename,
                 createdById: ctx.session.user.id,
+              });
+            }
+          }
+
+          // Insert task-rubric relationships
+          if (input.rubricIds && input.rubricIds.length > 0 && newTask) {
+            for (const rubricId of input.rubricIds) {
+              await tx.insert(taskCompetencyImpact).values({
+                taskId: newTask.id,
+                competencyTemplateId: rubricId,
               });
             }
           }
@@ -618,7 +669,8 @@ export const tasksRouter = createTRPCRouter({
           submissionNote: task.submissionNote,
           studentId: studentProfile.id,
           studentName: user.name,
-          studentCode: studentProfile.nis,
+          studentCode: user.code,
+          score: task.score,
         })
         .from(task)
         .innerJoin(placement, eq(task.placementId, placement.id))
@@ -638,11 +690,11 @@ export const tasksRouter = createTRPCRouter({
       const attachments =
         taskIds.length > 0
           ? await ctx.db.query.attachment.findMany({
-            where: and(
-              eq(attachment.ownerType, "task"),
-              inArray(attachment.ownerId, taskIds),
-            ),
-          })
+              where: and(
+                eq(attachment.ownerType, "task"),
+                inArray(attachment.ownerId, taskIds),
+              ),
+            })
           : [];
 
       // 4. Calculate stats
@@ -671,8 +723,13 @@ export const tasksRouter = createTRPCRouter({
           status: t.status,
           submittedAt: t.submittedAt,
           submissionNote: t.submissionNote,
+          score: t.score ? Number(t.score) : null,
+          // Only include files NOT created by the task creator (i.e., student submissions)
           files: attachments
-            .filter((a) => a.ownerId === t.id)
+            .filter(
+              (a) =>
+                a.ownerId === t.id && a.createdById !== refTask.createdById,
+            )
             .map((a) => ({
               id: a.id,
               url: a.url,
@@ -698,11 +755,19 @@ export const tasksRouter = createTRPCRouter({
 
   // List all tasks per student for Laporan page (mentor view)
   listForMentor: adminOrMentorProcedure
-    .use(requirePermissions({ task: ["read"], placement: ["read"], studentProfile: ["read"] }))
+    .use(
+      requirePermissions({
+        task: ["read"],
+        placement: ["read"],
+        studentProfile: ["read"],
+      }),
+    )
     .input(
       z.object({
         search: z.string().optional(),
-        status: z.enum(["belum_dikerjakan", "belum_direview", "sudah_direview"]).optional(),
+        status: z
+          .enum(["belum_dikerjakan", "belum_direview", "sudah_direview"])
+          .optional(),
         from: z.date().optional(),
         to: z.date().optional(),
         limit: z.number().min(1).max(200).default(100),
@@ -720,7 +785,7 @@ export const tasksRouter = createTRPCRouter({
       }
 
       // Map UI status to DB statuses
-      let statusFilter: typeof taskStatus.enumValues[number][] | undefined;
+      let statusFilter: (typeof taskStatus.enumValues)[number][] | undefined;
       if (input.status === "belum_dikerjakan") {
         statusFilter = ["todo", "in_progress"];
       } else if (input.status === "belum_direview") {
@@ -732,7 +797,9 @@ export const tasksRouter = createTRPCRouter({
 
       const where = and(
         mentorFilterId ? eq(placement.mentorId, mentorFilterId) : undefined,
-        statusFilter ? inArray(task.status, statusFilter) : notInArray(task.status, ["rejected"]), // Hide rejected
+        statusFilter
+          ? inArray(task.status, statusFilter)
+          : notInArray(task.status, ["rejected"]), // Hide rejected
         input.from
           ? sql`${task.dueDate} >= ${input.from.toISOString()}`
           : undefined,
@@ -762,7 +829,10 @@ export const tasksRouter = createTRPCRouter({
         .innerJoin(studentProfile, eq(placement.studentId, studentProfile.id))
         .innerJoin(user, eq(studentProfile.userId, user.id))
         .where(where)
-        .orderBy(sql`${task.createdAt} desc`)
+        .orderBy(
+          sql`${task.dueDate} desc nulls last`,
+          sql`${task.createdAt} desc`,
+        )
         .limit(input.limit)
         .offset(input.offset);
 
@@ -776,7 +846,9 @@ export const tasksRouter = createTRPCRouter({
       const total = totalRows[0]?.total ?? 0;
 
       // Map DB status to UI status
-      const mapStatus = (s: string): "belum_dikerjakan" | "belum_direview" | "sudah_direview" => {
+      const mapStatus = (
+        s: string,
+      ): "belum_dikerjakan" | "belum_direview" | "sudah_direview" => {
         if (s === "todo" || s === "in_progress") return "belum_dikerjakan";
         if (s === "submitted") return "belum_direview";
         return "sudah_direview"; // approved
@@ -815,6 +887,7 @@ export const tasksRouter = createTRPCRouter({
         taskId: z.number(),
         status: z.enum(["approved", "rejected"]),
         notes: z.string().optional(),
+        score: z.number().min(0).max(100).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -828,28 +901,43 @@ export const tasksRouter = createTRPCRouter({
       if (t.status !== "submitted") {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "Hanya tugas yang sudah disubmit yang bisa direview"
+          message: "Hanya tugas yang sudah disubmit yang bisa direview",
         });
       }
 
-      // For mentors, verify they have access to this task
+      // Get mentor profile for reviewedByMentorId
+      let mentorId: number | null = null;
       if (ctx.session.user.role === "mentor") {
         const mp = await ctx.db.query.mentorProfile.findFirst({
           where: eq(mentorProfile.userId, ctx.session.user.id),
         });
         if (!mp) throw new TRPCError({ code: "FORBIDDEN" });
+        mentorId = mp.id;
 
+        // Verify mentor has access to this task
         const p = await ctx.db.query.placement.findFirst({
-          where: and(eq(placement.id, t.placementId), eq(placement.mentorId, mp.id)),
+          where: and(
+            eq(placement.id, t.placementId),
+            eq(placement.mentorId, mp.id),
+          ),
         });
         if (!p) throw new TRPCError({ code: "FORBIDDEN" });
+      } else if (ctx.session.user.role === "admin") {
+        // Admin can review without being linked as mentor
+        mentorId = null;
       }
 
       await ctx.db
         .update(task)
         .set({
           status: input.status,
-          submissionNote: input.notes ? `${t.submissionNote ?? ""}\n\n[Review]: ${input.notes}` : t.submissionNote,
+          reviewedByMentorId: mentorId,
+          reviewNotes: input.notes ?? null,
+          reviewedAt: new Date(),
+          score:
+            input.status === "approved" && input.score !== undefined
+              ? String(input.score)
+              : null,
         })
         .where(eq(task.id, input.taskId));
 

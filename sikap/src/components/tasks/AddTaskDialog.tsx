@@ -1,20 +1,5 @@
 "use client";
 
-/**
- * TODO: Backend Integration
- *
- * This dialog currently creates tasks with local state only.
- * When backend is ready:
- * 1. Replace onAdd callback with api.tasks.create.useMutation()
- * 2. Include attachments array in mutation payload
- * 3. Handle task distribution to placements on backend
- * 4. Show loading state during mutation
- * 5. Display success/error messages
- *
- * Required backend endpoint:
- * api.tasks.create({ title, description, dueDate, targetMajor, placementIds, attachments })
- */
-
 import React from "react";
 import { api } from "@/trpc/react";
 import { toast } from "sonner";
@@ -40,7 +25,6 @@ import {
   FileUploadField,
   type FileUploadValue,
 } from "@/components/ui/file-upload-field";
-import { RUBRIC_CATEGORIES, RUBRICS_BY_MAJOR } from "@/lib/rubrics";
 
 export type TaskItem = {
   id: string;
@@ -63,8 +47,13 @@ export default function AddTaskDialog({
   const [date, setDate] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [majors, setMajors] = React.useState<Array<"RPL" | "TKJ" | "Umum">>([]);
-  const [rubrics, setRubrics] = React.useState<string[]>([]);
+  const [selectedRubricIds, setSelectedRubricIds] = React.useState<number[]>(
+    [],
+  );
   const [attachments, setAttachments] = React.useState<FileUploadValue[]>([]);
+
+  // Fetch rubrics from API
+  const { data: rubricsData } = api.rubrics.list.useQuery({});
 
   const todayStr = React.useMemo(() => {
     const d = new Date();
@@ -98,41 +87,37 @@ export default function AddTaskDialog({
     });
   }
 
+  // Filter rubrics based on selected majors (exclude "Umum" since it has no rubrics)
   const availableRubrics = React.useMemo(() => {
-    if (majors.length === 0) return [] as string[];
-    const all: string[] = [];
-    majors.forEach((m) => {
-      if (m === "Umum") return;
-      const cats = RUBRICS_BY_MAJOR[m];
-      Object.values(cats).forEach((list) =>
-        list.forEach((i) => {
-          if (!all.includes(i)) all.push(i);
-        }),
-      );
+    if (majors.length === 0 || majors.includes("Umum")) return [];
+    const rubrics = rubricsData?.items ?? [];
+    // Filter rubrics where their major matches any of selected majors
+    return rubrics.filter((r) => {
+      const rubricMajors = r.major.split(",");
+      return majors.some((m) => m !== "Umum" && rubricMajors.includes(m));
     });
-    return all;
-  }, [majors]);
+  }, [majors, rubricsData]);
 
   // Group rubrics by major for visual separation
   const rubricsByMajor = React.useMemo(() => {
-    const groups: Record<string, string[]> = {};
+    const groups: Record<string, typeof availableRubrics> = {};
 
     majors.forEach((major) => {
       if (major === "Umum") return;
-      const cats = RUBRICS_BY_MAJOR[major];
-      const rubricList: string[] = [];
-      Object.values(cats).forEach((list) => list.forEach((i) => {
-        if (!rubricList.includes(i)) rubricList.push(i);
-      }));
-      groups[major] = rubricList;
+      const filteredRubrics = availableRubrics.filter((r) =>
+        r.major.split(",").includes(major),
+      );
+      if (filteredRubrics.length > 0) {
+        groups[major] = filteredRubrics;
+      }
     });
 
     return groups;
-  }, [majors]);
+  }, [majors, availableRubrics]);
 
-  function toggleRubric(r: string) {
-    setRubrics((prev) =>
-      prev.includes(r) ? prev.filter((x) => x !== r) : [...prev, r],
+  function toggleRubric(id: number) {
+    setSelectedRubricIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
   }
 
@@ -156,7 +141,7 @@ export default function AddTaskDialog({
       setDescription("");
       setDate("");
       setMajors([]);
-      setRubrics([]);
+      setSelectedRubricIds([]);
       setAttachments([]);
     },
     onError: (err) => {
@@ -189,7 +174,7 @@ export default function AddTaskDialog({
       setError("Minimal pilih satu jurusan");
       return;
     }
-    if (availableRubrics.length > 0 && rubrics.length === 0) {
+    if (availableRubrics.length > 0 && selectedRubricIds.length === 0) {
       setError("Minimal pilih satu rubrik penilaian");
       return;
     }
@@ -217,6 +202,7 @@ export default function AddTaskDialog({
         description: description,
         dueDate: d,
         targetMajor: combinedMajor,
+        rubricIds: selectedRubricIds.length > 0 ? selectedRubricIds : undefined,
         attachments: attachments.map((a) => ({
           url: a.url,
           filename: a.filename,
@@ -360,28 +346,39 @@ export default function AddTaskDialog({
                 <FieldTitle>Rubrik Penilaian</FieldTitle>
                 <FieldContent>
                   <div className="grid max-h-[500px] grid-cols-1 gap-3 overflow-auto md:grid-cols-2">
-                    {Object.entries(rubricsByMajor).map(([major, rubricList], idx) => (
-                      <React.Fragment key={major}>
-                        {idx > 0 && <div className="col-span-full border-t pt-3 mt-1" />}
-                        <div className="col-span-full text-xs font-semibold text-muted-foreground mb-2">
-                          {major}
-                        </div>
-                        {rubricList.map((r) => (
-                          <label
-                            key={r}
-                            className={`flex cursor-pointer items-center justify-between gap-2 rounded-(--radius-sm) border px-3 py-2 transition-transform active:scale-[0.98] ${rubrics.includes(r) ? "ring-primary bg-secondary ring-1" : "bg-card"}`}
-                          >
-                            <span className="text-sm">{r}</span>
-                            <input
-                              type="checkbox"
-                              className="size-4"
-                              checked={rubrics.includes(r)}
-                              onChange={() => toggleRubric(r)}
-                            />
-                          </label>
-                        ))}
-                      </React.Fragment>
-                    ))}
+                    {Object.entries(rubricsByMajor).map(
+                      ([major, rubricList], idx) => (
+                        <React.Fragment key={major}>
+                          {idx > 0 && (
+                            <div className="col-span-full mt-1 border-t pt-3" />
+                          )}
+                          <div className="text-muted-foreground col-span-full mb-2 text-xs font-semibold">
+                            {major}
+                          </div>
+                          {rubricList.map((r) => (
+                            <label
+                              key={r.id}
+                              className={`flex cursor-pointer items-center justify-between gap-2 rounded-(--radius-sm) border px-3 py-2 transition-transform active:scale-[0.98] ${selectedRubricIds.includes(r.id) ? "ring-primary bg-secondary ring-1" : "bg-card"}`}
+                            >
+                              <div className="flex flex-col">
+                                <span className="text-sm">{r.name}</span>
+                                <span className="text-muted-foreground text-xs">
+                                  {r.category === "technical"
+                                    ? "Teknis"
+                                    : "Kepribadian"}
+                                </span>
+                              </div>
+                              <input
+                                type="checkbox"
+                                className="size-4"
+                                checked={selectedRubricIds.includes(r.id)}
+                                onChange={() => toggleRubric(r.id)}
+                              />
+                            </label>
+                          ))}
+                        </React.Fragment>
+                      ),
+                    )}
                   </div>
                 </FieldContent>
               </Field>
@@ -415,7 +412,7 @@ export default function AddTaskDialog({
               !description ||
               !date ||
               majors.length === 0 ||
-              (availableRubrics.length > 0 && rubrics.length === 0) ||
+              (availableRubrics.length > 0 && selectedRubricIds.length === 0) ||
               createTask.isPending
             }
           >

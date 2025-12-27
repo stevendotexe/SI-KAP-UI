@@ -6,7 +6,6 @@ import {
   createTRPCRouter,
   requirePermissions,
   adminOrMentorProcedure,
-  mentorProcedure,
 } from "@/server/api/trpc";
 import { auth } from "@/server/better-auth";
 import {
@@ -18,13 +17,9 @@ import {
 import { generateUserCode } from "@/server/db/utils";
 
 const docs = {
-  me: {
-    description:
-      "## Get Current Mentor Profile\n\nMengembalikan profil mentor yang sedang login beserta companyId.\n\n### Parameters\nTidak ada.\n\n### Response\n`{ id: number, userId: string, name: string, email: string, active: boolean, companyId: number | null }`.\n\n### Example (React)\n```ts\nconst { data } = api.mentors.me.useQuery();\nconst companyId = data?.companyId;\n```",
-  },
   list: {
     description:
-      "## List Mentor\n\nList mentor dalam company dengan filter dan paginasi. Untuk admin, companyId bersifat optional dan akan menampilkan semua mentor jika tidak diberikan. Untuk mentor, companyId akan otomatis diambil dari profil mentor.\n\n### Parameters\n- `companyId` (number, optional) - Optional untuk admin, akan menampilkan semua mentor jika tidak diberikan\n- `active` (boolean, optional)\n- `search` (string, optional)\n- `limit` (number, 1-200, default 100)\n- `offset` (number, >=0, default 0)\n\n### Response\n`{ items: MentorRow[], pagination: { total, limit, offset }, lastUpdated: string }` dengan `MentorRow = { id: number, mentorId: string, name: string, email: string, active: boolean, studentCount: number }`.\n\n### Example (React)\n```ts\n// Admin: get all mentors\nconst { data } = api.mentors.list.useQuery({ search: 'ahsan' });\n// Or filter by company\nconst { data } = api.mentors.list.useQuery({ companyId: 1, search: 'ahsan' });\n```",
+      "## List Mentor\n\nList mentor dalam company dengan filter dan paginasi.\n\n### Parameters\n- `companyId` (number)\n- `active` (boolean, optional)\n- `search` (string, optional)\n- `limit` (number, 1-200, default 100)\n- `offset` (number, >=0, default 0)\n\n### Response\n`{ items: MentorRow[], pagination: { total, limit, offset }, lastUpdated: string }` dengan `MentorRow = { id: number, mentorId: string, name: string, email: string, active: boolean, studentCount: number }`.\n\n### Example (React)\n```ts\nconst { data } = api.mentors.list.useQuery({ companyId: 1, search: 'ahsan' });\n```",
   },
   detail: {
     description:
@@ -45,7 +40,7 @@ const docs = {
 };
 
 export const mentorsRouter = createTRPCRouter({
-  me: mentorProcedure.meta(docs.me).query(async ({ ctx }) => {
+  me: adminOrMentorProcedure.query(async ({ ctx }) => {
     const mp = await ctx.db.query.mentorProfile.findFirst({
       where: eq(mentorProfile.userId, ctx.session.user.id),
       with: { user: true },
@@ -70,7 +65,7 @@ export const mentorsRouter = createTRPCRouter({
     .use(requirePermissions({ mentorProfile: ["read"], placement: ["read"] }))
     .input(
       z.object({
-        companyId: z.number().optional(),
+        companyId: z.number(),
         active: z.boolean().optional(),
         search: z.string().optional(),
         limit: z.number().min(1).max(200).default(100),
@@ -79,7 +74,7 @@ export const mentorsRouter = createTRPCRouter({
     )
     .query(async ({ ctx, input }) => {
       // For mentors, get their companyId if not provided
-      let companyId = input.companyId;
+      let companyId: number | undefined = input.companyId;
       if (ctx.session.user.role === "mentor" && !companyId) {
         const mp = await ctx.db.query.mentorProfile.findFirst({
           where: eq(mentorProfile.userId, ctx.session.user.id),
@@ -209,6 +204,7 @@ export const mentorsRouter = createTRPCRouter({
         profile: {
           id: mp.id,
           userId: mp.userId,
+          code: mp.user?.code ?? "",
           name: mp.user?.name ?? "",
           email: mp.user?.email ?? "",
           active: mp.active,

@@ -10,7 +10,7 @@ const statements = {
   ...defaultStatements,
   ...adminAc.statements,
   placement: ["create", "read", "update"],
-  attendanceLog: ["create", "read", "verify"],
+  attendanceLog: ["create", "read", "verify", "update", "delete"],
   assessment: ["create", "read", "update", "delete"],
   task: ["create", "read", "update", "delete", "review"],
   report: ["create", "read", "update", "review"],
@@ -18,6 +18,8 @@ const statements = {
   mentorProfile: ["read", "update"],
   calendarEvent: ["create", "read", "update", "delete"],
   analytics: ["read"],
+  finalReport: ["read", "create", "update", "delete"],
+  certificate: ["read", "create", "update"],
 } as const;
 
 const ac = createAccessControl(statements);
@@ -25,7 +27,7 @@ const ac = createAccessControl(statements);
 const adminRole = ac.newRole({
   ...adminAc.statements,
   placement: ["create", "read", "update"],
-  attendanceLog: ["read", "verify"],
+  attendanceLog: ["read", "verify", "update", "delete"],
   assessment: ["create", "read", "update", "delete"],
   task: ["create", "read", "update", "delete", "review"],
   report: ["create", "read", "update", "review"],
@@ -33,11 +35,13 @@ const adminRole = ac.newRole({
   mentorProfile: ["read", "update"],
   calendarEvent: ["create", "read", "update", "delete"],
   analytics: ["read"],
+  finalReport: ["read", "create", "update", "delete"],
+  certificate: ["read", "create", "update"],
 });
 
 const mentorRole = ac.newRole({
   placement: ["read", "update"],
-  attendanceLog: ["read", "verify"],
+  attendanceLog: ["read", "verify", "update", "delete"],
   assessment: ["create", "read", "update"],
   task: ["create", "read", "update", "review"],
   report: ["read", "review"],
@@ -46,6 +50,8 @@ const mentorRole = ac.newRole({
   mentorProfile: ["read", "update"],
   calendarEvent: ["create", "read", "update"],
   analytics: ["read"],
+  finalReport: ["read", "create", "update", "delete"],
+  certificate: ["read", "create", "update"],
 });
 
 const studentRole = ac.newRole({
@@ -56,6 +62,8 @@ const studentRole = ac.newRole({
   report: ["create", "read"],
   studentProfile: ["read"],
   calendarEvent: ["read"],
+  finalReport: ["read"],
+  certificate: ["read"],
 });
 
 export const auth = betterAuth({

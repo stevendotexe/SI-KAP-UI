@@ -37,12 +37,14 @@ export default function ClientSection({
   reports,
   tasks = [],
   info,
+  basePath = "/mentor",
 }: {
   scoreSeries: SeriesPoint[];
   attendanceSeries: SeriesPoint[];
   reports: Report[];
   tasks?: StudentTask[];
   info: Info;
+  basePath?: string;
 }) {
   const [mode, setMode] = React.useState<"laporan" | "informasi">("laporan");
   const [reviewed, setReviewed] = React.useState<
@@ -63,6 +65,7 @@ export default function ClientSection({
           tasks={tasks}
           reviewed={reviewed}
           onReviewedChange={setReviewed}
+          basePath={basePath}
         />
       ) : (
         <>
