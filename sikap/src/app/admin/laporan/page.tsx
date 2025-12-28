@@ -148,12 +148,12 @@ export default function AdminLaporanPage() {
   }
 
   return (
-    <main className="min-h-screen bg-muted/30 p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <main className="bg-muted text-foreground min-h-screen">
+      <div className="mx-auto max-w-[1200px] px-6 py-8">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-semibold">Laporan Harian Siswa</h1>
+            <h1 className="text-2xl font-semibold">Laporan Harian Siswa</h1>
             <p className="text-muted-foreground mt-1">Lihat semua laporan harian siswa PKL</p>
           </div>
           <Button variant="outline" onClick={handleExport} disabled={filtered.length === 0}>

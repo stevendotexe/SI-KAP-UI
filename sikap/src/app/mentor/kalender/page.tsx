@@ -116,113 +116,121 @@ export default function Page() {
 
   const weeks = useMemo(() => buildWeeks(year, month), [year, month]);
 
-  // Mentor calendar - no companyId needed, API will auto-detect from mentor profile
+  // Mentor calendar - show all activities using listAllForStudent
   const {
-    data: events,
+    data: eventsData,
     isLoading,
     isError,
     refetch,
-  } = api.calendarEvents.list.useQuery({
+  } = api.calendarEvents.listAllForStudent.useQuery({
     month: month + 1, // API expects 1-12
     year: year,
   });
 
+  // Map the response to match CalendarEvent type (properly convert dates)
+  const events = eventsData?.map(evt => ({
+    id: evt.id,
+    title: evt.title,
+    type: evt.type,
+    startDate: new Date(evt.startDate),
+    dueDate: new Date(evt.dueDate),
+    organizerName: evt.organizerName,
+    colorHex: evt.colorHex,
+    placementId: null,
+    description: null,
+    organizerLogoUrl: evt.organizerLogoUrl,
+  }));
+
   // Get events for a specific week to render on calendar
   function getWeekSegments(week: DayCell[]) {
-    if (!events || events.length === 0) return { segments: [], maxSlot: 0 };
+    if (!events || events.length === 0) return { segments: [], maxSlot: -1 };
 
-    const minDay = Math.min(...week.filter((w) => w.inMonth).map((w) => w.day));
-    const maxDay = Math.max(...week.filter((w) => w.inMonth).map((w) => w.day));
-    if (!isFinite(minDay) || !isFinite(maxDay))
-      return { segments: [], maxSlot: 0 };
+    // Get the actual date range for this week
+    const weekStart = week[0]?.date;
+    const weekEnd = week[6]?.date;
+    if (!weekStart || !weekEnd) return { segments: [], maxSlot: -1 };
 
-    // 1. Convert events to raw segments
     const rawSegments = events
       .map((evt) => {
         const startDate = new Date(evt.startDate);
         const endDate = new Date(evt.dueDate);
 
-        // Check if event is in current month
-        if (startDate.getMonth() !== month && endDate.getMonth() !== month)
-          return null;
+        // Convert to date-only for comparison (ignore time)
+        const evtStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+        const evtEnd = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+        const wkStart = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate());
+        const wkEnd = new Date(weekEnd.getFullYear(), weekEnd.getMonth(), weekEnd.getDate());
 
-        const startDay =
-          startDate.getMonth() === month ? startDate.getDate() : 1;
-        const endDay =
-          endDate.getMonth() === month
-            ? endDate.getDate()
-            : new Date(year, month + 1, 0).getDate();
+        // Check if event overlaps with this week
+        if (evtEnd < wkStart || evtStart > wkEnd) return null;
 
-        const segStartDay = Math.max(startDay, minDay);
-        const segEndDay = Math.min(endDay, maxDay);
-        if (segStartDay > segEndDay) return null;
+        // Calculate which days in the week to show the event
+        const segStart = evtStart > wkStart ? evtStart : wkStart;
+        const segEnd = evtEnd < wkEnd ? evtEnd : wkEnd;
 
-        const startIdx = week.findIndex(
-          (c) => c.inMonth && c.day === segStartDay,
-        );
-        const endIdx = week.findIndex((c) => c.inMonth && c.day === segEndDay);
+        // Find indices in the week array
+        const startIdx = week.findIndex((c) => {
+          const cellDate = new Date(c.date.getFullYear(), c.date.getMonth(), c.date.getDate());
+          return cellDate.getTime() === segStart.getTime();
+        });
+        const endIdx = week.findIndex((c) => {
+          const cellDate = new Date(c.date.getFullYear(), c.date.getMonth(), c.date.getDate());
+          return cellDate.getTime() === segEnd.getTime();
+        });
+
         if (startIdx < 0 || endIdx < 0) return null;
 
+        const span = endIdx - startIdx + 1;
+        const leftPct = (startIdx / 7) * 100;
+        const widthPct = (span / 7) * 100;
+
         return {
-          startIdx, // 0-6
-          endIdx, // 0-6
-          span: endIdx - startIdx + 1,
-          leftPct: (startIdx / 7) * 100,
-          widthPct: ((endIdx - startIdx + 1) / 7) * 100,
+          startIdx,
+          endIdx,
+          span,
+          leftPct,
+          widthPct,
           label: evt.title,
-          colorClass: evt.colorHex
-            ? ""
-            : (EVENT_COLORS[evt.type] ?? "bg-chart-4"),
+          colorClass: evt.colorHex ? "" : (EVENT_COLORS[evt.type] ?? "bg-chart-4"),
           colorHex: evt.colorHex,
           event: evt,
         };
       })
       .filter((s): s is NonNullable<typeof s> => !!s)
       .sort((a, b) => {
-        // Sort by start index, then span (longer first)
         if (a.startIdx !== b.startIdx) return a.startIdx - b.startIdx;
         return b.span - a.span;
       });
 
-    // 2. Assign slots to prevent overlap
-    const slots: number[][] = Array(7)
-      .fill([])
-      .map(() => []); // 7 days in a week
+    // Assign slots to prevent overlap
     const segmentsWithSlot: ((typeof rawSegments)[0] & { slot: number })[] = [];
-    const maxSlot = -1;
+    let maxSlot = -1;
 
     for (const seg of rawSegments) {
       // Find first available slot for this segment's duration
       let slot = 0;
       while (true) {
-        let fit = true;
-        for (let i = seg.startIdx; i <= seg.endIdx; i++) {
-          const daySlots = slots[i];
-          if (daySlots && daySlots[slot]) {
-            fit = false;
-            break;
-          }
-        }
-        if (fit) break;
+        const conflict = segmentsWithSlot.some(
+          (existing) =>
+            existing.slot === slot &&
+            !(seg.endIdx < existing.startIdx || seg.startIdx > existing.endIdx)
+        );
+        if (!conflict) break;
         slot++;
       }
-
-      // Mark slot as occupied
-      for (let i = seg.startIdx; i <= seg.endIdx; i++) {
-        const row = slots[i];
-        if (row) row[slot] = 1;
-      }
+      segmentsWithSlot.push({ ...seg, slot });
+      if (slot > maxSlot) maxSlot = slot;
     }
 
     return { segments: segmentsWithSlot, maxSlot };
   }
 
   return (
-    <div className="bg-muted/30 min-h-screen p-6">
-      <div className="mx-auto w-full max-w-7xl">
-        <div className="flex items-start justify-between">
+    <main className="bg-muted text-foreground min-h-screen">
+      <div className="mx-auto max-w-[1200px] px-6 py-8">
+        <div className="flex items-start justify-between mb-6">
           <div className="space-y-1">
-            <h1 className="text-2xl font-semibold sm:text-3xl">Kalender</h1>
+            <h1 className="text-2xl font-semibold">Kalender</h1>
             <p className="text-muted-foreground">Daftar jadwal</p>
           </div>
         </div>
@@ -335,13 +343,13 @@ export default function Page() {
                     {segments.map((s, si) => (
                       <div
                         key={si}
-                        className={`absolute z-10 h-7 ${s.colorClass} flex items-center justify-center rounded-full text-xs font-medium ${getContrastTextColor(s.colorHex)} cursor-default transition-opacity hover:opacity-90`}
+                        className={`absolute z-10 h-6 ${s.colorClass} flex items-center rounded text-xs font-medium ${getContrastTextColor(s.colorHex)} cursor-default transition-opacity hover:opacity-90 shadow-sm overflow-hidden`}
                         style={{
-                          top: 34 + s.slot * 32,
-                          left: `${s.leftPct}%`,
-                          width: `${s.widthPct}%`,
-                          paddingLeft: 12,
-                          paddingRight: 12,
+                          top: 28 + s.slot * 28,
+                          left: `calc(${s.leftPct}% + 4px)`,
+                          width: `calc(${s.widthPct}% - 8px)`,
+                          paddingLeft: 8,
+                          paddingRight: 8,
                           backgroundColor: s.colorHex ?? undefined,
                         }}
                         onMouseEnter={(e) => {
@@ -401,7 +409,7 @@ export default function Page() {
                     )}
                     {hoveredEvent.event.dueDate &&
                       new Date(hoveredEvent.event.dueDate).getTime() !==
-                        new Date(hoveredEvent.event.startDate).getTime() && (
+                      new Date(hoveredEvent.event.startDate).getTime() && (
                         <>
                           {" "}
                           -{" "}
@@ -468,7 +476,7 @@ export default function Page() {
                           )}
                           {event.dueDate &&
                             new Date(event.dueDate).getTime() !==
-                              new Date(event.startDate).getTime() && (
+                            new Date(event.startDate).getTime() && (
                               <>
                                 {" "}
                                 -{" "}
@@ -492,6 +500,6 @@ export default function Page() {
           </section>
         )}
       </div>
-    </div>
+    </main>
   );
 }

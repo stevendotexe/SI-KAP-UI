@@ -114,7 +114,7 @@ export default function BiodataSiswaPage() {
     nama !== (profileQuery.data?.name ?? "") ||
     tempatLahir !== (profileQuery.data?.birthPlace ?? "") ||
     semester !==
-      (profileQuery.data?.semester ? String(profileQuery.data.semester) : "") ||
+    (profileQuery.data?.semester ? String(profileQuery.data.semester) : "") ||
     asalSekolah !== (profileQuery.data?.school ?? "") ||
     alamat !== (profileQuery.data?.address ?? "") ||
     noTelp !== (profileQuery.data?.phone ?? "");
@@ -201,11 +201,11 @@ export default function BiodataSiswaPage() {
   const lockedCohort = profileQuery.data?.cohort ?? "-";
 
   return (
-    <div className="bg-muted/30 m-0 min-h-screen p-0">
-      <div className="m-0 w-full max-w-none p-5 pr-4 pl-4 sm:pr-6 sm:pl-6 lg:pr-10 lg:pl-10">
+    <main className="bg-muted text-foreground min-h-screen">
+      <div className="mx-auto max-w-[1200px] px-6 py-8">
         {/* Header */}
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold sm:text-3xl">Biodata</h1>
+        <div className="space-y-1 mb-6">
+          <h1 className="text-2xl font-semibold">Biodata</h1>
           <p className="text-muted-foreground">Silahkan isi biodata anda</p>
         </div>
 
@@ -384,6 +384,6 @@ export default function BiodataSiswaPage() {
           </form>
         </section>
       </div>
-    </div>
+    </main>
   );
 }

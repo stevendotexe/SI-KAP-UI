@@ -159,26 +159,26 @@ export const attendancesRouter = createTRPCRouter({
       return {
         summary: summaryRow
           ? (() => {
-              const present = Number(summaryRow.present ?? 0);
-              const absent = Number(summaryRow.absent ?? 0);
-              const total = Number(summaryRow.total ?? 0);
-              const attendancePercent =
-                total === 0 ? 0 : Math.round((present / total) * 100);
-              return {
-                date: summaryDate,
-                presentCount: present,
-                absentCount: absent,
-                total,
-                attendancePercent,
-              };
-            })()
-          : {
+            const present = Number(summaryRow.present ?? 0);
+            const absent = Number(summaryRow.absent ?? 0);
+            const total = Number(summaryRow.total ?? 0);
+            const attendancePercent =
+              total === 0 ? 0 : Math.round((present / total) * 100);
+            return {
               date: summaryDate,
-              presentCount: 0,
-              absentCount: 0,
-              total: 0,
-              attendancePercent: 0,
-            },
+              presentCount: present,
+              absentCount: absent,
+              total,
+              attendancePercent,
+            };
+          })()
+          : {
+            date: summaryDate,
+            presentCount: 0,
+            absentCount: 0,
+            total: 0,
+            attendancePercent: 0,
+          },
         items: rows.map(formatRow),
         pagination: {
           total: Number(totalDays ?? 0),
@@ -239,11 +239,13 @@ export const attendancesRouter = createTRPCRouter({
           : undefined,
       );
 
+      // Query starting from active placements, LEFT JOIN to attendance for the date
+      // This ensures ALL students show up, even without attendance records
       const rows = await ctx.db
         .select({
           id: attendanceLog.id,
-          date: attendanceLog.date,
-          status: attendanceLog.status,
+          date: sql<string>`COALESCE(${attendanceLog.date}, ${dateStr})`.as('date'),
+          status: sql<string>`COALESCE(${attendanceLog.status}, 'absent')`.as('status'),
           checkInAt: attendanceLog.checkInAt,
           checkOutAt: attendanceLog.checkOutAt,
           placementId: placement.id,
@@ -258,26 +260,66 @@ export const attendancesRouter = createTRPCRouter({
           verifiedByMentorId: attendanceLog.verifiedByMentorId,
           selfieUrl: attendanceLog.selfieUrl,
         })
-        .from(attendanceLog)
-        .innerJoin(placement, eq(attendanceLog.placementId, placement.id))
+        .from(placement)
         .innerJoin(studentProfile, eq(placement.studentId, studentProfile.id))
         .innerJoin(studentUser, eq(studentProfile.userId, studentUser.id))
         .leftJoin(mentorProfile, eq(placement.mentorId, mentorProfile.id))
         .leftJoin(mentorUser, eq(mentorProfile.userId, mentorUser.id))
-        .where(where)
+        .leftJoin(
+          attendanceLog,
+          and(
+            eq(attendanceLog.placementId, placement.id),
+            eq(attendanceLog.date, dateStr)
+          )
+        )
+        .where(
+          and(
+            eq(placement.status, "active"),
+            input.companyId ? eq(placement.companyId, input.companyId) : undefined,
+            mentorFilterId ? eq(placement.mentorId, mentorFilterId) : undefined,
+            input.status
+              ? input.status === "absent"
+                ? sql`(${attendanceLog.status} = 'absent' OR ${attendanceLog.status} IS NULL)`
+                : eq(attendanceLog.status, input.status)
+              : undefined,
+            input.search
+              ? sql`(lower(${studentUser.name}) like ${"%" + input.search.toLowerCase() + "%"} or ${studentUser.id} = ${input.search})`
+              : undefined,
+          )
+        )
         .orderBy(studentUser.name)
         .limit(input.limit)
         .offset(input.offset);
 
       const totalRows = await ctx.db
         .select({ total: sql<number>`count(*)` })
-        .from(attendanceLog)
-        .innerJoin(placement, eq(attendanceLog.placementId, placement.id))
+        .from(placement)
         .innerJoin(studentProfile, eq(placement.studentId, studentProfile.id))
         .innerJoin(studentUser, eq(studentProfile.userId, studentUser.id))
         .leftJoin(mentorProfile, eq(placement.mentorId, mentorProfile.id))
         .leftJoin(mentorUser, eq(mentorProfile.userId, mentorUser.id))
-        .where(where);
+        .leftJoin(
+          attendanceLog,
+          and(
+            eq(attendanceLog.placementId, placement.id),
+            eq(attendanceLog.date, dateStr)
+          )
+        )
+        .where(
+          and(
+            eq(placement.status, "active"),
+            input.companyId ? eq(placement.companyId, input.companyId) : undefined,
+            mentorFilterId ? eq(placement.mentorId, mentorFilterId) : undefined,
+            input.status
+              ? input.status === "absent"
+                ? sql`(${attendanceLog.status} = 'absent' OR ${attendanceLog.status} IS NULL)`
+                : eq(attendanceLog.status, input.status)
+              : undefined,
+            input.search
+              ? sql`(lower(${studentUser.name}) like ${"%" + input.search.toLowerCase() + "%"} or ${studentUser.id} = ${input.search})`
+              : undefined,
+          )
+        );
       const total = totalRows[0]?.total ?? 0;
 
       // Get per-student attendance counters for each placement
@@ -319,7 +361,8 @@ export const attendancesRouter = createTRPCRouter({
 
       return {
         items: rows.map((r) => ({
-          id: r.id,
+          // Use negative placementId as synthetic ID for students without attendance records
+          id: r.id ?? -r.placementId,
           date: r.date,
           status: r.status,
           checkInAt: r.checkInAt ? r.checkInAt.toISOString() : null,

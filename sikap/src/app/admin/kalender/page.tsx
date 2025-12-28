@@ -218,11 +218,11 @@ export default function Page() {
   }
 
   return (
-    <div className="min-h-screen bg-muted/30 p-6">
-      <div className="w-full max-w-7xl mx-auto">
-        <div className="flex items-start justify-between">
+    <main className="bg-muted text-foreground min-h-screen">
+      <div className="mx-auto max-w-[1200px] px-6 py-8">
+        <div className="flex items-start justify-between mb-6">
           <div className="space-y-1">
-            <h1 className="text-2xl sm:text-3xl font-semibold">Kalender</h1>
+            <h1 className="text-2xl font-semibold">Kalender</h1>
             <p className="text-muted-foreground">Daftar jadwal</p>
           </div>
         </div>
@@ -316,13 +316,13 @@ export default function Page() {
                     {segments.map((s, si) => (
                       <div
                         key={si}
-                        className={`absolute z-10 h-7 ${s.colorClass} rounded-full flex items-center justify-center text-xs font-medium ${getContrastTextColor(s.colorHex)} cursor-pointer hover:opacity-90 transition-opacity`}
+                        className={`absolute z-10 h-6 ${s.colorClass} rounded flex items-center text-xs font-medium ${getContrastTextColor(s.colorHex)} cursor-pointer hover:opacity-90 transition-opacity shadow-sm overflow-hidden`}
                         style={{
-                          top: 34 + (s.slot * 32),
-                          left: `${s.leftPct}%`,
-                          width: `${s.widthPct}%`,
-                          paddingLeft: 12,
-                          paddingRight: 12,
+                          top: 28 + (s.slot * 28),
+                          left: `calc(${s.leftPct}% + 4px)`,
+                          width: `calc(${s.widthPct}% - 8px)`,
+                          paddingLeft: 8,
+                          paddingRight: 8,
                           backgroundColor: s.colorHex ?? undefined,
                         }}
                         onMouseEnter={(e) => {
@@ -474,6 +474,6 @@ export default function Page() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </main>
   )
 }
