@@ -565,4 +565,47 @@ export const calendarEventsRouter = createTRPCRouter({
         colorHex: r.colorHex ?? null,
       }));
     }),
+
+  // Get single event detail for student
+  detailForStudent: protectedProcedure
+    .input(z.object({ eventId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      // Verify user is a student
+      if (ctx.session.user.role !== "student") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Only students can access this endpoint" });
+      }
+
+      const rows = await ctx.db
+        .select({
+          id: calendarEvent.id,
+          title: calendarEvent.title,
+          description: calendarEvent.description,
+          type: calendarEvent.type,
+          startDate: calendarEvent.scheduledAt,
+          endDate: calendarEvent.endDate,
+          location: calendarEvent.location,
+          organizerName: calendarEvent.organizerName,
+          organizerLogoUrl: calendarEvent.organizerLogoUrl,
+          colorHex: calendarEvent.colorHex,
+        })
+        .from(calendarEvent)
+        .where(eq(calendarEvent.id, input.eventId))
+        .limit(1);
+
+      const ev = rows[0];
+      if (!ev) throw new TRPCError({ code: "NOT_FOUND", message: "Event not found" });
+
+      return {
+        id: ev.id,
+        title: ev.title,
+        description: ev.description ?? null,
+        type: ev.type,
+        startDate: ev.startDate,
+        endDate: ev.endDate ?? ev.startDate,
+        location: ev.location ?? null,
+        organizerName: ev.organizerName ?? null,
+        organizerLogoUrl: ev.organizerLogoUrl ?? null,
+        colorHex: ev.colorHex ?? null,
+      };
+    }),
 });

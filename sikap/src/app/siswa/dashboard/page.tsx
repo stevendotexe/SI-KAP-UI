@@ -145,6 +145,8 @@ export default function DashboardPage() {
   const [izinOpen, setIzinOpen] = useState(false);
   const [izinReason, setIzinReason] = useState("");
   const [izinFileName, setIzinFileName] = useState("");
+  const [izinFile, setIzinFile] = useState<File | null>(null); // Store actual file
+  const [izinFilePreviewUrl, setIzinFilePreviewUrl] = useState<string | null>(null); // Preview URL
   const [isIzinSaved, setIsIzinSaved] = useState(false);
   const izinFileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -190,6 +192,16 @@ export default function DashboardPage() {
   useEffect(() => {
     if (todayAttendance.data) {
       const log = todayAttendance.data;
+
+      // Check if status is 'excused' (izin)
+      if (log.status === "excused") {
+        setIsIzinSaved(true);
+        setIzinReason(log.locationNote || "");
+        setMasukAt("Izin");
+        setKeluarAt("Izin");
+        return;
+      }
+
       if (log.checkInAt) {
         setIsMasukSaved(true);
         setMasukAt(
@@ -221,9 +233,22 @@ export default function DashboardPage() {
           }).format(new Date(log.checkOutAt)),
         );
         setKeluarImageName("presensi-keluar.png");
+        // NOTE: Database schema only has one set of location columns (latitude, longitude, locationNote)
+        // These columns are used for check-in location only.
+        // Check-out location is NOT persisted in database, only shown locally before page refresh.
+        // If you need to persist check-out location, you need to add separate columns to the database schema.
       }
     }
   }, [todayAttendance.data]);
+
+  // Cleanup file preview URL on component unmount
+  useEffect(() => {
+    return () => {
+      if (izinFilePreviewUrl) {
+        URL.revokeObjectURL(izinFilePreviewUrl);
+      }
+    };
+  }, [izinFilePreviewUrl]);
 
   const formatTs = () =>
     new Intl.DateTimeFormat("en-GB", {
@@ -467,12 +492,52 @@ export default function DashboardPage() {
 
   const handleResetIzin = () => {
     setIzinReason("");
+    setIzinFileName("");
+    setIzinFile(null);
+    // Cleanup object URL to prevent memory leak
+    if (izinFilePreviewUrl) {
+      URL.revokeObjectURL(izinFilePreviewUrl);
+      setIzinFilePreviewUrl(null);
+    }
+    if (izinFileInputRef.current) {
+      izinFileInputRef.current.value = "";
+    }
     setIsIzinSaved(false);
   };
 
+  const leaveMutation = api.attendances.recordLeave.useMutation();
+
   const handleSaveIzin = async () => {
-    setIsIzinSaved(true);
-    setIzinOpen(false);
+    try {
+      let attachmentUrl: string | undefined;
+
+      // Upload file if provided
+      if (izinFile) {
+        const formData = new FormData();
+        formData.append("file", izinFile);
+
+        const uploadResult = await uploadFilesAction(formData);
+        if (uploadResult?.data && uploadResult.data.length > 0 && uploadResult.data[0]) {
+          attachmentUrl = uploadResult.data[0].url;
+        }
+      }
+
+      // Call recordLeave mutation
+      await leaveMutation.mutateAsync({
+        timestamp: new Date(),
+        reason: izinReason,
+        attachmentUrl,
+      });
+
+      setIsIzinSaved(true);
+      setIzinOpen(false);
+
+      // Refetch today's attendance to update UI
+      void todayAttendance.refetch();
+    } catch (error) {
+      console.error("Failed to submit leave:", error);
+      alert("Gagal menyimpan izin. Silakan coba lagi.");
+    }
   };
 
   return (
@@ -509,7 +574,7 @@ export default function DashboardPage() {
                     suppressHydrationWarning
                   >
                     {now
-                      ? new Intl.DateTimeFormat("en-GB", {
+                      ? new Intl.DateTimeFormat("id-ID", {
                         weekday: "long",
                         day: "numeric",
                         month: "long",
@@ -519,7 +584,7 @@ export default function DashboardPage() {
                     <br />
                     <span className="text-muted-foreground">
                       {now
-                        ? new Intl.DateTimeFormat("en-GB", {
+                        ? new Intl.DateTimeFormat("id-ID", {
                           hour: "2-digit",
                           minute: "2-digit",
                           second: "2-digit",
@@ -531,6 +596,7 @@ export default function DashboardPage() {
                 </div>
 
                 <Separator className="my-6" />
+
 
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                   {/* Masuk */}
@@ -610,22 +676,30 @@ export default function DashboardPage() {
                       )}
 
                       {!masukImageName && (
-                        <Button
-                          type="button"
-                          variant={isIzinSaved ? "outline" : "secondary"}
-                          className={`inline-flex h-9 items-center gap-2 rounded-md px-5 ${isIzinSaved
-                            ? "bg-muted text-muted-foreground cursor-not-allowed border"
-                            : ""
-                            }`}
-                          onClick={() => setIzinOpen(true)}
-                          disabled={isIzinSaved}
-                          title="Ajukan Izin"
-                        >
-                          <FileText className="h-4 w-4" />
-                          <span className="text-sm font-medium">Izin</span>
-                        </Button>
+                        <>
+                          <Button
+                            type="button"
+                            variant={isIzinSaved ? "outline" : "secondary"}
+                            className={`inline-flex h-9 items-center gap-2 rounded-md px-5 ${isIzinSaved
+                              ? "bg-muted text-muted-foreground cursor-not-allowed border"
+                              : ""
+                              }`}
+                            onClick={() => setIzinOpen(true)}
+                            disabled={isIzinSaved}
+                            title="Ajukan Izin"
+                          >
+                            <FileText className="h-4 w-4" />
+                            <span className="text-sm font-medium">Izin</span>
+                          </Button>
+                        </>
                       )}
                     </div>
+                    {/* Success message for Izin */}
+                    {isIzinSaved && (
+                      <p className="text-green-600 dark:text-green-400 mt-2 text-xs font-medium">
+                        ✓ Izin berhasil disubmit
+                      </p>
+                    )}
                     {masukImageName && (
                       <>
                         <p className="text-muted-foreground mt-2 text-xs break-all">
@@ -948,10 +1022,29 @@ export default function DashboardPage() {
                   ref={izinFileInputRef}
                   type="file"
                   className="hidden"
+                  accept="image/*,application/pdf" // Accept images and PDFs
                   onChange={(e) => {
                     if (isIzinSaved) return;
                     const f = e.target.files?.[0];
-                    setIzinFileName(f ? f.name : "");
+                    if (f) {
+                      // Cleanup previous URL if exists
+                      if (izinFilePreviewUrl) {
+                        URL.revokeObjectURL(izinFilePreviewUrl);
+                      }
+                      // Create new preview URL
+                      const previewUrl = URL.createObjectURL(f);
+                      setIzinFile(f);
+                      setIzinFileName(f.name);
+                      setIzinFilePreviewUrl(previewUrl);
+                    } else {
+                      // Cleanup if no file selected
+                      if (izinFilePreviewUrl) {
+                        URL.revokeObjectURL(izinFilePreviewUrl);
+                      }
+                      setIzinFile(null);
+                      setIzinFileName("");
+                      setIzinFilePreviewUrl(null);
+                    }
                   }}
                   disabled={isIzinSaved}
                 />
@@ -970,13 +1063,38 @@ export default function DashboardPage() {
                     className="border-destructive/60 bg-card text-destructive/80 relative w-full min-w-[220px] rounded-full border px-4 py-2 text-sm sm:flex-1"
                     style={{ borderStyle: "dashed" }}
                   >
-                    {izinFileName ? izinFileName : "Belum ada lampiran"}
+                    {izinFileName ? (
+                      izinFilePreviewUrl ? (
+                        <a
+                          href={izinFilePreviewUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hover:underline cursor-pointer text-blue-600 dark:text-blue-400"
+                          onClick={(e) => {
+                            // Open in new tab
+                            e.preventDefault();
+                            window.open(izinFilePreviewUrl, '_blank');
+                          }}
+                        >
+                          {izinFileName}
+                        </a>
+                      ) : (
+                        izinFileName
+                      )
+                    ) : (
+                      "Belum ada lampiran"
+                    )}
                     {izinFileName && !isIzinSaved && (
                       <button
                         type="button"
                         aria-label="Hapus file"
                         onClick={() => {
+                          if (izinFilePreviewUrl) {
+                            URL.revokeObjectURL(izinFilePreviewUrl);
+                          }
                           setIzinFileName("");
+                          setIzinFile(null);
+                          setIzinFilePreviewUrl(null);
                           if (izinFileInputRef.current)
                             izinFileInputRef.current.value = "";
                         }}
@@ -1017,9 +1135,9 @@ export default function DashboardPage() {
                 onClick={() => {
                   void handleSaveIzin();
                 }}
-                disabled={!izinReason || isIzinSaved}
+                disabled={!izinReason || isIzinSaved || leaveMutation.isPending}
               >
-                Simpan
+                {leaveMutation.isPending ? "Menyimpan..." : "Simpan"}
               </Button>
             </DialogFooter>
           </DialogContent>

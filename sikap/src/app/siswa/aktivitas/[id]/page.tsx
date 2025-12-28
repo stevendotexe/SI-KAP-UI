@@ -30,9 +30,10 @@ export default function SiswaAktivitasDetailPage() {
     const router = useRouter();
     const eventId = parseInt(params.id as string);
 
-    const { data: event, isLoading, error } = api.calendarEvents.listForStudent.useQuery({});
-
-    const currentEvent = event?.items.find((e) => e.id === eventId);
+    const { data: currentEvent, isLoading, error } = api.calendarEvents.detailForStudent.useQuery(
+        { eventId },
+        { enabled: !isNaN(eventId) }
+    );
 
     if (isLoading) {
         return (

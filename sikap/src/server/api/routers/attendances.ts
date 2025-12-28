@@ -732,6 +732,8 @@ export const attendancesRouter = createTRPCRouter({
       }
 
       // Update with check-out time
+      // NOTE: Database schema only has one set of location columns (latitude, longitude, locationNote)
+      // These are used for check-in location. Check-out location is NOT persisted.
       const [updated] = await ctx.db
         .update(attendanceLog)
         .set({
@@ -982,5 +984,115 @@ export const attendancesRouter = createTRPCRouter({
       await ctx.db.delete(attendanceLog).where(eq(attendanceLog.id, input.id));
 
       return { success: true };
+    }),
+
+  recordLeave: protectedProcedure
+    .input(
+      z.object({
+        timestamp: z.date(),
+        reason: z.string(),
+        attachmentUrl: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Verify user is a student
+      if (ctx.session.user.role !== "student") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only students can record leave",
+        });
+      }
+
+      // Get student profile
+      const student = await ctx.db.query.studentProfile.findFirst({
+        where: eq(studentProfile.userId, ctx.session.user.id),
+      });
+
+      if (!student) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Student profile not found",
+        });
+      }
+
+      // Get active placement
+      const activePlacement = await ctx.db.query.placement.findFirst({
+        where: and(
+          eq(placement.studentId, student.id),
+          eq(placement.status, "active"),
+        ),
+      });
+
+      if (!activePlacement) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "No active placement found for this student",
+        });
+      }
+
+      // Get today's date in YYYY-MM-DD format
+      const today = input.timestamp.toISOString().slice(0, 10);
+
+      // Check if already has attendance for today
+      const existing = await ctx.db.query.attendanceLog.findFirst({
+        where: and(
+          eq(attendanceLog.placementId, activePlacement.id),
+          eq(attendanceLog.date, today),
+        ),
+      });
+
+      if (existing) {
+        // Update existing record to 'excused' status
+        const [updated] = await ctx.db
+          .update(attendanceLog)
+          .set({
+            status: "excused",
+            locationNote: input.reason,
+            checkOutAt: input.timestamp,
+          })
+          .where(eq(attendanceLog.id, existing.id))
+          .returning();
+
+        // Track attachment if provided
+        if (input.attachmentUrl && updated) {
+          await ctx.db.insert(attachment).values({
+            ownerType: "attendance_log",
+            ownerId: updated.id,
+            url: input.attachmentUrl,
+            filename: extractFilenameFromUrl(input.attachmentUrl),
+            mimeType: "application/octet-stream",
+            createdById: ctx.session.user.id,
+          });
+        }
+
+        return updated;
+      }
+
+      // Create leave record with 'excused' status
+      const [created] = await ctx.db
+        .insert(attendanceLog)
+        .values({
+          placementId: activePlacement.id,
+          date: today,
+          checkInAt: input.timestamp,
+          checkOutAt: input.timestamp,
+          status: "excused",
+          locationNote: input.reason,
+        })
+        .returning();
+
+      // Track attachment if provided
+      if (input.attachmentUrl && created) {
+        await ctx.db.insert(attachment).values({
+          ownerType: "attendance_log",
+          ownerId: created.id,
+          url: input.attachmentUrl,
+          filename: extractFilenameFromUrl(input.attachmentUrl),
+          mimeType: "application/octet-stream",
+          createdById: ctx.session.user.id,
+        });
+      }
+
+      return created;
     }),
 });

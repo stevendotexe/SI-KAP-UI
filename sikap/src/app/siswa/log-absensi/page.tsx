@@ -49,26 +49,38 @@ export default function LogAbsensiPage() {
                       month: "long",
                       day: "numeric",
                     })
-                    const checkIn = r.checkInAt
-                      ? new Date(r.checkInAt).toLocaleTimeString("id-ID", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        second: "2-digit",
-                      })
-                      : "-"
-                    const checkOut = r.checkOutAt
-                      ? new Date(r.checkOutAt).toLocaleTimeString("id-ID", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        second: "2-digit",
-                      })
-                      : "-"
+
+                    // Check if this is a leave record (submitted through leave form)
+                    // Leave form sets both checkInAt and checkOutAt to the same timestamp
+                    // and status to 'excused'
+                    const isLeaveRecord = r.status === "excused" &&
+                      r.checkInAt && r.checkOutAt &&
+                      new Date(r.checkInAt).getTime() === new Date(r.checkOutAt).getTime()
+
+                    const checkIn = isLeaveRecord
+                      ? "Izin"
+                      : r.checkInAt
+                        ? new Date(r.checkInAt).toLocaleTimeString("id-ID", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          second: "2-digit",
+                        })
+                        : "-"
+                    const checkOut = isLeaveRecord
+                      ? "Izin"
+                      : r.checkOutAt
+                        ? new Date(r.checkOutAt).toLocaleTimeString("id-ID", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          second: "2-digit",
+                        })
+                        : "-"
 
                     return (
                       <tr key={r.id} className="bg-card hover:bg-muted/50 transition-colors">
                         <td className="px-4 py-3 border-r border-border last:border-r-0 whitespace-nowrap">{dateStr}</td>
-                        <td className="px-4 py-3 border-r border-border last:border-r-0">{checkIn}</td>
-                        <td className="px-4 py-3">{checkOut}</td>
+                        <td className={`px-4 py-3 border-r border-border last:border-r-0 ${isLeaveRecord ? "text-amber-600 dark:text-amber-400 font-medium" : ""}`}>{checkIn}</td>
+                        <td className={`px-4 py-3 ${isLeaveRecord ? "text-amber-600 dark:text-amber-400 font-medium" : ""}`}>{checkOut}</td>
                       </tr>
                     )
                   })}

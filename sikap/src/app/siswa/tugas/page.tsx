@@ -54,7 +54,7 @@ export default function DaftarTugasSiswaPage() {
         </div>
 
         {/* Search */}
-        <div>
+        <div className="mb-4">
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -115,7 +115,7 @@ export default function DaftarTugasSiswaPage() {
         </div>
 
         {/* Cards */}
-        <section className="space-y-6">
+        <section className="space-y-6 mt-4">
           {/* Loading state */}
           {isLoading && (
             <div className="flex flex-col items-center justify-center py-12">
@@ -152,40 +152,50 @@ export default function DaftarTugasSiswaPage() {
           {/* Task cards */}
           {!isLoading &&
             !error &&
-            data?.items.map((task) => {
-              const badge = getTaskStatusBadgeConfig(task.status)
-              return (
-                <article
-                  key={task.id}
-                  className="rounded-2xl border bg-card shadow-sm p-5 md:p-6"
-                >
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-semibold">{task.title}</p>
-                        <span
-                          className={`inline-flex items-center rounded-full ${badge.bg} ${badge.text} px-2 py-0.5 text-xs font-medium`}
-                        >
-                          {badge.label}
-                        </span>
+            data?.items
+              .slice() // Create a copy to avoid mutating the original array
+              .sort((a, b) => {
+                // Sort by dueDate ascending (earliest first)
+                // Handle null/undefined dates by putting them at the end
+                if (!a.dueDate && !b.dueDate) return 0
+                if (!a.dueDate) return 1
+                if (!b.dueDate) return -1
+                return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+              })
+              .map((task) => {
+                const badge = getTaskStatusBadgeConfig(task.status)
+                return (
+                  <article
+                    key={task.id}
+                    className="rounded-2xl border bg-card shadow-sm p-5 md:p-6"
+                  >
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-semibold">{task.title}</p>
+                          <span
+                            className={`inline-flex items-center rounded-full ${badge.bg} ${badge.text} px-2 py-0.5 text-xs font-medium`}
+                          >
+                            {badge.label}
+                          </span>
+                        </div>
+                        {task.description && (
+                          <div className="text-muted-foreground" dangerouslySetInnerHTML={{ __html: task.description }} />
+                        )}
+                        <p className="text-destructive font-semibold">
+                          Tenggat waktu : {formatDate(task.dueDate)}
+                        </p>
                       </div>
-                      {task.description && (
-                        <div className="text-muted-foreground" dangerouslySetInnerHTML={{ __html: task.description }} />
-                      )}
-                      <p className="text-destructive font-semibold">
-                        Tenggat waktu : {formatDate(task.dueDate)}
-                      </p>
-                    </div>
 
-                    <div className="flex items-center">
-                      <Button variant="destructive" className="h-9 px-4" asChild>
-                        <Link href={`/siswa/tugas/${task.id}`}>Lihat Detail</Link>
-                      </Button>
+                      <div className="flex items-center">
+                        <Button variant="destructive" className="h-9 px-4" asChild>
+                          <Link href={`/siswa/tugas/${task.id}`}>Lihat Detail</Link>
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                </article>
-              )
-            })}
+                  </article>
+                )
+              })}
         </section>
       </div>
     </main>
