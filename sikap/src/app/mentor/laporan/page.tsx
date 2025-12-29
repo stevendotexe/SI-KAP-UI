@@ -12,7 +12,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { api } from "@/trpc/react";
-import { Search, ArrowLeft, CheckCircle, XCircle, Printer, ArrowUpDown } from "lucide-react";
+import { Search, ArrowLeft, CheckCircle, XCircle, Printer, ArrowUpDown, Clock, AlertCircle } from "lucide-react";
+import { StatsCards } from "@/components/dashboard/StatsCards";
 import StudentJournalCard from "@/components/mentor/StudentJournalCard";
 import { toast } from "sonner";
 
@@ -93,6 +94,18 @@ export default function MentorLaporanPage() {
         s.studentSchool?.toLowerCase().includes(q)
     );
   }, [summaries, debouncedSearch]);
+  // Calculate stats for Dashboard
+  const stats = useMemo(() => {
+    return summaries.reduce(
+      (acc, s) => ({
+        total: acc.total + s.totalSubmitted,
+        pending: acc.pending + s.pending,
+        approved: acc.approved + s.approved,
+        rejected: acc.rejected + s.rejected,
+      }),
+      { total: 0, pending: 0, approved: 0, rejected: 0 }
+    );
+  }, [summaries]);
 
   // Filter and sort journal details
   const filteredJournals = useMemo(() => {
@@ -114,6 +127,15 @@ export default function MentorLaporanPage() {
 
     return result;
   }, [journalDetails, detailStatusFilter, detailSortOrder]);
+
+  const detailStats = useMemo(() => {
+    return journalDetails.reduce((acc, j) => ({
+      total: acc.total + 1,
+      pending: acc.pending + (j.reviewStatus === 'pending' ? 1 : 0),
+      approved: acc.approved + (j.reviewStatus === 'approved' ? 1 : 0),
+      rejected: acc.rejected + (j.reviewStatus === 'rejected' ? 1 : 0),
+    }), { total: 0, pending: 0, approved: 0, rejected: 0 });
+  }, [journalDetails]);
 
   // Toggle journal selection
   function toggleJournalSelection(id: number) {
@@ -270,6 +292,10 @@ export default function MentorLaporanPage() {
             </div>
           </div>
 
+
+          {/* Stats Cards */}
+          <StatsCards stats={stats} isLoading={isLoadingSummaries} />
+
           {/* Student Cards Grid */}
           {isLoadingSummaries ? (
             <div className="flex items-center gap-2 text-muted-foreground">
@@ -335,6 +361,9 @@ export default function MentorLaporanPage() {
             Cetak Laporan
           </Button>
         </div>
+
+        {/* Detail Stats Cards */}
+        <StatsCards stats={detailStats} isLoading={isLoadingDetails} />
 
         {/* Action Bar */}
         {journalDetails.some((j) => j.reviewStatus === "pending") && (

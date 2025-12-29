@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Select,
   SelectContent,
@@ -10,108 +11,156 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Download, CheckCircle, XCircle, Clock, ArrowUpDown } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { api } from "@/trpc/react";
-
-const statusConfig = {
-  approved: { icon: <CheckCircle className="w-4 h-4" />, class: "bg-emerald-100 text-emerald-700", label: "Disetujui" },
-  pending: { icon: <Clock className="w-4 h-4" />, class: "bg-amber-100 text-amber-700", label: "Menunggu" },
-  rejected: { icon: <XCircle className="w-4 h-4" />, class: "bg-red-100 text-red-700", label: "Ditolak" },
-};
+import { Search, ArrowLeft, CheckCircle, XCircle, Printer, ArrowUpDown, Clock, AlertCircle } from "lucide-react";
+import { StatsCards } from "@/components/dashboard/StatsCards";
+import StudentJournalCard from "@/components/mentor/StudentJournalCard";
+import { toast } from "sonner";
 
 export default function AdminLaporanPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"approved" | "pending" | "rejected" | null>(null);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(null);
-  const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+  const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
+  const [selectedJournals, setSelectedJournals] = useState<number[]>([]);
 
-  // Debounce search to prevent API calls on every keystroke
+  const utils = api.useUtils();
+
+  // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
-    }, 500); // 500ms delay
+    }, 300);
 
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Fetch companies
-  const { data: companiesData, isLoading: isLoadingCompanies } = api.companies.list.useQuery({
-    limit: 100,
-  });
-
-  // Auto-select first company if none selected
-  const companies = companiesData?.items ?? [];
-  const companyId = selectedCompanyId ?? companies[0]?.id ?? null;
-
-  // Memoize date range to prevent infinite re-renders
+  // Memoize date range (default to current month for initial view, can be expanded if needed)
   const dateRange = useMemo(() => {
     const now = new Date();
     const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    // For admin, maybe we want to see ALL reports by default? 
+    // Or stick to month to avoid overload. Let's use start of year for admin to be broader?
+    // User said "selayaknya mentor", so sticking to month is safe, but maybe admin wants more.
+    // Let's stick to month for consistency and performance.
     return { from: firstOfMonth, to: now };
-  }, []); // Computed once on mount
+  }, []);
 
-  // Memoize query input to prevent reference changes
-  const queryInput = useMemo(() => ({
-    companyId: companyId!,
-    search: debouncedSearch || undefined,
-    status: statusFilter ?? undefined,
+  // Fetch company journals summaries
+  const { data: summariesData, isLoading: isLoadingSummaries } = api.reports.listCompanyJournals.useQuery({
     from: dateRange.from,
     to: dateRange.to,
-    limit: 200,
-  }), [companyId, debouncedSearch, statusFilter, dateRange]);
+    search: debouncedSearch, // Passing search to server for filtering students if needed
+  });
 
-  // Fetch reports for selected company (now focused on daily journals)
-  const { data: reportsData, isLoading: isLoadingReports, isError } = api.reports.list.useQuery(
-    queryInput,
+  // Fetch details for selected student
+  const { data: detailsData, isLoading: isLoadingDetails } = api.reports.getAdminJournalDetails.useQuery(
     {
-      enabled: companyId !== null,
-    }
+      studentId: selectedStudentId!,
+      from: dateRange.from,
+      to: dateRange.to,
+    },
+    { enabled: selectedStudentId !== null }
   );
 
-  const reports = useMemo(() => reportsData?.items ?? [], [reportsData]);
+  // Fetch ALL journals for selected student (for printing)
+  const { data: allJournalsData } = api.reports.getAllAdminJournals.useQuery(
+    { studentId: selectedStudentId! },
+    { enabled: selectedStudentId !== null }
+  );
 
-  // Filter to show only daily reports (journals)
-  const filtered = useMemo(() => {
-    const result = reports.filter((r) => {
-      const matchSearch =
-        !search ||
-        r.student.name.toLowerCase().includes(search.toLowerCase()) ||
-        r.title?.toLowerCase().includes(search.toLowerCase());
-      const matchStatus = !statusFilter || r.reviewStatus === statusFilter;
-      const isDaily = r.type === "daily"; // Only show daily journals
-      return matchSearch && matchStatus && isDaily;
-    });
+  // Verify mutation (Admin)
+  const verifyMutation = api.reports.adminVerifyJournal.useMutation({
+    onSuccess: () => {
+      toast.success("Laporan berhasil diverifikasi");
+      setSelectedJournals([]);
+      void utils.reports.getAdminJournalDetails.invalidate();
+      void utils.reports.listCompanyJournals.invalidate();
+    },
+    onError: (error) => {
+      toast.error(error.message || "Gagal memverifikasi laporan");
+    },
+  });
 
-    // Apply sorting
+  const summaries = summariesData?.items ?? [];
+  const journalDetails = detailsData?.items ?? [];
+  const studentInfo = detailsData?.student;
+
+  // Calculate stats for Dashboard
+  const stats = useMemo(() => {
+    return summaries.reduce(
+      (acc, s) => ({
+        total: acc.total + s.totalSubmitted,
+        pending: acc.pending + s.pending,
+        approved: acc.approved + s.approved,
+        rejected: acc.rejected + s.rejected,
+      }),
+      { total: 0, pending: 0, approved: 0, rejected: 0 }
+    );
+  }, [summaries]);
+
+  // State for filtering and sorting journal details (Drill-down view)
+  const [detailStatusFilter, setDetailStatusFilter] = useState<"approved" | "pending" | "rejected" | "all">("all");
+  const [detailSortOrder, setDetailSortOrder] = useState<"newest" | "oldest">("newest");
+
+  // Filter summaries by search (already filtered on server if passed, but clientside refined if needed)
+  // Since we passed search to `listCompanyJournals`, `summaries` already filtered by student name.
+  // But let's keep it safe.
+  const filteredSummaries = summaries; // Already filtered by server query
+
+  // Filter and sort journal details
+  const filteredJournals = useMemo(() => {
+    let result = [...journalDetails];
+
+    if (detailStatusFilter !== "all") {
+      result = result.filter(j => j.reviewStatus === detailStatusFilter);
+    }
+
     result.sort((a, b) => {
-      const dateA = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
-      const dateB = b.submittedAt ? new Date(b.submittedAt).getTime() : 0;
-      return sortOrder === "newest"
-        ? dateB - dateA
-        : dateA - dateB;
+      const dateA = a.activityDate ?? "";
+      const dateB = b.activityDate ?? "";
+      return detailSortOrder === "newest"
+        ? dateB.localeCompare(dateA)
+        : dateA.localeCompare(dateB);
     });
 
     return result;
-  }, [reports, search, statusFilter, sortOrder]);
+  }, [journalDetails, detailStatusFilter, detailSortOrder]);
 
-  // Calculate stats from filtered reports
-  const stats = useMemo(() => {
-    const approved = filtered.filter((r) => r.reviewStatus === "approved").length;
-    const pending = filtered.filter((r) => r.reviewStatus === "pending").length;
-    const rejected = filtered.filter((r) => r.reviewStatus === "rejected").length;
-    return { approved, pending, rejected };
-  }, [filtered]);
+  const detailStats = useMemo(() => {
+    return journalDetails.reduce((acc, j) => ({
+      total: acc.total + 1,
+      pending: acc.pending + (j.reviewStatus === 'pending' ? 1 : 0),
+      approved: acc.approved + (j.reviewStatus === 'approved' ? 1 : 0),
+      rejected: acc.rejected + (j.reviewStatus === 'rejected' ? 1 : 0),
+    }), { total: 0, pending: 0, approved: 0, rejected: 0 });
+  }, [journalDetails]);
 
-  const isLoading = isLoadingCompanies || isLoadingReports;
+  function toggleJournalSelection(id: number) {
+    setSelectedJournals((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }
 
-  // Format duration from minutes
+  function toggleSelectAllPending() {
+    const pendingIds = journalDetails
+      .filter((j) => j.reviewStatus === "pending")
+      .map((j) => j.id);
+
+    const allSelected = pendingIds.every(id => selectedJournals.includes(id));
+    if (allSelected && selectedJournals.length > 0) {
+      setSelectedJournals([]);
+    } else {
+      setSelectedJournals(pendingIds);
+    }
+  }
+
+  const allPendingSelected = (() => {
+    const pendingIds = journalDetails
+      .filter((j) => j.reviewStatus === "pending")
+      .map((j) => j.id);
+    return pendingIds.length > 0 && pendingIds.every(id => selectedJournals.includes(id));
+  })();
+
   function formatDuration(minutes: number | null): string {
     if (!minutes) return "-";
     const h = Math.floor(minutes / 60);
@@ -121,211 +170,375 @@ export default function AdminLaporanPage() {
     return `${h} jam ${m} menit`;
   }
 
-  // Export to CSV
-  function handleExport() {
-    if (filtered.length === 0) return;
-
-    const headers = ["Siswa", "Tanggal", "Durasi", "Deskripsi", "Status", "Mentor"];
-    const rows = filtered.map((r) => [
-      r.student.name,
-      r.submittedAt ? new Date(r.submittedAt).toLocaleDateString("id-ID") : "-",
-      r.summary?.includes("menit") ? r.summary.split(" ")[0] : "-",
-      r.title || r.summary?.slice(0, 50) || "-",
-      r.reviewStatus === "approved" ? "Disetujui" : r.reviewStatus === "pending" ? "Menunggu" : "Ditolak",
-      r.mentor?.name || "-",
-    ]);
-
-    const csvContent = [
-      headers.join(","),
-      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
-    ].join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `laporan-pkl-${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
+  function handleBulkApprove() {
+    if (selectedJournals.length === 0) {
+      toast.error("Pilih laporan yang ingin disetujui");
+      return;
+    }
+    verifyMutation.mutate({
+      reportIds: selectedJournals,
+      status: "approved",
+    });
   }
 
-  return (
-    <main className="bg-muted text-foreground min-h-screen">
-      <div className="mx-auto max-w-[1200px] px-6 py-8">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl font-semibold">Laporan Harian Siswa</h1>
-            <p className="text-muted-foreground mt-1">Lihat semua laporan harian siswa PKL</p>
+  function handleBulkReject() {
+    if (selectedJournals.length === 0) {
+      toast.error("Pilih laporan yang ingin ditolak");
+      return;
+    }
+    verifyMutation.mutate({
+      reportIds: selectedJournals,
+      status: "rejected",
+      notes: "Ditolak oleh admin",
+    });
+  }
+
+  function handlePrint() {
+    const allJournals = allJournalsData?.items ?? [];
+    const info = allJournalsData?.student ?? studentInfo;
+    if (!info || allJournals.length === 0) return;
+
+    const printContent = `
+      <html>
+        <head>
+          <title>Laporan Harian PKL - ${info.name}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h1 { font-size: 18px; margin-bottom: 10px; }
+            h2 { font-size: 14px; color: #666; margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
+            th { background-color: #f5f5f5; }
+            .status-approved { color: green; }
+            .status-pending { color: orange; }
+            .status-rejected { color: red; }
+            @media print { body { padding: 0; } }
+          </style>
+        </head>
+        <body>
+          <h1>Laporan Harian PKL</h1>
+          <h2>${info.name} - ${info.school || 'N/A'} (${allJournals.length} Laporan)</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Tanggal</th>
+                <th>Durasi</th>
+                <th>Kegiatan</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${allJournals.map(j => `
+                <tr>
+                  <td>${j.activityDate ? new Date(j.activityDate).toLocaleDateString('id-ID') : '-'}</td>
+                  <td>${formatDuration(j.durationMinutes)}</td>
+                  <td>${j.content || '-'}</td>
+                  <td class="status-${j.reviewStatus}">${j.reviewStatus === 'approved' ? 'Disetujui' :
+        j.reviewStatus === 'pending' ? 'Menunggu' : 'Ditolak'
+      }</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <p style="margin-top: 20px; font-size: 12px; color: #666;">
+            Dicetak pada: ${new Date().toLocaleString('id-ID')}
+          </p>
+        </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.print();
+    }
+  }
+
+  // Back to Dashboard View
+  if (selectedStudentId === null) {
+    return (
+      <main className="min-h-screen bg-gray-50">
+        <div className="max-w-[1200px] mx-auto px-6 py-8">
+          {/* Header */}
+          <div className="mb-6">
+            <h1 className="text-2xl font-semibold text-gray-900">Laporan Siswa PKL</h1>
+            <p className="text-sm text-gray-600 mt-1">
+              Kelola laporan siswa di perusahaan Anda
+            </p>
           </div>
-          <Button variant="outline" onClick={handleExport} disabled={filtered.length === 0}>
-            <Download className="w-4 h-4 mr-2" />
-            Ekspor CSV
+
+          {/* Search */}
+          <div className="mb-6">
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Cari nama siswa atau sekolah..."
+                className="pl-10"
+              />
+            </div>
+          </div>
+
+          {/* Stats Cards */}
+          <StatsCards stats={stats} isLoading={isLoadingSummaries} />
+
+          {/* Student Cards Grid */}
+          {isLoadingSummaries ? (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Spinner />
+              <span>Memuat data siswa...</span>
+            </div>
+          ) : filteredSummaries.length === 0 ? (
+            <div className="bg-white rounded-xl border shadow-sm p-8 text-center">
+              <p className="text-muted-foreground">
+                {search ? "Tidak ada siswa yang cocok dengan pencarian" : "Tidak ada siswa yang ditemukan"}
+              </p>
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredSummaries.map((s) => (
+                <StudentJournalCard
+                  key={s.studentId}
+                  studentId={s.studentId}
+                  studentName={s.studentName}
+                  studentSchool={s.studentSchool}
+                  totalSubmitted={s.totalSubmitted}
+                  expectedDays={s.expectedDays}
+                  pending={s.pending}
+                  approved={s.approved}
+                  rejected={s.rejected}
+                  onClick={() => setSelectedStudentId(s.studentId)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </main>
+    );
+  }
+
+  // Detail View (Same as Mentor)
+  return (
+    <main className="min-h-screen bg-gray-50">
+      <div className="max-w-[1200px] mx-auto px-6 py-8">
+        {/* Header with back button */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                setSelectedStudentId(null);
+                setSelectedJournals([]);
+              }}
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-semibold text-gray-900">
+                {studentInfo?.name || "Loading..."}
+              </h1>
+              <p className="text-sm text-gray-600">{studentInfo?.school || ""}</p>
+            </div>
+          </div>
+
+          <Button variant="outline" onClick={handlePrint} disabled={journalDetails.length === 0}>
+            <Printer className="w-4 h-4 mr-2" />
+            Cetak Laporan
           </Button>
         </div>
 
-        {/* Company Selector */}
-        {companies.length > 1 && (
-          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center mb-6">
-            <label className="text-sm font-medium">Perusahaan:</label>
-            <Select
-              value={companyId?.toString() ?? ""}
-              onValueChange={(value) => setSelectedCompanyId(Number(value))}
-              disabled={isLoadingCompanies}
-            >
-              <SelectTrigger className="w-[300px] rounded-full bg-background">
-                <SelectValue placeholder={isLoadingCompanies ? "Memuat..." : "Pilih Perusahaan"} />
+        {/* Detail Stats Cards */}
+        <StatsCards stats={detailStats} isLoading={isLoadingDetails} />
+
+        {/* Action Bar */}
+        {journalDetails.some((j) => j.reviewStatus === "pending") && (
+          <div className="bg-white rounded-xl border shadow-sm p-4 mb-6">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4 justify-between">
+              <span className="text-sm text-gray-600 whitespace-nowrap">
+                {selectedJournals.length} dipilih
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="outline" size="sm" onClick={toggleSelectAllPending} className="text-xs sm:text-sm">
+                  {allPendingSelected ? "Batal Pilih" : "Pilih Semua"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleBulkReject}
+                  disabled={selectedJournals.length === 0 || verifyMutation.isPending}
+                  className="text-red-600 hover:text-red-700 text-xs sm:text-sm"
+                >
+                  <XCircle className="w-4 h-4 sm:mr-1" />
+                  <span className="hidden sm:inline">Tolak</span>
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleBulkApprove}
+                  disabled={selectedJournals.length === 0 || verifyMutation.isPending}
+                  className="bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm"
+                >
+                  {verifyMutation.isPending ? (
+                    <Spinner className="sm:mr-2" />
+                  ) : (
+                    <CheckCircle className="w-4 h-4 sm:mr-1" />
+                  )}
+                  <span className="hidden sm:inline">Setujui</span>
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Filter and Sort Controls */}
+        {!isLoadingDetails && journalDetails.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <Select value={detailStatusFilter} onValueChange={(v) => setDetailStatusFilter(v as typeof detailStatusFilter)}>
+              <SelectTrigger className="w-[140px] bg-white rounded-full">
+                <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
-                {companies.map((company) => (
-                  <SelectItem key={company.id} value={company.id.toString()}>
-                    {company.name}
-                  </SelectItem>
-                ))}
+                <SelectItem value="all">Semua Status</SelectItem>
+                <SelectItem value="pending">Menunggu</SelectItem>
+                <SelectItem value="approved">Disetujui</SelectItem>
+                <SelectItem value="rejected">Ditolak</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={detailSortOrder} onValueChange={(v) => setDetailSortOrder(v as typeof detailSortOrder)}>
+              <SelectTrigger className="w-[130px] bg-white rounded-full">
+                <ArrowUpDown className="w-4 h-4 mr-1" />
+                <SelectValue placeholder="Urutkan" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest">Terbaru</SelectItem>
+                <SelectItem value="oldest">Terlama</SelectItem>
               </SelectContent>
             </Select>
           </div>
         )}
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-          <div className="rounded-2xl border bg-card p-4 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-full bg-emerald-100">
-                <CheckCircle className="w-5 h-5 text-emerald-600" />
-              </div>
-              <div>
-                <div className="text-2xl font-semibold">{isLoading ? "-" : stats.approved}</div>
-                <div className="text-sm text-muted-foreground">Disetujui</div>
-              </div>
-            </div>
+        {/* Journal List */}
+        {isLoadingDetails ? (
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Spinner />
+            <span>Memuat laporan...</span>
           </div>
-          <div className="rounded-2xl border bg-card p-4 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-full bg-amber-100">
-                <Clock className="w-5 h-5 text-amber-600" />
-              </div>
-              <div>
-                <div className="text-2xl font-semibold">{isLoading ? "-" : stats.pending}</div>
-                <div className="text-sm text-muted-foreground">Menunggu Review</div>
-              </div>
-            </div>
+        ) : filteredJournals.length === 0 ? (
+          <div className="bg-white rounded-xl border shadow-sm p-8 text-center">
+            <p className="text-muted-foreground">
+              {detailStatusFilter !== "all" ? "Tidak ada laporan dengan filter tersebut" : "Belum ada laporan yang disubmit"}
+            </p>
           </div>
-          <div className="rounded-2xl border bg-card p-4 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-full bg-gray-100">
-                <XCircle className="w-5 h-5 text-gray-600" />
-              </div>
-              <div>
-                <div className="text-2xl font-semibold">{isLoading ? "-" : stats.rejected}</div>
-                <div className="text-sm text-muted-foreground">Ditolak</div>
-              </div>
-            </div>
-          </div>
-        </div>
+        ) : (
+          <div className="space-y-3">
+            {filteredJournals.map((journal) => {
+              const isSelected = selectedJournals.includes(journal.id);
+              const isPending = journal.reviewStatus === "pending";
 
-        {/* Search & Filters */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Cari nama siswa..."
-              className="pl-10 rounded-full"
-            />
-          </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline">
-                {statusFilter ? statusConfig[statusFilter].label : "Semua Status"}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => setStatusFilter(null)}>Semua Status</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setStatusFilter("approved")}>Disetujui</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setStatusFilter("pending")}>Menunggu</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setStatusFilter("rejected")}>Ditolak</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline">
-                <ArrowUpDown className="w-4 h-4 mr-1" />
-                {sortOrder === "newest" ? "Terbaru" : "Terlama"}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => setSortOrder("newest")}>Terbaru</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSortOrder("oldest")}>Terlama</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+              return (
+                <div
+                  key={journal.id}
+                  className={`bg-white rounded-xl border shadow-sm p-4 ${isSelected ? "border-red-500 ring-1 ring-red-500" : ""
+                    }`}
+                >
+                  <div className="flex items-start gap-4">
+                    {/* Checkbox for pending items */}
+                    {isPending && (
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleJournalSelection(journal.id)}
+                        className="mt-1 h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                      />
+                    )}
 
-        {/* Table */}
-        <div className="rounded-2xl border bg-card shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-muted/50">
-                <tr>
-                  <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">Siswa</th>
-                  <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">Tanggal</th>
-                  <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">Kegiatan</th>
-                  <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">Mentor</th>
-                  <th className="text-left text-sm font-medium text-muted-foreground px-4 py-3">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {isLoading ? (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
-                      Memuat data...
-                    </td>
-                  </tr>
-                ) : isError ? (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-destructive">
-                      Terjadi kesalahan saat memuat data
-                    </td>
-                  </tr>
-                ) : filtered.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
-                      Tidak ada laporan ditemukan
-                    </td>
-                  </tr>
-                ) : (
-                  filtered.map((report) => {
-                    const status = statusConfig[report.reviewStatus];
-                    const dateStr = report.submittedAt
-                      ? new Date(report.submittedAt).toLocaleDateString("id-ID", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      })
-                      : "-";
-
-                    return (
-                      <tr key={report.id} className="border-t hover:bg-muted/30 transition-colors">
-                        <td className="px-4 py-3 font-medium">{report.student.name}</td>
-                        <td className="px-4 py-3 text-sm text-muted-foreground">{dateStr}</td>
-                        <td className="px-4 py-3 text-sm max-w-xs truncate">
-                          {report.summary || report.title || "-"}
-                        </td>
-                        <td className="px-4 py-3 text-sm">{report.mentor?.name ?? "-"}</td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${status.class}`}>
-                            {status.icon}
-                            {status.label}
+                    {/* Content */}
+                    <div className="flex-1">
+                      <div className="mb-2">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-gray-900">
+                            {journal.activityDate
+                              ? new Date(journal.activityDate).toLocaleDateString("id-ID", {
+                                weekday: "long",
+                                day: "numeric",
+                                month: "long",
+                                year: "numeric",
+                              })
+                              : "-"}
                           </span>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${journal.reviewStatus === "approved"
+                              ? "bg-green-100 text-green-700"
+                              : journal.reviewStatus === "pending"
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-red-100 text-red-700"
+                              }`}
+                          >
+                            {journal.reviewStatus === "approved"
+                              ? "Disetujui"
+                              : journal.reviewStatus === "pending"
+                                ? "Menunggu"
+                                : "Ditolak"}
+                          </span>
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          Durasi PKL: {formatDuration(journal.durationMinutes)}
+                        </div>
+                      </div>
+                      <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                        {journal.content}
+                      </p>
+                      {/* Admin Note if available? (Added in backend but not shown in UI previously, good to add) */}
+                      {journal.reviewNotes && (
+                        <div className="mt-2 text-xs text-red-600 bg-red-50 p-2 rounded">
+                          Note: {journal.reviewNotes}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Quick actions for individual item */}
+                    {isPending && !isSelected && (
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() =>
+                            verifyMutation.mutate({
+                              reportIds: [journal.id],
+                              status: "approved",
+                            })
+                          }
+                          disabled={verifyMutation.isPending}
+                          className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                        >
+                          <CheckCircle className="w-5 h-5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() =>
+                            verifyMutation.mutate({
+                              reportIds: [journal.id],
+                              status: "rejected",
+                              notes: "Ditolak oleh admin",
+                            })
+                          }
+                          disabled={verifyMutation.isPending}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <XCircle className="w-5 h-5" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        </div>
+        )}
       </div>
-    </main>
+    </main >
   );
 }
