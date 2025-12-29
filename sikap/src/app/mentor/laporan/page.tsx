@@ -56,6 +56,12 @@ export default function MentorLaporanPage() {
     { enabled: selectedStudentId !== null }
   );
 
+  // Fetch ALL journals for selected student (for printing)
+  const { data: allJournalsData } = api.reports.getAllMenteeJournals.useQuery(
+    { studentId: selectedStudentId! },
+    { enabled: selectedStudentId !== null }
+  );
+
   // Verify mutation
   const verifyMutation = api.reports.verifyJournal.useMutation({
     onSuccess: (data) => {
@@ -144,9 +150,9 @@ export default function MentorLaporanPage() {
     if (!minutes) return "-";
     const h = Math.floor(minutes / 60);
     const m = minutes % 60;
-    if (h === 0) return `${m}m`;
-    if (m === 0) return `${h}j`;
-    return `${h}j ${m}m`;
+    if (h === 0) return `${m} menit`;
+    if (m === 0) return `${h} jam`;
+    return `${h} jam ${m} menit`;
   }
 
   // Handle bulk approve
@@ -174,15 +180,17 @@ export default function MentorLaporanPage() {
     });
   }
 
-  // Handle print
+  // Handle print - prints ALL journals, not just filtered ones
   function handlePrint() {
-    if (!studentInfo) return;
+    const allJournals = allJournalsData?.items ?? [];
+    const info = allJournalsData?.student ?? studentInfo;
+    if (!info || allJournals.length === 0) return;
 
-    // Create printable content
+    // Create printable content with ALL entries
     const printContent = `
       <html>
         <head>
-          <title>Laporan Harian PKL - ${studentInfo.name}</title>
+          <title>Laporan Harian PKL - ${info.name}</title>
           <style>
             body { font-family: Arial, sans-serif; padding: 20px; }
             h1 { font-size: 18px; margin-bottom: 10px; }
@@ -198,7 +206,7 @@ export default function MentorLaporanPage() {
         </head>
         <body>
           <h1>Laporan Harian PKL</h1>
-          <h2>${studentInfo.name} - ${studentInfo.school || 'N/A'}</h2>
+          <h2>${info.name} - ${info.school || 'N/A'} (${allJournals.length} Laporan)</h2>
           <table>
             <thead>
               <tr>
@@ -209,7 +217,7 @@ export default function MentorLaporanPage() {
               </tr>
             </thead>
             <tbody>
-              ${journalDetails.map(j => `
+              ${allJournals.map(j => `
                 <tr>
                   <td>${j.activityDate ? new Date(j.activityDate).toLocaleDateString('id-ID') : '-'}</td>
                   <td>${formatDuration(j.durationMinutes)}</td>

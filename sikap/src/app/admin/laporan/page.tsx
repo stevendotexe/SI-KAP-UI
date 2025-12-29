@@ -116,9 +116,9 @@ export default function AdminLaporanPage() {
     if (!minutes) return "-";
     const h = Math.floor(minutes / 60);
     const m = minutes % 60;
-    if (h === 0) return `${m}m`;
-    if (m === 0) return `${h}j`;
-    return `${h}j ${m}m`;
+    if (h === 0) return `${m} menit`;
+    if (m === 0) return `${h} jam`;
+    return `${h} jam ${m} menit`;
   }
 
   // Export to CSV
@@ -164,7 +164,7 @@ export default function AdminLaporanPage() {
 
         {/* Company Selector */}
         {companies.length > 1 && (
-          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center mb-6">
             <label className="text-sm font-medium">Perusahaan:</label>
             <Select
               value={companyId?.toString() ?? ""}
@@ -186,7 +186,7 @@ export default function AdminLaporanPage() {
         )}
 
         {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           <div className="rounded-2xl border bg-card p-4 shadow-sm">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-full bg-emerald-100">
@@ -223,7 +223,7 @@ export default function AdminLaporanPage() {
         </div>
 
         {/* Search & Filters */}
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-col sm:flex-row gap-3 mb-6">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input

@@ -20,6 +20,7 @@ import {
   Pencil,
   Trash2,
   ArrowUpDown,
+  Printer,
 } from "lucide-react";
 import JournalFormDialog from "@/components/students/JournalFormDialog";
 import JournalCalendarView from "@/components/students/JournalCalendarView";
@@ -44,6 +45,9 @@ export default function LaporanSiswaPage() {
       month: selectedMonth,
       year: selectedYear,
     });
+
+  // Fetch ALL journals for printing
+  const { data: allJournalsData } = api.reports.listAllJournals.useQuery();
 
   // Delete mutation
   const { mutate: deleteJournal } = api.reports.deleteJournal.useMutation({
@@ -113,6 +117,69 @@ export default function LaporanSiswaPage() {
     ? entries.find((e) => e.activityDate === selectedDate)
     : null;
 
+  // Handle print - prints ALL journals, not just current month
+  function handlePrint() {
+    const allEntries = allJournalsData?.items ?? [];
+    if (allEntries.length === 0) return;
+
+    // Create printable content with ALL entries
+    const printContent = `
+      <html>
+        <head>
+          <title>Laporan Harian PKL</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h1 { font-size: 18px; margin-bottom: 10px; }
+            h2 { font-size: 14px; color: #666; margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
+            th { background-color: #f5f5f5; }
+            .status-approved { color: green; }
+            .status-pending { color: orange; }
+            .status-rejected { color: red; }
+            @media print { body { padding: 0; } }
+          </style>
+        </head>
+        <body>
+          <h1>Laporan Harian PKL</h1>
+          <h2>Total: ${allEntries.length} Laporan</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Tanggal</th>
+                <th>Durasi</th>
+                <th>Kegiatan</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${allEntries.map(j => `
+                <tr>
+                  <td>${j.activityDate ? new Date(j.activityDate).toLocaleDateString('id-ID') : '-'}</td>
+                  <td>${formatDuration(j.durationMinutes)}</td>
+                  <td>${j.content || '-'}</td>
+                  <td class="status-${j.reviewStatus}">${j.reviewStatus === 'approved' ? 'Disetujui' :
+        j.reviewStatus === 'pending' ? 'Menunggu' : 'Ditolak'
+      }</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <p style="margin-top: 20px; font-size: 12px; color: #666;">
+            Dicetak pada: ${new Date().toLocaleString('id-ID')}
+          </p>
+        </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.print();
+    }
+  }
+
   return (
     <div className="min-h-screen bg-muted/30 p-0 m-0">
       <div className="w-full max-w-none p-0 m-0">
@@ -127,16 +194,27 @@ export default function LaporanSiswaPage() {
                 Catat kegiatan magang Anda setiap hari
               </p>
             </div>
-            <Button
-              onClick={() => {
-                setSelectedDate(null);
-                setDialogOpen(true);
-              }}
-              className="gap-2 bg-red-600 text-white hover:bg-red-700 w-full sm:w-auto"
-            >
-              <Plus className="size-4" />
-              <span className="sm:inline">Tambah Laporan</span>
-            </Button>
+            <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-2 w-full sm:w-auto">
+              <Button
+                variant="outline"
+                onClick={handlePrint}
+                disabled={(allJournalsData?.items.length ?? 0) === 0}
+                className="gap-2"
+              >
+                <Printer className="size-4" />
+                <span>Cetak Semua</span>
+              </Button>
+              <Button
+                onClick={() => {
+                  setSelectedDate(null);
+                  setDialogOpen(true);
+                }}
+                className="gap-2 bg-red-600 text-white hover:bg-red-700"
+              >
+                <Plus className="size-4" />
+                <span>Tambah</span>
+              </Button>
+            </div>
           </div>
 
           {/* Stats Cards */}

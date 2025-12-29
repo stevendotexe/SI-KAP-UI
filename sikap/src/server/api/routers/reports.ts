@@ -657,6 +657,49 @@ export const reportsRouter = createTRPCRouter({
     }),
 
   /**
+   * List ALL journal entries for current student (for printing)
+   */
+  listAllJournals: protectedProcedure
+    .query(async ({ ctx }) => {
+      const sp = await requireStudentPlacement(ctx);
+      const placementRow = await ctx.db.query.placement.findFirst({
+        where: eq(placement.studentId, sp.id),
+      });
+      if (!placementRow) return { items: [] };
+
+      const rows = await ctx.db
+        .select({
+          id: report.id,
+          activityDate: report.activityDate,
+          content: report.content,
+          durationMinutes: report.durationMinutes,
+          reviewStatus: report.reviewStatus,
+          reviewNotes: report.reviewNotes,
+          submittedAt: report.submittedAt,
+        })
+        .from(report)
+        .where(
+          and(
+            eq(report.placementId, placementRow.id),
+            eq(report.type, "daily"),
+          ),
+        )
+        .orderBy(report.activityDate);
+
+      return {
+        items: rows.map((r) => ({
+          id: r.id,
+          activityDate: r.activityDate,
+          content: r.content,
+          durationMinutes: r.durationMinutes,
+          reviewStatus: r.reviewStatus,
+          reviewNotes: r.reviewNotes,
+          submittedAt: r.submittedAt,
+        })),
+      };
+    }),
+
+  /**
    * List mentee journal summaries (Mentor) - grouped by student
    */
   listMenteeJournals: mentorProcedure
@@ -812,6 +855,72 @@ export const reportsRouter = createTRPCRouter({
           ),
         )
         .orderBy(sql`${report.activityDate} desc`);
+
+      return {
+        student: {
+          id: input.studentId,
+          name: p.studentName,
+          school: p.studentSchool,
+        },
+        items: journals,
+      };
+    }),
+
+  /**
+   * Get ALL journal entries for a specific student (Mentor print - no date filter)
+   */
+  getAllMenteeJournals: mentorProcedure
+    .input(
+      z.object({
+        studentId: z.number(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const mp = await ctx.db.query.mentorProfile.findFirst({
+        where: eq(mentorProfile.userId, ctx.session.user.id),
+      });
+      if (!mp) throw new TRPCError({ code: "FORBIDDEN" });
+
+      // Verify this student is assigned to this mentor
+      const placementRow = await ctx.db
+        .select({
+          id: placement.id,
+          studentName: studentUser.name,
+          studentSchool: studentProfile.school,
+        })
+        .from(placement)
+        .innerJoin(studentProfile, eq(placement.studentId, studentProfile.id))
+        .innerJoin(studentUser, eq(studentProfile.userId, studentUser.id))
+        .where(
+          and(
+            eq(placement.mentorId, mp.id),
+            eq(studentProfile.id, input.studentId),
+          ),
+        )
+        .limit(1);
+
+      const p = placementRow[0];
+      if (!p) throw new TRPCError({ code: "NOT_FOUND", message: "Student not found or not assigned to you" });
+
+      // Fetch ALL journals without date filter
+      const journals = await ctx.db
+        .select({
+          id: report.id,
+          activityDate: report.activityDate,
+          content: report.content,
+          durationMinutes: report.durationMinutes,
+          reviewStatus: report.reviewStatus,
+          reviewNotes: report.reviewNotes,
+          submittedAt: report.submittedAt,
+        })
+        .from(report)
+        .where(
+          and(
+            eq(report.placementId, p.id),
+            eq(report.type, "daily"),
+          ),
+        )
+        .orderBy(report.activityDate);
 
       return {
         student: {
