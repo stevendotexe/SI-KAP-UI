@@ -168,14 +168,15 @@ export const attendancesRouter = createTRPCRouter({
       const formatRow = (r: (typeof rows)[number]) => {
         const present = Number(r.present ?? 0);
         const absent = Number(r.absent ?? 0);
-        const total = Number(r.total ?? 0);
+        const loggedTotal = Number(r.total ?? 0);
+        // Use total active students as denominator for percentage, not just logged students
         const attendancePercent =
-          total === 0 ? 0 : Math.round((present / total) * 100);
+          totalStudents === 0 ? 0 : Math.round((present / totalStudents) * 100);
         return {
           date: r.date,
           presentCount: present,
-          absentCount: absent,
-          total,
+          absentCount: totalStudents - present, // Students without attendance or with absent status
+          total: totalStudents, // Use total students, not just logged
           attendancePercent,
         };
       };
