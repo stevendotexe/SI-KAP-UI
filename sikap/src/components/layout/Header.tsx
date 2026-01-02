@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import { useState, useEffect } from "react";
 
 export type HeaderProps = {
@@ -9,7 +9,6 @@ export type HeaderProps = {
 };
 
 export default function Header({ title, onMenuClick }: HeaderProps) {
-  const [notifications] = useState(3); // Example notification count
   const [currentDate, setCurrentDate] = useState("");
 
   useEffect(() => {
@@ -54,19 +53,6 @@ export default function Header({ title, onMenuClick }: HeaderProps) {
         <div className="text-sm text-gray-600 font-medium">
           {currentDate}
         </div>
-
-        {/* Notifications */}
-        <button
-          className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors"
-          aria-label="Notifications"
-        >
-          <Bell size={20} className="text-gray-600" />
-          {notifications > 0 && (
-            <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-              {notifications > 9 ? "9+" : notifications}
-            </span>
-          )}
-        </button>
       </div>
     </header>
   );

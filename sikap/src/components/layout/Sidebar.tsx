@@ -235,21 +235,6 @@ export default function Sidebar({
         {/* Dropdown Menu */}
         {userMenuOpen && (
           <div className="mt-1 rounded-lg border border-gray-100 bg-white py-1 shadow-lg">
-            <Link
-              href="/profile"
-              className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
-            >
-              <User size={16} />
-              <span>Profil Saya</span>
-            </Link>
-            <Link
-              href="/settings"
-              className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
-            >
-              <Settings size={16} />
-              <span>Pengaturan</span>
-            </Link>
-            <hr className="my-1 border-gray-100" />
             <button
               onClick={async () => {
                 await authClient.signOut({

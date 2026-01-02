@@ -57,17 +57,17 @@ export default function MentorAktivitasPage() {
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [eventToDelete, setEventToDelete] = useState<CalendarEvent | null>(null);
 
+    // Month and Year filter state
+    const now = new Date();
+    const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
+    const [selectedYear, setSelectedYear] = useState(now.getFullYear());
+
     const utils = api.useUtils();
 
-    // Get current month/year for default query
-    const now = new Date();
-    const [month] = useState(now.getMonth() + 1);
-    const [year] = useState(now.getFullYear());
-
-    // Fetch from calendar events API
-    const { data, isLoading, isError, refetch } = api.calendarEvents.list.useQuery({
-        month,
-        year,
+    // Fetch from calendar events API - mentor uses listForAdmin which now supports both roles
+    const { data, isLoading, isError, refetch } = api.calendarEvents.listForAdmin.useQuery({
+        month: selectedMonth,
+        year: selectedYear,
         type: filterType !== "all" ? (filterType as any) : undefined,
         search: search || undefined,
     });
@@ -76,7 +76,7 @@ export default function MentorAktivitasPage() {
 
     const deleteMutation = api.calendarEvents.delete.useMutation({
         onSuccess: () => {
-            void utils.calendarEvents.list.invalidate();
+            void utils.calendarEvents.listForAdmin.invalidate();
             setDeleteConfirmOpen(false);
             setEventToDelete(null);
             toast.success("Aktivitas berhasil dihapus");
@@ -112,6 +112,23 @@ export default function MentorAktivitasPage() {
         }
     }
 
+    const monthNames = [
+        { value: 1, label: "Januari" },
+        { value: 2, label: "Februari" },
+        { value: 3, label: "Maret" },
+        { value: 4, label: "April" },
+        { value: 5, label: "Mei" },
+        { value: 6, label: "Juni" },
+        { value: 7, label: "Juli" },
+        { value: 8, label: "Agustus" },
+        { value: 9, label: "September" },
+        { value: 10, label: "Oktober" },
+        { value: 11, label: "November" },
+        { value: 12, label: "Desember" },
+    ];
+
+    const years = Array.from({ length: 5 }, (_, i) => now.getFullYear() - 2 + i);
+
     return (
         <main className="bg-muted text-foreground min-h-screen">
             <div className="mx-auto max-w-[1200px] px-6 py-8">
@@ -144,20 +161,42 @@ export default function MentorAktivitasPage() {
                     </div>
                 </div>
 
-                {/* Filter */}
-                <div className="mb-6">
+                {/* Filters */}
+                <div className="mb-6 flex flex-wrap gap-3">
+                    {/* Month Filter */}
+                    <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(Number(v))}>
+                        <SelectTrigger className="w-[140px] bg-background">
+                            <SelectValue placeholder="Bulan" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {monthNames.map((m) => (
+                                <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    {/* Year Filter */}
+                    <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
+                        <SelectTrigger className="w-[100px] bg-background">
+                            <SelectValue placeholder="Tahun" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {years.map((y) => (
+                                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    {/* Type Filter */}
                     <Select value={filterType} onValueChange={setFilterType}>
-                        <SelectTrigger className="w-[180px] bg-background">
+                        <SelectTrigger className="w-[140px] bg-background">
                             <SelectValue placeholder="Semua Tipe" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">Semua Tipe</SelectItem>
                             <SelectItem value="in_class">In-Class</SelectItem>
                             <SelectItem value="field_trip">Field Trip</SelectItem>
-                            <SelectItem value="meet_greet">Meet & Greet</SelectItem>
-                            <SelectItem value="meeting">Meeting</SelectItem>
-                            <SelectItem value="deadline">Deadline</SelectItem>
-                            <SelectItem value="milestone">Milestone</SelectItem>
+                            <SelectItem value="meet_greet">Meet &amp; Greet</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
@@ -300,7 +339,7 @@ export default function MentorAktivitasPage() {
                     }}
                     editingEvent={editingEvent}
                     onSuccess={() => {
-                        void utils.calendarEvents.list.invalidate();
+                        void utils.calendarEvents.listForAdmin.invalidate();
                         setDialogOpen(false);
                     }}
                 />

@@ -11,6 +11,7 @@ import DashboardLineChart from "@/components/dashboard/DashboardLineChart";
 import DashboardPieChart from "@/components/dashboard/DashboardPieChart";
 import AttendanceTable from "@/components/dashboard/AttendanceTable";
 import StatusButtons from "@/components/dashboard/StatusButtons";
+import AttendanceSummaryCard from "@/components/dashboard/AttendanceSummaryCard";
 
 type DashboardCounts = RouterOutputs["dashboards"]["getDashboardCounts"];
 type SeriesPoint = { period: string; count: number };
@@ -138,6 +139,11 @@ export default async function AdminDashboardPage() {
             Gagal memuat data dashboard. Menampilkan data kosong.
           </div>
         )}
+
+        {/* Attendance Summary Card */}
+        <div className="mb-6">
+          <AttendanceSummaryCard detailHref="/admin/kehadiran" role="admin" />
+        </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           {/* Baris 1: dua kartu metrik */}

@@ -452,9 +452,15 @@ export const calendarEventsRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
-      // Only admins can access this endpoint
-      if (ctx.session.user.role !== "admin") {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+      // Admin and Mentor can access this endpoint
+      let mentorCompanyId: number | null = null;
+
+      if (ctx.session.user.role === "mentor") {
+        const mp = await ctx.db.query.mentorProfile.findFirst({
+          where: eq(mentorProfile.userId, ctx.session.user.id),
+        });
+        if (!mp) throw new TRPCError({ code: "FORBIDDEN", message: "Mentor profile not found" });
+        mentorCompanyId = mp.companyId;
       }
 
       const range = monthRange({ month: input.month, year: input.year });
@@ -489,6 +495,10 @@ export const calendarEventsRouter = createTRPCRouter({
             input.type ? eq(calendarEvent.type, input.type) : undefined,
             input.search
               ? sql`(lower(${calendarEvent.title}) like ${"%" + input.search.toLowerCase() + "%"} or lower(${calendarEvent.organizerName}) like ${"%" + input.search.toLowerCase() + "%"})`
+              : undefined,
+            // For mentors, filter by company OR show events without placement
+            mentorCompanyId
+              ? sql`(${calendarEvent.placementId} IS NULL OR ${placement.companyId} = ${mentorCompanyId})`
               : undefined,
           ),
         )
