@@ -170,8 +170,8 @@ export const reportsRouter = createTRPCRouter({
       const companyId = adminProfile?.companyId;
 
       const range = {
-        from: input.from ?? new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-        to: input.to ?? new Date()
+        from: input.from ?? null,
+        to: input.to ?? null
       };
 
       // Base conditions
@@ -203,20 +203,26 @@ export const reportsRouter = createTRPCRouter({
       // Now aggregate journals for each student
       const summaries = await Promise.all(
         students.map(async (s) => {
+          // Build report conditions - only add date filter if dates provided
+          const reportConditions = [
+            eq(report.placementId, s.placementId),
+            eq(report.type, "daily"),
+          ];
+
+          if (range.from) {
+            reportConditions.push(gte(report.activityDate, range.from.toISOString().slice(0, 10)));
+          }
+          if (range.to) {
+            reportConditions.push(lte(report.activityDate, range.to.toISOString().slice(0, 10)));
+          }
+
           const reports = await ctx.db
             .select({
               id: report.id,
               status: report.reviewStatus,
             })
             .from(report)
-            .where(
-              and(
-                eq(report.placementId, s.placementId),
-                eq(report.type, "daily"),
-                gte(report.activityDate, range.from.toISOString().slice(0, 10)),
-                lte(report.activityDate, range.to.toISOString().slice(0, 10)),
-              )
-            );
+            .where(and(...reportConditions));
 
           const pending = reports.filter(r => r.status === "pending").length;
           const approved = reports.filter(r => r.status === "approved").length;
@@ -923,7 +929,8 @@ export const reportsRouter = createTRPCRouter({
       });
       if (!mp) throw new TRPCError({ code: "FORBIDDEN" });
 
-      const range = coerceRange({ from: input.from, to: input.to });
+      // Only use date range if explicitly provided
+      const hasDateFilter = input.from || input.to;
 
       // Get all placements for this mentor with user creation date
       const placements = await ctx.db
@@ -949,21 +956,29 @@ export const reportsRouter = createTRPCRouter({
       // For each placement, count journals
       const summaries = await Promise.all(
         placements.map(async (p) => {
+          // Build conditions - only add date filter if dates provided
+          const reportConditions = [
+            eq(report.placementId, p.id),
+            eq(report.type, "daily"),
+          ];
+
+          if (hasDateFilter && input.from) {
+            reportConditions.push(gte(report.activityDate, input.from.toISOString().slice(0, 10)));
+          }
+          if (hasDateFilter && input.to) {
+            reportConditions.push(lte(report.activityDate, input.to.toISOString().slice(0, 10)));
+          }
+          if (input.status) {
+            reportConditions.push(eq(report.reviewStatus, input.status));
+          }
+
           const journalCounts = await ctx.db
             .select({
               reviewStatus: report.reviewStatus,
               count: sql<number>`count(*)::int`,
             })
             .from(report)
-            .where(
-              and(
-                eq(report.placementId, p.id),
-                eq(report.type, "daily"),
-                gte(report.activityDate, range.from.toISOString().slice(0, 10)),
-                lte(report.activityDate, range.to.toISOString().slice(0, 10)),
-                input.status ? eq(report.reviewStatus, input.status) : undefined,
-              ),
-            )
+            .where(and(...reportConditions))
             .groupBy(report.reviewStatus);
 
           const pending = journalCounts.find((c) => c.reviewStatus === "pending")?.count ?? 0;

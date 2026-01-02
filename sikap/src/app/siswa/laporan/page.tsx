@@ -46,8 +46,8 @@ export default function LaporanSiswaPage() {
       year: selectedYear,
     });
 
-  // Fetch ALL journals for printing
-  const { data: allJournalsData } = api.reports.listAllJournals.useQuery();
+  // Fetch ALL journals for printing and stats
+  const { data: allJournalsData, isLoading: isLoadingAllJournals } = api.reports.listAllJournals.useQuery();
 
   // Delete mutation
   const { mutate: deleteJournal } = api.reports.deleteJournal.useMutation({
@@ -62,12 +62,17 @@ export default function LaporanSiswaPage() {
   });
 
   const entries = data?.items ?? [];
-  const stats = data?.stats ?? {
-    total: 0,
-    pending: 0,
-    approved: 0,
-    rejected: 0,
-  };
+
+  // Calculate all-time stats from ALL journals (not just current month)
+  const allTimeStats = useMemo(() => {
+    const allItems = allJournalsData?.items ?? [];
+    return {
+      total: allItems.length,
+      pending: allItems.filter((j) => j.reviewStatus === "pending").length,
+      approved: allItems.filter((j) => j.reviewStatus === "approved").length,
+      rejected: allItems.filter((j) => j.reviewStatus === "rejected").length,
+    };
+  }, [allJournalsData]);
 
   // Apply filter and sorting
   const filteredEntries = useMemo(() => {
@@ -226,7 +231,7 @@ export default function LaporanSiswaPage() {
                 </div>
                 <div>
                   <div className="text-xl sm:text-2xl font-semibold">
-                    {isLoading ? "-" : stats.total}
+                    {isLoadingAllJournals ? "-" : allTimeStats.total}
                   </div>
                   <div className="text-muted-foreground text-xs sm:text-sm">
                     Total Laporan
@@ -241,7 +246,7 @@ export default function LaporanSiswaPage() {
                 </div>
                 <div>
                   <div className="text-xl sm:text-2xl font-semibold">
-                    {isLoading ? "-" : stats.pending}
+                    {isLoadingAllJournals ? "-" : allTimeStats.pending}
                   </div>
                   <div className="text-muted-foreground text-xs sm:text-sm">Menunggu</div>
                 </div>
@@ -254,7 +259,7 @@ export default function LaporanSiswaPage() {
                 </div>
                 <div>
                   <div className="text-xl sm:text-2xl font-semibold">
-                    {isLoading ? "-" : stats.approved}
+                    {isLoadingAllJournals ? "-" : allTimeStats.approved}
                   </div>
                   <div className="text-muted-foreground text-xs sm:text-sm">Disetujui</div>
                 </div>
@@ -267,7 +272,7 @@ export default function LaporanSiswaPage() {
                 </div>
                 <div>
                   <div className="text-xl sm:text-2xl font-semibold">
-                    {isLoading ? "-" : stats.rejected}
+                    {isLoadingAllJournals ? "-" : allTimeStats.rejected}
                   </div>
                   <div className="text-muted-foreground text-xs sm:text-sm">Ditolak</div>
                 </div>

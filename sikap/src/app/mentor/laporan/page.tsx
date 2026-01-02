@@ -34,25 +34,13 @@ export default function MentorLaporanPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Memoize date range to prevent infinite re-renders
-  const dateRange = useMemo(() => {
-    const now = new Date();
-    const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    return { from: firstOfMonth, to: now };
-  }, []); // Empty deps = computed once on mount
+  // Fetch mentee journal summaries (ALL dates, no filtering)
+  const { data: summariesData, isLoading: isLoadingSummaries } = api.reports.listMenteeJournals.useQuery({});
 
-  // Fetch mentee journal summaries
-  const { data: summariesData, isLoading: isLoadingSummaries } = api.reports.listMenteeJournals.useQuery({
-    from: dateRange.from,
-    to: dateRange.to,
-  });
-
-  // Fetch details for selected student
+  // Fetch details for selected student (ALL dates)
   const { data: detailsData, isLoading: isLoadingDetails } = api.reports.getMenteeJournalDetails.useQuery(
     {
       studentId: selectedStudentId!,
-      from: dateRange.from,
-      to: dateRange.to,
     },
     { enabled: selectedStudentId !== null }
   );

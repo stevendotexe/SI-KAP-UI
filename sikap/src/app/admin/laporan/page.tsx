@@ -34,30 +34,15 @@ export default function AdminLaporanPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Memoize date range (default to current month for initial view, can be expanded if needed)
-  const dateRange = useMemo(() => {
-    const now = new Date();
-    const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    // For admin, maybe we want to see ALL reports by default? 
-    // Or stick to month to avoid overload. Let's use start of year for admin to be broader?
-    // User said "selayaknya mentor", so sticking to month is safe, but maybe admin wants more.
-    // Let's stick to month for consistency and performance.
-    return { from: firstOfMonth, to: now };
-  }, []);
-
-  // Fetch company journals summaries
+  // Fetch company journals summaries (ALL dates, no filtering)
   const { data: summariesData, isLoading: isLoadingSummaries } = api.reports.listCompanyJournals.useQuery({
-    from: dateRange.from,
-    to: dateRange.to,
-    search: debouncedSearch, // Passing search to server for filtering students if needed
+    search: debouncedSearch,
   });
 
-  // Fetch details for selected student
+  // Fetch details for selected student (ALL dates)
   const { data: detailsData, isLoading: isLoadingDetails } = api.reports.getAdminJournalDetails.useQuery(
     {
       studentId: selectedStudentId!,
-      from: dateRange.from,
-      to: dateRange.to,
     },
     { enabled: selectedStudentId !== null }
   );

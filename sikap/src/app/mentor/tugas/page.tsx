@@ -12,6 +12,7 @@ import {
 import { api } from "@/trpc/react";
 import AddTaskDialog, { type TaskItem } from "@/components/tasks/AddTaskDialog";
 import TaskCard from "@/components/tasks/TaskCard";
+import { toast } from "sonner";
 
 export default function Page() {
   return (
@@ -26,6 +27,9 @@ export default function Page() {
 function TaskClient() {
   const [q, setQ] = React.useState("");
   const [date, setDate] = React.useState("Semua Tanggal");
+  const [deletingId, setDeletingId] = React.useState<string | null>(null);
+
+  const utils = api.useUtils();
 
   const range = React.useMemo(() => {
     if (date === "Semua Tanggal") return {};
@@ -50,6 +54,19 @@ function TaskClient() {
     limit: 100,
   });
 
+  // Delete mutation
+  const deleteMutation = api.tasks.delete.useMutation({
+    onSuccess: () => {
+      toast.success("Tugas berhasil dihapus");
+      setDeletingId(null);
+      void utils.tasks.list.invalidate();
+    },
+    onError: (error) => {
+      toast.error(error.message || "Gagal menghapus tugas");
+      setDeletingId(null);
+    },
+  });
+
   const tasks: TaskItem[] =
     tasksData?.items.map((t) => ({
       id: t.id.toString(),
@@ -71,6 +88,13 @@ function TaskClient() {
 
   function onAdd() {
     void refetch();
+  }
+
+  function handleDelete(id: string) {
+    if (confirm("Apakah Anda yakin ingin menghapus tugas ini?")) {
+      setDeletingId(id);
+      deleteMutation.mutate({ taskId: parseInt(id) });
+    }
   }
 
   return (
@@ -128,9 +152,17 @@ function TaskClient() {
         ) : filtered.length === 0 ? (
           <div className="text-muted-foreground text-sm">Tidak ada tugas.</div>
         ) : (
-          filtered.map((t) => <TaskCard key={t.id} t={t} />)
+          filtered.map((t) => (
+            <TaskCard
+              key={t.id}
+              t={t}
+              onDelete={handleDelete}
+              isDeleting={deletingId === t.id}
+            />
+          ))
         )}
       </div>
     </div>
   );
 }
+
