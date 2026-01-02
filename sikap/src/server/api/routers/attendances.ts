@@ -123,20 +123,44 @@ export const attendancesRouter = createTRPCRouter({
       const summaryDate = (input.summaryDate ?? new Date())
         .toISOString()
         .slice(0, 10);
+
+      // Get total active students (with optional mentor/company filter)
+      const [totalStudentsRow] = await ctx.db
+        .select({ total: sql<number>`count(*)` })
+        .from(placement)
+        .where(
+          and(
+            eq(placement.status, "active"),
+            effectiveCompanyId
+              ? eq(placement.companyId, effectiveCompanyId)
+              : undefined,
+            mentorFilterId ? eq(placement.mentorId, mentorFilterId) : undefined,
+          ),
+        );
+      const totalStudents = Number(totalStudentsRow?.total ?? 0);
+
+      // Get attendance counts for the summary date using LEFT JOIN from placements
+      // This ensures we count from all active students, not just those with logs
       const [summaryRow] = await ctx.db
         .select({
           present: sql<number>`sum(case when ${attendanceLog.status} in ('present','late') then 1 else 0 end)`,
           absent: sql<number>`sum(case when ${attendanceLog.status} in ('absent','excused') then 1 else 0 end)`,
-          total: sql<number>`count(*)`,
+          logged: sql<number>`count(${attendanceLog.id})`,
         })
-        .from(attendanceLog)
-        .innerJoin(placement, eq(attendanceLog.placementId, placement.id))
+        .from(placement)
+        .leftJoin(
+          attendanceLog,
+          and(
+            eq(attendanceLog.placementId, placement.id),
+            eq(attendanceLog.date, summaryDate),
+          ),
+        )
         .where(
           and(
+            eq(placement.status, "active"),
             effectiveCompanyId
               ? eq(placement.companyId, effectiveCompanyId)
               : undefined,
-            eq(attendanceLog.date, summaryDate),
             mentorFilterId ? eq(placement.mentorId, mentorFilterId) : undefined,
           ),
         );
@@ -156,29 +180,21 @@ export const attendancesRouter = createTRPCRouter({
         };
       };
 
+      const presentCount = Number(summaryRow?.present ?? 0);
+      const absentLogged = Number(summaryRow?.absent ?? 0);
+      // Students without any log are considered absent
+      const loggedCount = Number(summaryRow?.logged ?? 0);
+      const absentCount = totalStudents - presentCount;
+
       return {
-        summary: summaryRow
-          ? (() => {
-            const present = Number(summaryRow.present ?? 0);
-            const absent = Number(summaryRow.absent ?? 0);
-            const total = Number(summaryRow.total ?? 0);
-            const attendancePercent =
-              total === 0 ? 0 : Math.round((present / total) * 100);
-            return {
-              date: summaryDate,
-              presentCount: present,
-              absentCount: absent,
-              total,
-              attendancePercent,
-            };
-          })()
-          : {
-            date: summaryDate,
-            presentCount: 0,
-            absentCount: 0,
-            total: 0,
-            attendancePercent: 0,
-          },
+        summary: {
+          date: summaryDate,
+          presentCount,
+          absentCount,
+          total: totalStudents,
+          attendancePercent:
+            totalStudents === 0 ? 0 : Math.round((presentCount / totalStudents) * 100),
+        },
         items: rows.map(formatRow),
         pagination: {
           total: Number(totalDays ?? 0),
